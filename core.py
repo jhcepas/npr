@@ -1,11 +1,14 @@
 import os
+import shutil
 import hashlib
 import time
 from string import strip
 import logging
+import numpy
 from collections import deque
 import re
 from ete2a1 import PhyloTree, SeqGroup
+
 
 # Aux functions
 get_md5 = lambda x: hashlib.md5(x).hexdigest()
@@ -18,9 +21,9 @@ PHYML_BIN= "phyml"
 RAXML_BIN = "raxml728"
 MUSCLE_BIN = "muscle"
 BASE_DIR = os.path.abspath("./prueba/")
-RETRY_WHEN_ERRORS = False
+RETRY_WHEN_ERRORS = True
 
-EXECUTE = False
+EXECUTE = True
 def set_logindent(x):
     global __LOGINDENT__
     __LOGINDENT__ = x
@@ -57,8 +60,10 @@ class Process(object):
         # How to run the app
         self.bin = bin
         self.args = args
-        # generates an unique job identifier based on the params of the app.
-        self.jobid = get_md5(','.join(sorted([get_md5(str(pair)) for pair in self.args.iteritems()])))
+        # generates an unique job identifier based on the params of
+        # the app.
+        self.jobid = get_md5(','.join(sorted([get_md5(str(pair)) for pair in 
+                                              self.args.iteritems()])))
         self.ifdone_cmd = ""
         self.iffail_cmd = ""
 
@@ -69,14 +74,17 @@ class Process(object):
         self.status_file = os.path.join(self.jobdir, "__status__")
         self.time_file = os.path.join(self.jobdir, "__time__")
         self.cmd_file = os.path.join(self.jobdir, "__cmd__")
-
+        self.stdout_file = os.path.join(self.jobdir, "__stdout__")
+        self.stderr_file = os.path.join(self.jobdir, "__stderr__")
+        
     def dump_script(self):
         launch_cmd = ' '.join([self.bin] + ["%s %s" %(k,v) for k,v in self.args.iteritems() if v is not None])
         lines = [
           "#!/bin/sh",
           "(echo R > %s && date > %s) &&" %(self.status_file, self.time_file),
           "(cd %s && %s && (echo D > %s; %s) || (echo E > %s; %s));" %\
-              (self.jobdir, launch_cmd,  self.status_file, self.ifdone_cmd, self.status_file, self.iffail_cmd), 
+              (self.jobdir, launch_cmd,  self.status_file, self.ifdone_cmd, 
+               self.status_file, self.iffail_cmd), 
           "date >> %s; " %(self.time_file),
           ]
         script = '\n'.join(lines)
@@ -91,24 +99,44 @@ class Process(object):
         else:
             return open(self.status_file).read(1)
    
-    def retry(self):
-        open(self.status_file, "w").write("W")
+    def clean(self):
+        shutil.rmtree(self.jobdir)
         
 class Task(object):
     def __repr__(self):
         return "Task (%s-%s-%s)" %(self.ttype, self.tname, self.taskid[:8])
 
     def __init__(self, cladeid, task_type, task_name):
+        # Cladeid is used to identify the tree node associated with
+        # the task. It is calculated as a hash string based on the
+        # list of sequence IDs grouped by the node.
         self.cladeid = cladeid
+
         # task type: "alg|tree|acleaner|mchooser|bootstrap"
         self.ttype = task_type 
+
+        # Used only to name directories and identify task in log
+        # messages
         self.tname = task_name
-        # To be filled by the subtypes
-        self.jobs = []
-        self.taskdir = None
-        self.taskid = None
-        self.jobs_file = None
-        self.status_file = None
+        
+        # The following attributes are expected to be filled by the
+        # different subclasses
+
+        # List of associated jobs necessary to complete the task
+        self.jobs = [] 
+
+        # Working directory for the task
+        self.taskdir = None 
+
+        # Unique id based on the parameters set for each task
+        self.taskid = None 
+
+        # Path to the file with job commands
+        self.jobs_file = None 
+
+        # Path to the file containing task status: (D)one, (R)unning
+        # or (W)aiting
+        self.status_file = None 
         self.status = "W"
 
     def get_jobs_status(self):
@@ -122,15 +150,19 @@ class Task(object):
         JOBS = open(self.jobs_file, "w")
         for job in self.jobs:
             job.dump_script()
-            print >>JOBS, "sh %s" %job.cmd_file
+            
+            print >>JOBS, "sh %s >%s 2>%s" %\
+                (job.cmd_file, job.stdout_file, job.stderr_file)
         JOBS.close()
         dec_logindent(2)
 
     def load_task_info(self):
         # Creates a task id based on its jobs
-        unique_id = get_md5(','.join(sorted([j.jobid for j in self.jobs])))
-        self.taskid = unique_id
-        self.taskdir = os.path.join(BASE_DIR, self.cladeid, self.tname+"_"+self.taskid)
+        if not self.taskid: 
+            unique_id = get_md5(','.join(sorted([j.jobid for j in self.jobs])))
+            self.taskid = unique_id
+        self.taskdir = os.path.join(BASE_DIR, self.cladeid, 
+                                    self.tname+"_"+self.taskid)
         if not os.path.exists(self.taskdir):
             os.makedirs(self.taskdir)
 
@@ -144,7 +176,8 @@ class Task(object):
     def retry(self):
         self.status = "W"
         for job in self.jobs:
-            job.retry()
+            if job.status() == "E":
+                job.clean()
 
     def load_jobs(self):
         ''' Customizable function. It must create all job objects and add
@@ -156,34 +189,53 @@ class Task(object):
         pointing to the resulting file '''
 
 class MsfTask(Task):
-    def __init__(self, seed_file, format="fasta"):
+    def __init__(self, cladeid, seed_file, format="fasta"):
+        # Initialize task
+        Task.__init__(self, cladeid, "msf", "msf-task")
+
+        # Set basic information 
         self.seed_file = seed_file
         self.seed_file_format = format
         self.msf = SeqGroup(self.seed_file, format=self.seed_file_format)
-        cladeid = get_cladeid(self.msf.id2name.values())
         self.nseqs = len(self.msf)
-        Task.__init__(self, cladeid, "msf", "initial_msf")
-        # Sets task information, such as taskdir and taskid
+        msf_id = get_cladeid(self.msf.id2name.values())
+
+        # Cladeid is created ignoring outgroup seqs. In contrast,
+        # msf_id is calculated using all IDs present in the MSF. If no
+        # cladeid is supplied, we can assume that MSF represents the
+        # first iteration, so no outgroups must be ignored. Therefore,
+        # cladeid=msfid
+        if not cladeid: 
+            self.cladeid = msf_id
+        else:
+            self.cladeid = cladeid
+        
+        # taskid does not depend on jobs, so I set it manually
+        self.taskid = msf_id
+
+        # Sets task information, such as taskdir. taskid will kept as
+        # it was set manually
         self.load_task_info()
+
         # Sets the path of output file
         self.multiseq_file = os.path.join(self.taskdir, "msf.fasta")
 
-
     def finish(self):
+        # Dump msf file to the correct path
         self.msf.write(outfile=self.multiseq_file)
         
     def check(self):
         if os.path.exists(self.multiseq_file):
             return True
         return False
-
        
 class MuscleAlgTask(Task):
     def __init__(self, cladeid, multiseq_file):
+        # Initialize task
         Task.__init__(self, cladeid, "alg", "muscle_alg")
-        self.alg_fasta_file = None
-        self.alg_phylip_file = None
-        # set app arguments and options
+
+        # Arguments and options used to executed the associated muscle
+        # jobs. This will identify different Tasks of the same type
         self.multiseq_file = multiseq_file
         self.muscle_args = {
             '-in': None,
@@ -191,22 +243,29 @@ class MuscleAlgTask(Task):
             '-maxhours': 24,
             }
 
-        # Prepare needed jobs
+        # Prepare required jobs
         self.load_jobs()
-        # Sets task information, such as taskdir and taskid
+
+        # Set task information, such as task working dir and taskid
         self.load_task_info()
-        # Sets the working dir for all jobs
+
+        # Set the working dir for all jobs
         self.set_jobs_wd(self.taskdir)
-        # set output file 
+
+        # Set Task specific attributes
         main_job = self.jobs[0]
         self.alg_fasta_file = os.path.join(main_job.jobdir, "alg.fasta")        
         self.alg_phylip_file = os.path.join(main_job.jobdir, "alg.iphylip")        
 
     def finish(self):
+        # Once executed, alignment is converted into relaxed
+        # interleaved phylip format. Both files, fasta and phylip,
+        # remain accessible.
         alg = SeqGroup(self.alg_fasta_file)
         alg.write(outfile=self.alg_phylip_file, format="iphylip_relaxed")
 
     def load_jobs(self):
+        # Only one Muscle job is necessary to run this task
         muscle_args = self.muscle_args.copy()
         muscle_args["-in"] = self.multiseq_file
         muscle_args["-out"] = "alg.fasta"
@@ -221,7 +280,119 @@ class MuscleAlgTask(Task):
 
 class TrimalTask(Task):
     pass
-      
+
+class MergeTreeTask(Task):
+    def __init__(self, cladeid, task_tree, main_tree,
+                 rooting_dict=None):
+        # Initialize task
+        Task.__init__(self, cladeid, "mergetree", "tree_merger")
+        print "task tree", task_tree
+        print "main_tree", main_tree
+        # Process current main tree and the new generated tree
+        # (task_tree) to find out the outgroups used in task_tree. The
+        # trick lies on the fact that cladeid is always calculated
+        # ignoring the IDs of outgroups seqs.
+        if main_tree:
+            for n in main_tree.traverse():
+                if get_cladeid(n.get_leaf_names()) == cladeid:
+                    target_node = n
+                    break
+            #target_node = main_tree.search_nodes(cladeid=cladeid)[0]
+            
+            core_seqs = set(target_node.get_leaf_names())
+            outgroup_seqs = core_seqs - set(task_tree.get_leaf_names())
+            print outgroup_seqs
+            raw_input()
+        else:
+            outgroup_seqs = None
+
+        t = task_tree
+        print "pruned task_tree", t
+        # Root task_tree. If outgroup_seqs are available, uses manual
+        # rooting. Otherwise, it means that task_tree is the result of
+        # the first iteration, so it will try automatic rooting based
+        # on dictionary or midpoint. 
+        if outgroup_seqs: 
+            log.info("Rooting new tree using %d custom seqs" %
+                     len(outgroup_seqs))
+            outgroup = t.set_outgroup(t.get_common_ancestor(outgroup_seqs))
+            # If outcrop_seqs are split by current root node, outgroup
+            # cannot be found. Let's find it from a different
+            # perspective using non-outgroup seqs.
+            if outgroup is t: 
+                outgroup = t.set_outgroup(t.get_common_ancestor(core_seqs))
+                t = outgroup
+            else:
+                t = t.get_common_ancestor(core_seqs)
+            # Let's forget about outgroups, we want only the
+            # informative topology
+            t.detach() 
+        elif rooting_dict:
+            log.info("Rooting new tree using a rooting dictionary")
+            t.set_outgroup(t.get_farthest_oldest_node(rooting_dict))
+        else:
+            log.info("Rooting new tree using midpoint outgroup")
+            t.set_outgroup(t.get_midpoint_outgroup())
+
+        # Extract the two new partitions (potentially representing two
+        # new iterations in the pipeline). Note that outgroup node was
+        # detached previously.
+        a = t.children[0]
+        b = t.children[1]
+        
+        # Sequences grouped by each of the new partitions
+        seqs_a = a.get_leaf_names()
+        seqs_b = b.get_leaf_names()
+
+        # To detect the best outgroups of each of the new partitions
+        # (a and b), I calculate the branch length distances from them
+        # (a and b) to all leaf nodes in its corresponding sister
+        # node.
+        a2b_dists = []
+        b2a_dists = []
+        for b_leaf in b.iter_leaves():
+            dist = a.get_distance(b_leaf)
+            a2b_dists.append([dist, b_leaf.name])
+        for a_leaf in a.iter_leaves():
+            dist = b.get_distance(a_leaf)
+            b2a_dists.append([dist, a_leaf.name])
+
+        # Then we can sort outgroups prioritizing sequences whose
+        # distances are close to the mean (avoiding the closest and
+        # farthest sequences).
+        mean_a2b_dist = numpy.mean([d[0] for d in  a2b_dists])
+        mean_b2a_dist = numpy.mean([d[0] for d in  b2a_dists])
+        rank_outs_a = sorted(a2b_dists, lambda x,y: cmp(abs(x[0] - mean_a2b_dist),
+                                                        abs(y[0] - mean_a2b_dist),
+                                                        ))
+        rank_outs_b = sorted(b2a_dists, lambda x,y: cmp(abs(x[0] - mean_b2a_dist),
+                                                        abs(y[0] - mean_b2a_dist),
+                                                        ))
+        print rank_outs_a
+        print rank_outs_b
+        outs_a = [e[1] for e in rank_outs_a]
+        outs_b = [e[1] for e in rank_outs_b]
+
+        # Annotate current tree
+        for n in t.traverse():
+            n.add_features(cladeid=get_cladeid(n.get_leaf_names()))
+
+        # Updates main tree with the results extracted from task_tree
+        if main_tree is None:
+            main_tree = t
+        else:
+            log.info("Merging trees")
+            target = main_tree.search_nodes(cladeid=cladeid)[0] 
+            # Switch nodes in the main_tree so current tree topology
+            # is incorporated.
+            up = target.up
+            target.detach()
+            up.add_child(t)
+        
+        self.set_a = [a.cladeid, seqs_a, outs_a]
+        self.set_b = [b.cladeid, seqs_b, outs_b]
+        self.main_tree = main_tree
+        print "final main_tree", main_tree
 class RaxmlTreeTask(Task):
     def __init__(self, cladeid, alg_file, model):
         Task.__init__(self, cladeid, "tree", "raxml_tree")
@@ -250,7 +421,8 @@ class RaxmlTreeTask(Task):
     def finish(self):
         # first job is the raxml tree
         tree_job = self.jobs[0]
-        self.tree_file = os.path.join(tree_job.jobdir, "RAxML_bestTree."+self.cladeid)
+        self.tree_file = os.path.join(tree_job.jobdir, 
+                                      "RAxML_bestTree."+self.cladeid)
 
     def check(self):
         if os.path.exists(self.tree_file) and PhyloTree(self.tree_file):
@@ -280,7 +452,6 @@ class ModelChooserTask(Task):
                             # creating jobs
             "--quiet": "" }
 
-
         # Prepare jobs and task
         self.load_jobs()
         self.load_task_info()
@@ -307,71 +478,35 @@ class ModelChooserTask(Task):
     def finish(self):
         lks = []
         for j in self.jobs:
-            tree_file = os.path.join(j.jobdir, self.alg_basename+"_phyml_tree.txt")
-            stats_file = os.path.join(j.jobdir, self.alg_basename+"_phyml_stats.txt")
+            tree_file = os.path.join(j.jobdir, 
+                                     self.alg_basename+"_phyml_tree.txt")
+            stats_file = os.path.join(j.jobdir, 
+                                      self.alg_basename+"_phyml_stats.txt")
             tree = PhyloTree(tree_file)
-            m = re.search('Log-likelihood:\s+(-?\d+\.\d+)', \
-                              open(stats_file).read())
+            m = re.search('Log-likelihood:\s+(-?\d+\.\d+)', 
+                          open(stats_file).read())
             lk = float(m.groups()[0])
             tree.add_feature("lk", lk)
             tree.add_feature("model", j.args["--model"])
             lks.append([float(tree.lk), tree.model])
         lks.sort()
         lks.reverse()
-        self.best_model = lks[-1][1] # model with higher likelihood 
+        # choose the model with higher likelihood
+        self.best_model = lks[-1][1] 
 
     def check(self):
         if self.best_model != None:
             return True
         return False
 
-def my_pipeline(task):
-    """ This function defines the algorithm followed by the pipeline. It
-    creates new jobs and decides what programs to run and when to run
-    them. """
-    new_tasks = []
-
-    if task.ttype == "msf":
-        new_tasks.append(\
-            MuscleAlgTask(task.cladeid, task.multiseq_file))
-
-    elif task.ttype == "alg":
-        #new_tasks.append(\
-        #    TrimalTask(task.cladeid, task.alg_file))
-        new_tasks.append(\
-            ModelChooserTask(task.cladeid, task.alg_phylip_file))
-
-    elif task.ttype == "acleaner":
-        new_tasks.append(\
-            ModelChooserTask(task.cladeid, task.clean_alg_file))
-
-    elif task.ttype == "mchooser":
-        new_tasks.append(\
-            RaxmlTreeTask(task.cladeid, task.alg_file, task.best_model))
-
-    elif task.ttype == "tree":
-        t = PhyloTree(task.tree_file)
-        alg = SeqGroup(task.alg_file, "iphylip_relaxed")
-        for ch in t.children:
-            seqs = ch.get_leaf_names()
-            if len(seqs) > 3:
-                new_msf_file = os.path.join(task.taskdir, "children1.msf")
-                # Generate new fasta
-                fasta = '\n'.join([">%s\n%s" %\
-                                       (n,del_gaps(alg.get_seq(n)))\
-                                       for n in seqs])
-                open(new_msf_file, "w").write(fasta)
-                new_tasks.append(\
-                    MsfTask(new_msf_file))
-
-    return new_tasks # If empty ([]), job is considered done and
-                     # without pending tasks
-   
 def schedule(processer, schedule_time, seed_file):
     """ Main pipeline scheduler """ 
     WAITING_TIME = schedule_time
-   
-    pending_tasks = deque([MsfTask(seed_file)])
+    main_tree = None
+    # Initial task hangs from the seed msf file. Note that empty
+    # cladeid force cladeid to be generated using all seqs in file.
+    init_task = MsfTask(None, seed_file)
+    pending_tasks = deque([init_task])
     while pending_tasks:
         for task in list(pending_tasks):
             set_logindent(0)
@@ -388,6 +523,7 @@ def schedule(processer, schedule_time, seed_file):
                 task.dump_job_commands()
                 task.status = "R"
                 if EXECUTE: 
+                    log.info("Running jobs..")
                     os.system("sh %s" %task.jobs_file)
 
             if task.status == "R":
@@ -398,7 +534,7 @@ def schedule(processer, schedule_time, seed_file):
                     task.finish()
                     if task.check():
                         inc_logindent(3)
-                        new_tasks = processer(task)
+                        new_tasks, main_tree = processer(task, main_tree)
                         inc_logindent(-3)
                         pending_tasks.extend(new_tasks)
                         pending_tasks.remove(task)
@@ -416,12 +552,51 @@ def schedule(processer, schedule_time, seed_file):
                     task.retry()
             elif task.status == "D":
                 log.info("Task is DONE")
-
-
-                    
             
         time.sleep(WAITING_TIME)
         print
+
+def my_pipeline(task, main_tree):
+    """ This function defines the pipeline that will be applied. You
+    can configure rules to decide which steps follow the others and
+    make decisions about when to stop or continue the optimization.
+    """
+    new_tasks = []
+    if task.ttype == "msf":
+        new_tasks.append(MuscleAlgTask(task.cladeid,
+                                       task.multiseq_file))
+
+    elif task.ttype == "alg":
+        #new_tasks.append(\
+        #    TrimalTask(task.cladeid, task.alg_file))
+        new_tasks.append(ModelChooserTask(task.cladeid, 
+                                          task.alg_phylip_file))
+
+    elif task.ttype == "acleaner":
+        new_tasks.append(ModelChooserTask(task.cladeid,
+                                          task.clean_alg_file))
+
+    elif task.ttype == "mchooser":
+        new_tasks.append(RaxmlTreeTask(task.cladeid, 
+                                       task.alg_file, task.best_model))
+
+    elif task.ttype == "tree":
+        t = PhyloTree(task.tree_file)
+        merge = MergeTreeTask(task.cladeid, t, main_tree)
+        main_tree = merge.main_tree
+        alg = SeqGroup(task.alg_file, "iphylip_relaxed")
+        for part in [merge.set_a, merge.set_b]:
+            set_cladeid, seqs, outgroups = part
+            if len(seqs)>4 and len(outgroups)>2:
+                msf_seqs = seqs + outgroups[:3]
+                new_msf_file = os.path.join(task.taskdir, "children_%s.msf" %set_cladeid)
+                fasta = '\n'.join([">%s\n%s" %
+                                   (n,del_gaps(alg.get_seq(n)))
+                                   for n in msf_seqs])
+                open(new_msf_file, "w").write(fasta)
+                new_tasks.append(\
+                    MsfTask(set_cladeid, new_msf_file))
+    return new_tasks, main_tree
 
 if __name__ == "__main__":
     log = logging.getLogger(__name__)
