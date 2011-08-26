@@ -4,7 +4,6 @@ import logging
 from collections import deque
 
 from argparse import ArgumentParser
-from ete2a1 import PhyloTree, SeqGroup
 
 from utils import del_gaps
 from task import *
@@ -28,8 +27,6 @@ Contact: jhuerta (at) crg.es, tgabaldon (at) crg.es
 
 """ %__VERSION__
 
-
-BASE_DIR = os.path.abspath("./prueba/")
 RETRY_WHEN_ERRORS = True
 EXECUTE = False
 
@@ -178,8 +175,8 @@ if __name__ == "__main__":
     print __DESCRIPTION__
 
     # Prepares main log
-    log = logging.Logger("npr_main")
-    log.setLevel(logging.INFO)
+    log = logging.getLogger("main")
+    log.setLevel(logging.DEBUG)
     log_format = IndentFormatter("%(levelname) 6s -%(indent)s %(message)s")
     log_handler = logging.StreamHandler()
     log_handler.setFormatter(log_format)

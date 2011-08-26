@@ -6,7 +6,7 @@ from process import Process
 from ete2a1 import PhyloTree, SeqGroup
 from utils import get_cladeid, get_md5, basename
 import logging
-log = logging.getLogger("npr-main")
+log = logging.getLogger("main")
 
 # Program binary paths 
 PHYML_BIN= "phyml"
