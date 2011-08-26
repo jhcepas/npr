@@ -26,8 +26,7 @@ If you use this program for published work, please cite:
   Jaime Huerta-Cepas and Toni Gabaldon. Nested Phylogenetic
   Reconstruction. XXX-XX. 2011.
 
-Contact:
-jhuerta@crg.es & tgabaldon@crg.es
+Contact: jhuerta (at) crg.es, tgabaldon (at) crg.es
 
 """ %__VERSION__
 
