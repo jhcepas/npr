@@ -1,10 +1,10 @@
-from os import path
+import os
 from string import strip
 import hashlib
 
 # Aux functions (general)
 get_md5 = lambda x: hashlib.md5(x).hexdigest()
-basename = lambda path: path.split(path)[-1]
+basename = lambda path: os.path.split(path)[-1]
 # Aux functions (task specific)
 get_raxml_mem = lambda taxa,sites: (taxa-2) * sites * (80 * 8) * 9.3132e-10
 get_cladeid = lambda seqids: get_md5(','.join(sorted(map(strip, seqids))))
