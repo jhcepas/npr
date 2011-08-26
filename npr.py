@@ -11,7 +11,6 @@ from ete2a1 import PhyloTree, SeqGroup
 
 from argparse import ArgumentParser
 
-
 try:
     module_path = os.path.split(__file__)[0]
     __VERSION__ = open(os.path.join(module_path, "VERSION")).read().strip()
