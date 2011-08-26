@@ -11,9 +11,16 @@ from ete2a1 import PhyloTree, SeqGroup
 
 from argparse import ArgumentParser
 
+
+try:
+    module_path = os.path.split(__file__)[0]
+    __VERSION__ = open(os.path.join(module_path, "VERSION")).read().strip()
+except: 
+    __VERSION__ = "unknown"
+
 __DESCRIPTION__ = """ 
 Nested Phylogenetic Reconstruction program.  
-v0.1 (Aug, 2011).
+NPR-1.0%s (Aug, 2011).
 
 If you use this program for published work, please cite: 
 
@@ -23,7 +30,7 @@ If you use this program for published work, please cite:
 Contact:
 jhuerta@crg.es & tgabaldon@crg.es
 
-"""
+""" %__VERSION__
 
 # Aux functions
 get_md5 = lambda x: hashlib.md5(x).hexdigest()
@@ -629,7 +636,7 @@ if __name__ == "__main__":
     parser.add_argument("-s", "--seed-file", dest="init_msf_file", 
                         type=str, 
                         help=""" Initial multi sequence file""")
-  
+ 
     args = parser.parse_args()
     
     print __DESCRIPTION__
