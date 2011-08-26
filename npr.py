@@ -9,6 +9,21 @@ from collections import deque
 import re
 from ete2a1 import PhyloTree, SeqGroup
 
+from argparse import ArgumentParser
+
+__DESCRIPTION__ = """ 
+Nested Phylogenetic Reconstruction program.  
+v0.1 (Aug, 2011).
+
+If you use this program for published work, please cite: 
+
+  Jaime Huerta-Cepas and Toni Gabaldon. Nested Phylogenetic
+  Reconstruction. XXX-XX. 2011.
+
+Contact:
+jhuerta@crg.es & tgabaldon@crg.es
+
+"""
 
 # Aux functions
 get_md5 = lambda x: hashlib.md5(x).hexdigest()
@@ -286,8 +301,8 @@ class MergeTreeTask(Task):
                  rooting_dict=None):
         # Initialize task
         Task.__init__(self, cladeid, "mergetree", "tree_merger")
-        print "task tree", task_tree
-        print "main_tree", main_tree
+        log.debug("Task Tree: %s", task_tree)
+        log.debug("Main Tree: %s", main_tree)
         # Process current main tree and the new generated tree
         # (task_tree) to find out the outgroups used in task_tree. The
         # trick lies on the fact that cladeid is always calculated
@@ -300,7 +315,6 @@ class MergeTreeTask(Task):
             outgroup_seqs = None
 
         t = task_tree
-        print "pruned task_tree", t
         # Root task_tree. If outgroup_seqs are available, uses manual
         # rooting. Otherwise, it means that task_tree is the result of
         # the first iteration, so it will try automatic rooting based
@@ -327,6 +341,8 @@ class MergeTreeTask(Task):
         else:
             log.info("Rooting new tree using midpoint outgroup")
             t.set_outgroup(t.get_midpoint_outgroup())
+
+        log.debug("Pruned Task_Tree: %s", t)
 
         # Extract the two new partitions (potentially representing two
         # new iterations in the pipeline). Note that outgroup node was
@@ -389,7 +405,7 @@ class MergeTreeTask(Task):
         self.set_a = [a.cladeid, seqs_a, outs_a]
         self.set_b = [b.cladeid, seqs_b, outs_b]
         self.main_tree = main_tree
-        print "final main_tree", main_tree
+        log.debug("Final Merged Main_Tree: %s", main_tree)
 
 class RaxmlTreeTask(Task):
     def __init__(self, cladeid, alg_file, model):
@@ -597,13 +613,35 @@ def my_pipeline(task, main_tree):
     return new_tasks, main_tree
 
 if __name__ == "__main__":
-    log = logging.getLogger(__name__)
-    log.setLevel(logging.DEBUG)
-    log_handler = logging.StreamHandler()
-    log_format = IndentFormatter("%(levelname) 6s -%(indent)s %(message)s")
+    parser = ArgumentParser(description=__DESCRIPTION__)
+    # name or flags - Either a name or a list of option strings, e.g. foo or -f, --foo.
+    # action - The basic type of action to be taken when this argument is encountered at the command line. (store, store_const, store_true, store_false, append, append_const, version)
+    # nargs - The number of command-line arguments that should be consumed. (N, ? (one or default), * (all 1 or more), + (more than 1) )
+    # const - A constant value required by some action and nargs selections. 
+    # default - The value produced if the argument is absent from the command line.
+    # type - The type to which the command-line argument should be converted.
+    # choices - A container of the allowable values for the argument.
+    # required - Whether or not the command-line option may be omitted (optionals only).
+    # help - A brief description of what the argument does.
+    # metavar - A name for the argument in usage messages.
+    # dest - The name of the attribute to be added to the object returned by parse_args().
 
+    parser.add_argument("-s", "--seed-file", dest="init_msf_file", 
+                        type=str, 
+                        help=""" Initial multi sequence file""")
+  
+    args = parser.parse_args()
+    
+    print __DESCRIPTION__
+
+    # Prepares main log
+    log = logging.Logger("npr_main")
+    log.setLevel(logging.INFO)
+    log_format = IndentFormatter("%(levelname) 6s -%(indent)s %(message)s")
+    log_handler = logging.StreamHandler()
     log_handler.setFormatter(log_format)
-    log = logging.Logger("main")
     log.addHandler(log_handler)
+
+    # Example run
     schedule(my_pipeline, 1, "./Phy0007XAR_HUMAN.msf.fasta")
 
