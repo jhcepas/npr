@@ -22,8 +22,8 @@ RAXML_BIN = "raxml728"
 MUSCLE_BIN = "muscle"
 BASE_DIR = os.path.abspath("./prueba/")
 RETRY_WHEN_ERRORS = True
+EXECUTE = False
 
-EXECUTE = True
 def set_logindent(x):
     global __LOGINDENT__
     __LOGINDENT__ = x
@@ -293,16 +293,9 @@ class MergeTreeTask(Task):
         # trick lies on the fact that cladeid is always calculated
         # ignoring the IDs of outgroups seqs.
         if main_tree:
-            for n in main_tree.traverse():
-                if get_cladeid(n.get_leaf_names()) == cladeid:
-                    target_node = n
-                    break
-            #target_node = main_tree.search_nodes(cladeid=cladeid)[0]
-            
+            target_node = main_tree.search_nodes(cladeid=cladeid)[0]
             core_seqs = set(target_node.get_leaf_names())
-            outgroup_seqs = core_seqs - set(task_tree.get_leaf_names())
-            print outgroup_seqs
-            raw_input()
+            outgroup_seqs = set(task_tree.get_leaf_names()) - core_seqs
         else:
             outgroup_seqs = None
 
@@ -315,18 +308,19 @@ class MergeTreeTask(Task):
         if outgroup_seqs: 
             log.info("Rooting new tree using %d custom seqs" %
                      len(outgroup_seqs))
-            outgroup = t.set_outgroup(t.get_common_ancestor(outgroup_seqs))
+            outgroup = t.get_common_ancestor(outgroup_seqs)
             # If outcrop_seqs are split by current root node, outgroup
             # cannot be found. Let's find it from a different
             # perspective using non-outgroup seqs.
             if outgroup is t: 
-                outgroup = t.set_outgroup(t.get_common_ancestor(core_seqs))
-                t = outgroup
-            else:
-                t = t.get_common_ancestor(core_seqs)
+                outgroup = t.get_common_ancestor(core_seqs)
+
+            t.set_outgroup(outgroup)
+            t = t.get_common_ancestor(core_seqs)
             # Let's forget about outgroups, we want only the
             # informative topology
             t.detach() 
+
         elif rooting_dict:
             log.info("Rooting new tree using a rooting dictionary")
             t.set_outgroup(t.get_farthest_oldest_node(rooting_dict))
@@ -348,30 +342,33 @@ class MergeTreeTask(Task):
         # (a and b), I calculate the branch length distances from them
         # (a and b) to all leaf nodes in its corresponding sister
         # node.
-        a2b_dists = []
-        b2a_dists = []
+        to_b_dists = []
+        to_a_dists = []
         for b_leaf in b.iter_leaves():
-            dist = a.get_distance(b_leaf)
-            a2b_dists.append([dist, b_leaf.name])
+            dist = b_leaf.get_distance(a)
+            to_a_dists.append([dist, b_leaf.name])
         for a_leaf in a.iter_leaves():
-            dist = b.get_distance(a_leaf)
-            b2a_dists.append([dist, a_leaf.name])
+            dist = a_leaf.get_distance(b)
+            to_b_dists.append([dist, a_leaf.name])
 
         # Then we can sort outgroups prioritizing sequences whose
         # distances are close to the mean (avoiding the closest and
         # farthest sequences).
-        mean_a2b_dist = numpy.mean([d[0] for d in  a2b_dists])
-        mean_b2a_dist = numpy.mean([d[0] for d in  b2a_dists])
-        rank_outs_a = sorted(a2b_dists, lambda x,y: cmp(abs(x[0] - mean_a2b_dist),
-                                                        abs(y[0] - mean_a2b_dist),
+        mean_to_b_dist = numpy.mean([d[0] for d in  to_b_dists])
+        mean_to_a_dist = numpy.mean([d[0] for d in  to_a_dists])
+        rank_outs_a = sorted(to_a_dists, lambda x,y: cmp(abs(x[0] - mean_to_a_dist),
+                                                        abs(y[0] - mean_to_a_dist),
                                                         ))
-        rank_outs_b = sorted(b2a_dists, lambda x,y: cmp(abs(x[0] - mean_b2a_dist),
-                                                        abs(y[0] - mean_b2a_dist),
+
+        rank_outs_b = sorted(to_b_dists, lambda x,y: cmp(abs(x[0] - mean_to_b_dist),
+                                                        abs(y[0] - mean_to_b_dist),
                                                         ))
-        print rank_outs_a
-        print rank_outs_b
         outs_a = [e[1] for e in rank_outs_a]
         outs_b = [e[1] for e in rank_outs_b]
+        log.debug("Mean distance to node A: %s" %mean_to_a_dist)
+        log.debug("Best outgroup for A: %s" %rank_outs_a[:2])
+        log.debug("Mean distance to node B: %s" %mean_to_b_dist)
+        log.debug("Best outgroup for B: %s" %rank_outs_b[:2])
 
         # Annotate current tree
         for n in t.traverse():
@@ -393,6 +390,7 @@ class MergeTreeTask(Task):
         self.set_b = [b.cladeid, seqs_b, outs_b]
         self.main_tree = main_tree
         print "final main_tree", main_tree
+
 class RaxmlTreeTask(Task):
     def __init__(self, cladeid, alg_file, model):
         Task.__init__(self, cladeid, "tree", "raxml_tree")
@@ -435,7 +433,7 @@ class ModelChooserTask(Task):
         self.best_model = None
         self.alg_file = alg_file
         self.alg_basename = basename(self.alg_file)
-        self.models = ["JTT", "DcMut", "Blosum62", "MtRev"]
+        self.models = ["JTT", "DcMut"]#, "Blosum62", "MtRev"]
         # Arguments used to start phyml jobs. Note that models is a
         # list, so the dictionary will be used to submit several
         # phyml_jobs
