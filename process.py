@@ -2,11 +2,17 @@ import os
 import shutil
 from utils import get_md5, basename
 
-class Process(object):
+class Job(object):
     ''' A generic program launcher prepared to interact with the Task
-    class. '''
+    class.
+
+    A job is executed and monitored. Execution time,
+    standard output and error are tracked in log files. The final
+    status of the application is also logged. Possible status for
+    process status are (W)aiting, (R)unning, (E)rror and (D)one.
+    '''
     def __repr__(self):
-        return "Process (%s-%s)" %(basename(self.bin), self.jobid[:8])
+        return "Job (%s-%s)" %(basename(self.bin), self.jobid[:8])
 
     def __init__(self, bin, args):
         # Used at execution time
@@ -35,18 +41,17 @@ class Process(object):
     def dump_script(self):
         launch_cmd = ' '.join([self.bin] + ["%s %s" %(k,v) for k,v in self.args.iteritems() if v is not None])
         lines = [
-          "#!/bin/sh",
-          "(echo R > %s && date > %s) &&" %(self.status_file, self.time_file),
-          "(cd %s && %s && (echo D > %s; %s) || (echo E > %s; %s));" %\
-              (self.jobdir, launch_cmd,  self.status_file, self.ifdone_cmd, 
-               self.status_file, self.iffail_cmd), 
-          "date >> %s; " %(self.time_file),
-          ]
+            "#!/bin/sh",
+            "(echo R > %s && date > %s) &&" %(self.status_file, self.time_file),
+            "(cd %s && %s && (echo D > %s; %s) || (echo E > %s; %s));" %\
+                (self.jobdir, launch_cmd,  self.status_file, self.ifdone_cmd, 
+                 self.status_file, self.iffail_cmd), 
+            "date >> %s; " %(self.time_file),
+            ]
         script = '\n'.join(lines)
         if not os.path.exists(self.jobdir):
             os.makedirs(self.jobdir)
         open(self.cmd_file, "w").write(script)
-
  
     def status(self):
         if not os.path.exists(self.status_file):
