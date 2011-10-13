@@ -9,7 +9,7 @@ from utils import get_cladeid, get_md5, basename
 import logging
 log = logging.getLogger("main")
 
-from config import *
+from config import BASE_DIR
 
 class Task(object):
     def __repr__(self):

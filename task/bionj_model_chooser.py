@@ -20,6 +20,7 @@ class BionjModelChooserTask(Task):
         Task.__init__(self, cladeid, "mchooser", "model_chooser")
         self.best_model = None
         self.alg_file = alg_file
+        self.seqtype = "aa"
         self.alg_basename = basename(self.alg_file)
         self.models = ["JTT", "DcMut"]#, "Blosum62", "MtRev"]
         # Arguments used to start phyml jobs. Note that models is a

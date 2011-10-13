@@ -2,6 +2,10 @@ import os
 import shutil
 from utils import get_md5, basename
 
+import logging
+log = logging.getLogger("main")
+
+
 class Job(object):
     ''' A generic program launcher prepared to interact with the Task
     class.
@@ -52,6 +56,7 @@ class Job(object):
         if not os.path.exists(self.jobdir):
             os.makedirs(self.jobdir)
         open(self.cmd_file, "w").write(script)
+        log.debug(script)
  
     def status(self):
         if not os.path.exists(self.status_file):

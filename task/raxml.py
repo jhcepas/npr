@@ -13,17 +13,26 @@ from ete_dev import PhyloTree
 __all__ = ["RaxmlTreeTask"]
 
 class RaxmlTreeTask(Task):
-    def __init__(self, cladeid, alg_file, model):
+    def __init__(self, cladeid, alg_file, model, seqtype="aa"):
         Task.__init__(self, cladeid, "tree", "raxml_tree")
         # set app arguments and options
         self.alg_file = alg_file
-        seqtype = "PROT"
+        self.seqtype = seqtype
+        self.model = model
+
+        if self.seqtype.lower() == "aa":
+            model_string =  'PROTGAMMA%s' %(self.model.upper())
+        elif self.seqtype.lower() == "nt":
+            model_string =  'GTRGAMMA'
+        else:
+            raise ValueError("Unknown seqtype %s", seqtype)
+
         cpus = 2
         partitions_file = None
         self.args = {
             '-f': "d", # Normal ML algorithm
             '-T': '%d' %cpus,
-            '-m': '%sGAMMA%s' %(seqtype, model.upper()),
+            '-m': model_string,
             '-s': self.alg_file,
             '-n': self.cladeid,
             '-q': partitions_file,
@@ -42,7 +51,6 @@ class RaxmlTreeTask(Task):
         tree_job = self.jobs[0]
         self.tree_file = os.path.join(tree_job.jobdir,
                                       "RAxML_bestTree."+self.cladeid)
-
     def check(self):
         if os.path.exists(self.tree_file) and PhyloTree(self.tree_file):
             return True

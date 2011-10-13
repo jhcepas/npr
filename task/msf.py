@@ -14,11 +14,12 @@ from ete_dev import PhyloTree, SeqGroup
 __all__ = ["MsfTask"]
 
 class MsfTask(Task):
-    def __init__(self, cladeid, seed_file, format="fasta"):
+    def __init__(self, cladeid, seed_file, seqtype, format="fasta"):
         # Initialize task
         Task.__init__(self, cladeid, "msf", "msf-task")
 
         # Set basic information
+        self.seqtype = seqtype
         self.seed_file = seed_file
         self.seed_file_format = format
         self.msf = SeqGroup(self.seed_file, format=self.seed_file_format)

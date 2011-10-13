@@ -16,6 +16,7 @@ class ClustalOmegaAlgTask(Task):
 
         # Arguments and options used to executed the associated muscle
         # jobs. This will identify different Tasks of the same type
+        seld.seqtype = "aa" # only aa supported
         self.multiseq_file = multiseq_file
         self.args = {
             '-i': None,

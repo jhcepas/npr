@@ -13,12 +13,13 @@ from ete_dev import SeqGroup
 __all__ = ["TrimalTask"]
 
 class TrimalTask(Task):
-    def __init__(self, cladeid, alg_file):
+    def __init__(self, cladeid, alg_file, seqtype):
         # Initialize task
         Task.__init__(self, cladeid, "acleaner", "trimal_cleaner")
 
         # Arguments and options used to executed the associated muscle
         # jobs. This will identify different Tasks of the same type
+        self.seqtype = seqtype
         self.alg_file = alg_file
         self.args = {
             '-in': None,

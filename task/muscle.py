@@ -1,5 +1,4 @@
 import os
-import sys
 import logging
 log = logging.getLogger("main")
 
@@ -7,18 +6,20 @@ from .config import *
 from .master_task import Task
 from .master_job import Job
 
+import sys
 sys.path.insert(0, "/home/jhuerta/_Devel/ete/2.2/")
 from ete_dev import SeqGroup
 
 __all__ = ["MuscleAlgTask"]
 
 class MuscleAlgTask(Task):
-    def __init__(self, cladeid, multiseq_file):
+    def __init__(self, cladeid, multiseq_file, seqtype):
         # Initialize task
         Task.__init__(self, cladeid, "alg", "muscle_alg")
-
+        
         # Arguments and options used to executed the associated muscle
         # jobs. This will identify different Tasks of the same type
+        self.seqtype = seqtype
         self.multiseq_file = multiseq_file
         self.args = {
             '-in': None,

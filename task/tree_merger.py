@@ -40,7 +40,11 @@ class MergeTreeTask(Task):
         if outgroup_seqs:
             log.info("Rooting new tree using %d custom seqs" %
                      len(outgroup_seqs))
-            outgroup = t.get_common_ancestor(outgroup_seqs)
+            if len(outgroup_seqs) > 1:
+                outgroup = t.get_common_ancestor(outgroup_seqs)
+            else:
+                outgroup = t & list(outgroup_seqs)[0]
+
             # If outcrop_seqs are split by current root node, outgroup
             # cannot be found. Let's find it from a different
             # perspective using non-outgroup seqs.
