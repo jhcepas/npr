@@ -14,57 +14,68 @@ MAX_SEQS_TO_USE_NT = 20
 SEQS_lIMIT = 4
 CLEAN_ALG = True
 
-def pipeline(task, main_tree, aa_seed_file, nt_seed_file):
+def pipeline(task, main_tree, config):
     # new tasks is a list of Task instances that are returned to the
     # scheduler.
+
+    aa_seed_file = config["general"]["aa_seed"]
+    nt_seed_file = config["general"]["nt_seed"]
 
     new_tasks = []
     if not task:
         if aa_seed_file:
-            new_tasks.append(MsfTask(None, aa_seed_file, "aa"))
+            new_tasks.append(Msf(None, aa_seed_file, "aa"))
         elif nt_seed_file:
-            new_tasks.append(MsfTask(None, nt_seed_file, "nt"))
+            new_tasks.append(Msf(None, nt_seed_file, "nt"))
         else:
             raise Exception("I need at least one seed file")
 
     elif task.ttype == "msf":
         if task.nseqs <= MAX_SEQS_FOR_MUSCLE:
-            new_tasks.append(MuscleAlgTask(task.cladeid, task.multiseq_file, 
-                                           task.seqtype))
+            new_tasks.append(Muscle(task.cladeid, task.multiseq_file, 
+                                           task.seqtype, config["muscle"]))
         else:
-            new_tasks.append(ClustalOmegaAlgTask(task.cladeid, 
-                                                 task.multiseq_file))
+            new_tasks.append(Clustalo(task.cladeid, 
+                                                 task.multiseq_file, 
+                                                 config["clustalo"]))
 
     elif task.ttype == "alg":
         if CLEAN_ALG:
             new_tasks.append(\
-                TrimalTask(task.cladeid, task.alg_fasta_file, task.seqtype))
+                Trimal(task.cladeid, task.alg_fasta_file, task.seqtype, 
+                       config["trimal"]))
         else:
             if task.seqtype == "aa":
-                new_tasks.append(BionjModelChooserTask(task.cladeid, 
-                                                       task.alg_phylip_file))
+                new_tasks.append(BionjModelChooser(task.cladeid, 
+                                                   task.alg_phylip_file, 
+                                                   config["bionj_modelchooser"]))
             elif task.seqtype == "nt":
-                new_tasks.append(JModeltestTask(task.cladeid, 
-                                                task.alg_fasta_file))
+                new_tasks.append(JModeltest(task.cladeid, 
+                                            task.alg_fasta_file, 
+                                            config["jmodeltest"]))
                                
     elif task.ttype == "acleaner":
         if task.seqtype == "aa":
-            new_tasks.append(BionjModelChooserTask(task.cladeid,
-                                                   task.clean_alg_phylip_file))
+            new_tasks.append(BionjModelChooser(task.cladeid,
+                                               task.clean_alg_phylip_file, 
+
+                                               config["bionj_modelchooser"]))
         elif task.seqtype == "nt":
-            new_tasks.append(JModeltestTask(task.cladeid, 
-                                            task.alg_file))
+            new_tasks.append(JModeltest(task.cladeid, 
+                                        task.alg_file, 
+                                        config["jmodeltest"]))
             
     elif task.ttype == "mchooser":
         if task.seqtype == "aa":
-            new_tasks.append(RaxmlTreeTask(task.cladeid, task.alg_file, 
-                                           task.best_model, "aa"))
+            new_tasks.append(Raxml(task.cladeid, task.alg_file, 
+                                       task.best_model, "aa", 
+                                       config["raxml"]))
         else:
             raise Exception("Not implemented yet!!")
 
     elif task.ttype == "tree":
         t = PhyloTree(task.tree_file)
-        merge = MergeTreeTask(task.cladeid, t, main_tree)
+        merge = TreeMerger(task.cladeid, t, main_tree)
         main_tree = merge.main_tree
                        
         for part in [merge.set_a, merge.set_b]:
@@ -90,7 +101,7 @@ def pipeline(task, main_tree, aa_seed_file, nt_seed_file):
                                for n in msf_seqs])
             open(new_msf_file, "w").write(fasta)
             new_tasks.append(\
-                MsfTask(part_cladeid, new_msf_file, seqtype))
+                Msf(part_cladeid, new_msf_file, seqtype))
             
     return new_tasks, main_tree
 

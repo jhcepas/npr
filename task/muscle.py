@@ -2,7 +2,6 @@ import os
 import logging
 log = logging.getLogger("main")
 
-from .config import *
 from .master_task import Task
 from .master_job import Job
 
@@ -10,23 +9,21 @@ import sys
 sys.path.insert(0, "/home/jhuerta/_Devel/ete/2.2/")
 from ete_dev import SeqGroup
 
-__all__ = ["MuscleAlgTask"]
+__all__ = ["Muscle"]
 
-class MuscleAlgTask(Task):
-    def __init__(self, cladeid, multiseq_file, seqtype):
-        # Initialize task
-        Task.__init__(self, cladeid, "alg", "muscle_alg")
-        
-        # Arguments and options used to executed the associated muscle
-        # jobs. This will identify different Tasks of the same type
+class Muscle(Task):
+    def __init__(self, cladeid, multiseq_file, seqtype, args):
+        self.bin = args["_path"]
         self.seqtype = seqtype
         self.multiseq_file = multiseq_file
-        self.args = {
+        # fixed options for running this task
+        base_args = {
             '-in': None,
             '-out': None,
-            '-maxhours': 24,
             }
-
+        # Initialize task
+        Task.__init__(self, cladeid, "alg", "muscle_alg", base_args, args)
+        
         # Prepare required jobs
         self.load_jobs()
 
@@ -51,9 +48,10 @@ class MuscleAlgTask(Task):
     def load_jobs(self):
         # Only one Muscle job is necessary to run this task
         args = self.args.copy()
+        print args
         args["-in"] = self.multiseq_file
         args["-out"] = "alg.fasta"
-        job = Job(MUSCLE_BIN, args)
+        job = Job(self.bin, args)
         self.jobs.append(job)
 
     def check(self):

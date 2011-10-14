@@ -3,47 +3,43 @@ import sys
 import logging
 log = logging.getLogger("main")
 
-from .config import *
 from .master_task import Task
 from .master_job import Job
 
 sys.path.insert(0, "/home/jhuerta/_Devel/ete/2.2/")
 from ete_dev import PhyloTree
 
-__all__ = ["RaxmlTreeTask"]
+__all__ = ["Raxml"]
 
-class RaxmlTreeTask(Task):
-    def __init__(self, cladeid, alg_file, model, seqtype="aa"):
-        Task.__init__(self, cladeid, "tree", "raxml_tree")
+class Raxml(Task):
+    def __init__(self, cladeid, alg_file, model, seqtype, args):
+        method = args.get("method", "GAMMA").upper()
+        inv = args.get("pinv", "").upper()
+        freq = args.get("ebf", "").upper()
         # set app arguments and options
+        self.bin = args["_path"]
         self.alg_file = alg_file
-        self.seqtype = seqtype
         self.model = model
-
+        self.seqtype = seqtype
         if self.seqtype.lower() == "aa":
-            model_string =  'PROTGAMMA%s' %(self.model.upper())
+            model_string =  'PROT%s%s' %(method, self.model.upper())
         elif self.seqtype.lower() == "nt":
-            model_string =  'GTRGAMMA'
+            model_string =  'GTR%s' %method
         else:
             raise ValueError("Unknown seqtype %s", seqtype)
-
-        cpus = 2
-        partitions_file = None
-        self.args = {
-            '-f': "d", # Normal ML algorithm
-            '-T': '%d' %cpus,
+        base_args = {
             '-m': model_string,
-            '-s': self.alg_file,
-            '-n': self.cladeid,
-            '-q': partitions_file,
+            '-s': alg_file,
+            '-n': cladeid,
             }
+        Task.__init__(self, cladeid, "tree", "raxml_tree", base_args, args)
 
         self.load_jobs()
         self.load_task_info()
         self.set_jobs_wd(self.taskdir)
 
     def load_jobs(self):
-        tree_job = Job(RAXML_BIN, self.args)
+        tree_job = Job(self.bin, self.args)
         self.jobs.append(tree_job)
 
     def finish(self):

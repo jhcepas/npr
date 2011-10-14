@@ -12,28 +12,22 @@ from .utils import basename
 sys.path.insert(0, "/home/jhuerta/_Devel/ete/2.2/")
 from ete_dev import PhyloTree
 
-__all__ = ["BionjModelChooser"]
+__all__ = ["Phyml"]
 
-class BionjModelChooser(Task):
-    def __init__(self, cladeid, alg_file, args):
-        self.alg_file = alg_file
+class Phyml(Task):
+    def __init__(self, cladeid, alg_file, seqtype, args):
         self.alg_basename = basename(self.alg_file)
+        self.alg_file = alg_file
+        self.seqtype = seqtype
         self.bin = args["_path"]
         base_args = {
-            "--datatype": "aa",
+            "--datatype": seqtype,
             "--input": self.alg_basename,
             "--bootstrap": "0",
-            "-o": "lr",
-            "--model": None, # I will iterate over this value when
-                             # creating jobs
-            "--quiet": ""
-            }
+            "--no-memory-check": "", 
+            "--quiet": "" }
 
-        Task.__init__(self, cladeid, "mchooser", "model_chooser", base_args, args)
-        self.best_model = None
-
-        self.seqtype = "aa"
-        self.models = args["_models"]
+        Task.__init__(self, cladeid, "tree", "phyml_tree", base_args, args)
         # Prepare jobs and task
         self.load_jobs()
         self.load_task_info()
@@ -47,14 +41,13 @@ class BionjModelChooser(Task):
             fake_alg_file = os.path.join(j.jobdir, self.alg_basename)
             if os.path.exists(fake_alg_file):
                 os.remove(fake_alg_file)
+
             os.symlink(self.alg_file, fake_alg_file)
 
     def load_jobs(self):
-        for m in self.models:
-            args = self.args.copy()
-            args["--model"] = m
-            job = Job(self.bin, args)
-            self.jobs.append(job)
+        args = self.args.copy()
+        job = Job(self.bib, args)
+        self.jobs.append(job)
 
     def finish(self):
         lks = []

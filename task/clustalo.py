@@ -3,28 +3,24 @@ import sys
 import logging
 log = logging.getLogger("main")
 
-from .config import *
 from .master_task import Task
 from .master_job import Job
 
-__all__ = ["ClustalOmegaAlgTask"]
+__all__ = ["Clustalo"]
 
-class ClustalOmegaAlgTask(Task):
-    def __init__(self, cladeid, multiseq_file):
-        # Initialize task
-        Task.__init__(self, cladeid, "alg", "clustal_omega_alg")
-
-        # Arguments and options used to executed the associated muscle
-        # jobs. This will identify different Tasks of the same type
-        seld.seqtype = "aa" # only aa supported
+class Clustalo(Task):
+    def __init__(self, cladeid, multiseq_file, args):
+        self.seqtype = "aa" # only aa supported
         self.multiseq_file = multiseq_file
-        self.args = {
+        self.bin = args["_path"]
+        base_args = {
             '-i': None,
             '-o': None,
-            '-v': "",
-            '--threads': "1", 
             '--outfmt': "fa",
             }
+        # Initialize task
+        Task.__init__(self, cladeid, "alg", "clustal_omega_alg", base_args, args)
+
 
         # Prepare required jobs
         self.load_jobs()

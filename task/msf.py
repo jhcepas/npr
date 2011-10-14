@@ -5,15 +5,14 @@ log = logging.getLogger("main")
 
 from .master_task import Task
 from .utils import get_cladeid
-from .config import *
 
 sys.path.insert(0, "/home/jhuerta/_Devel/ete/2.2/")
 from .master_job import Job
 from ete_dev import PhyloTree, SeqGroup
 
-__all__ = ["MsfTask"]
+__all__ = ["Msf"]
 
-class MsfTask(Task):
+class Msf(Task):
     def __init__(self, cladeid, seed_file, seqtype, format="fasta"):
         # Initialize task
         Task.__init__(self, cladeid, "msf", "msf-task")

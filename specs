@@ -1,0 +1,5 @@
+[general]
+basedir = string(default="./test")
+loglevel = option(info, debug)
+
+[phyml]

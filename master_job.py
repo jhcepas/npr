@@ -5,7 +5,6 @@ from utils import get_md5, basename
 import logging
 log = logging.getLogger("main")
 
-
 class Job(object):
     ''' A generic program launcher prepared to interact with the Task
     class.

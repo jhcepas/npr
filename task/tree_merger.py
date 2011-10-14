@@ -3,7 +3,6 @@ import numpy
 import logging
 log = logging.getLogger("main")
 
-from .config import *
 from .master_task import Task
 from .master_job import Job
 from .utils import get_cladeid
@@ -12,9 +11,9 @@ import sys
 sys.path.insert(0, "/home/jhuerta/_Devel/ete/2.2/")
 from ete_dev import PhyloTree
 
-__all__ = ["MergeTreeTask"]
+__all__ = ["TreeMerger"]
 
-class MergeTreeTask(Task):
+class TreeMerger(Task):
     def __init__(self, cladeid, task_tree, main_tree,
                  rooting_dict=None):
         # Initialize task

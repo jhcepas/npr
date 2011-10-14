@@ -5,17 +5,16 @@ import sys
 sys.path.insert(0, "/home/jhuerta/_Devel/ete/2.2/")
 from ete_dev import PhyloTree, SeqGroup
 from ete_dev.parser import fasta
-from utils import get_cladeid, get_md5, basename
+from utils import get_md5, merge_dicts
 import logging
 log = logging.getLogger("main")
 
-from config import BASE_DIR
-
 class Task(object):
+    global_config = {"basedir": "./test"}
     def __repr__(self):
         return "Task (%s-%s-%s)" %(self.ttype, self.tname, self.taskid[:8])
 
-    def __init__(self, cladeid, task_type, task_name):
+    def __init__(self, cladeid, task_type, task_name, base_args={}, extra_args={}):
         # Cladeid is used to identify the tree node associated with
         # the task. It is calculated as a hash string based on the
         # list of sequence IDs grouped by the node.
@@ -47,6 +46,7 @@ class Task(object):
         # or (W)aiting
         self.status_file = None
         self.status = "W"
+        self.args = merge_dicts(extra_args, base_args)
 
     def get_jobs_status(self):
         if self.jobs:
@@ -55,13 +55,11 @@ class Task(object):
             return set(["D"])
 
     def dump_job_commands(self):
-
         JOBS = open(self.jobs_file, "w")
         for job in self.jobs:
             job.dump_script()
-
-            print >>JOBS, "sh %s >%s 2>%s" %\
-                (job.cmd_file, job.stdout_file, job.stderr_file)
+            JOBS.write("sh %s >%s 2>%s\n" %\
+                           (job.cmd_file, job.stdout_file, job.stderr_file))
         JOBS.close()
 
     def load_task_info(self):
@@ -69,7 +67,7 @@ class Task(object):
         if not self.taskid:
             unique_id = get_md5(','.join(sorted([j.jobid for j in self.jobs])))
             self.taskid = unique_id
-        self.taskdir = os.path.join(BASE_DIR, self.cladeid,
+        self.taskdir = os.path.join(self.global_config["basedir"], self.cladeid,
                                     self.tname+"_"+self.taskid)
         if not os.path.exists(self.taskdir):
             os.makedirs(self.taskdir)

@@ -3,30 +3,27 @@ import sys
 import logging
 log = logging.getLogger("main")
 
-from .config import *
 from .master_task import Task
 from .master_job import Job
 
 sys.path.insert(0, "/home/jhuerta/_Devel/ete/2.2/")
 from ete_dev import SeqGroup
 
-__all__ = ["TrimalTask"]
+__all__ = ["Trimal"]
 
-class TrimalTask(Task):
-    def __init__(self, cladeid, alg_file, seqtype):
-        # Initialize task
-        Task.__init__(self, cladeid, "acleaner", "trimal_cleaner")
-
-        # Arguments and options used to executed the associated muscle
-        # jobs. This will identify different Tasks of the same type
+class Trimal(Task):
+    def __init__(self, cladeid, alg_file, seqtype, args):
         self.seqtype = seqtype
         self.alg_file = alg_file
-        self.args = {
+        self.bin = args["_path"]
+        base_args = {
             '-in': None,
             '-out': None,
             '-fasta': "", 
-            '-gt': "0.1",
             }
+        # Initialize task
+        Task.__init__(self, cladeid, "acleaner", "trimal_cleaner", 
+                      base_args, args)
 
         # Prepare required jobs
         self.load_jobs()
@@ -53,7 +50,7 @@ class TrimalTask(Task):
         args = self.args.copy()
         args["-in"] = self.alg_file
         args["-out"] = "clean.alg.fasta"
-        job = Job(TRIMAL_BIN, args)
+        job = Job(self.bin, args)
         self.jobs.append(job)
 
     def check(self):
