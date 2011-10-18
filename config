@@ -3,12 +3,14 @@ basedir = ./prueba
 pipeline = template/standard1.py
 
 [phyml]
-_path = phyml
+_path = /home/jhuerta/_Projects/npr/external_apps/phyml
 --pinv = e        # Proportion of invariant sites.  Fixed value in the
                   # [0,1] range or "e" for estimated
 --alpha = e       # Gamma distribution shape parameter. fixed value or
                   # "e" for "estimated"
 --model = JTT
+--no_memory_check = ""
+--quite = ""
 --nclasses =  4   # Number of rate categories
 -o = tlr          # optimization
 -m = "LG"         # Default model if no model-selection step is executed
@@ -16,7 +18,7 @@ _path = phyml
                   # frequencies from model
 
 [raxml]
-_path = raxml728
+_path = /home/jhuerta/_Projects/npr/external_apps/raxmlHPC-PTHREADS-SSE3
 _method = "GAMMA" # GAMMA or CAT
 #_pinv = I # If True, estimates the proportion of invariable sites. 
 #_ebf = F # Empirical base frequencies
@@ -26,29 +28,35 @@ _model = JTT # Used only if no model selection is performed
 -p = 31416 # Random seed to generate starting tree. Make results reproducible 
 
 [muscle]
-_path = muscle
+_path = /home/jhuerta/_Projects/npr/external_apps/muscle
 -maxhours = 24
 -maxiters = 16
 
+[mafft]
+_path = "MAFFT_BINARIES=~/_Projects/npr/external_apps/mafft-6.861-without-extensions/binaries/  /home/jhuerta/_Projects/npr/external_apps/mafft"
+--quiet = ""
+--auto = ""
+
 [clustalo]
-_path = clustalo
+_path = /home/jhuerta/_Projects/npr/external_apps/clustalo
 -v = ""
 --threads = 1 
 
 [bionj_modelchooser]
-_path = phyml
+_path = /home/jhuerta/_Projects/npr/external_apps/phyml
 _models = "JTT", "WAG" 
 -f = m            # char freq (m)odel or (e)stimated
 --pinv = e        # Proportion of invariant sites
 --alpha = e       # 
 --nclasses =  4   # Number of classes
-
+--no_memory_check = ""
+--quite = ""
 [trimal]
 _path = trimal
 -gt = 0.1
 
 [jmodeltest]
-_path = "JMODELTEST_HOME=~/_Projects/npr/jmodeltest2; cd $JMODELTEST_HOME; java -jar $JMODELTEST_HOME/jModelTest.jar"
+_path = "JMODELTEST_HOME=~/_Projects/npr/external_apps/jmodeltest2; cd $JMODELTEST_HOME; java -jar $JMODELTEST_HOME/jModelTest.jar"
 -tr = 1 
 -s = 3  # Selection of models to test? 
 -g = 4

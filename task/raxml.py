@@ -34,9 +34,8 @@ class Raxml(Task):
             }
         Task.__init__(self, cladeid, "tree", "raxml", base_args, args)
 
-        self.load_jobs()
-        self.load_task_info()
-        self.set_jobs_wd(self.taskdir)
+        # Load task info
+        self.init()
 
     def load_jobs(self):
         tree_job = Job(self.bin, self.args)

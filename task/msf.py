@@ -40,7 +40,7 @@ class Msf(Task):
 
         # Sets task information, such as taskdir. taskid will kept as
         # it was set manually
-        self.load_task_info()
+        self.init()
 
         # Sets the path of output file
         self.multiseq_file = os.path.join(self.taskdir, "msf.fasta")

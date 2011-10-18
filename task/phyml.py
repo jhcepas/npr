@@ -31,9 +31,7 @@ class Phyml(Task):
         Task.__init__(self, cladeid, "tree", "phyml", base_args, args)
 
         # Prepare jobs and task
-        self.load_jobs()
-        self.load_task_info()
-        self.set_jobs_wd(self.taskdir)
+        self.init()
         
         # Phyml cannot write the output in a different directory that
         # the original alg file. So I use relative path to alg file

@@ -15,7 +15,7 @@ class Job(object):
     process status are (W)aiting, (R)unning, (E)rror and (D)one.
     '''
     def __repr__(self):
-        return "Job (%s-%s)" %(basename(self.bin), self.jobid[:8])
+        return "Job (%s, %s)" %(basename(self.bin), self.jobid[:6])
 
     def __init__(self, bin, args):
         # Used at execution time

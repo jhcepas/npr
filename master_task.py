@@ -12,7 +12,11 @@ log = logging.getLogger("main")
 class Task(object):
     global_config = {"basedir": "./test"}
     def __repr__(self):
-        return "Task %s (%s-%s)" %(self.ttype, self.tname, self.taskid[:6])
+        if self.taskid:
+            tid = self.taskid[:6]
+        else:
+            tid = "?"
+        return "Task (%s-%s, %s)" %(self.ttype, self.tname, tid)
 
     def __init__(self, cladeid, task_type, task_name, base_args={}, extra_args={}):
         # Cladeid is used to identify the tree node associated with
@@ -46,8 +50,19 @@ class Task(object):
         # or (W)aiting
         self.status_file = None
         self.status = "W"
-        self.args = merge_dicts(extra_args, base_args)
+        self.args = merge_dicts(extra_args, base_args, parent=self)
 
+
+    def init(self):
+        # Prepare required jobs
+        self.load_jobs()
+
+        # Set task information, such as task working dir and taskid
+        self.load_task_info()
+
+        # Set the working dir for all jobs
+        self.set_jobs_wd(self.taskdir)
+        
     def get_jobs_status(self):
         if self.jobs:
             return set([j.status() for j in self.jobs])

@@ -25,9 +25,9 @@ class JModeltest(Task):
         self.alg_file = alg_file
         self.seqtype = "nt"
         self.best_model = None
-        self.load_jobs()
-        self.load_task_info()
-        self.set_jobs_wd(self.taskdir)
+
+        # Load task data
+        self.init()
 
     def load_jobs(self):
         tree_job = Job(self.bin, self.args)

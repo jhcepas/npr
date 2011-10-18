@@ -32,8 +32,12 @@ def pipeline(task, main_tree, config):
 
     elif task.ttype == "msf":
         if task.nseqs <= MAX_SEQS_FOR_MUSCLE:
-            new_tasks.append(Muscle(task.cladeid, task.multiseq_file, 
-                                           task.seqtype, config["muscle"]))
+            #new_tasks.append(Muscle(task.cladeid, task.multiseq_file, 
+            #                        task.seqtype, config["muscle"]))
+            new_tasks.append(Mafft(task.cladeid, task.multiseq_file, 
+                                   task.seqtype, config["mafft"]))
+
+
         else:
             new_tasks.append(Clustalo(task.cladeid, 
                                                  task.multiseq_file, 

@@ -23,15 +23,9 @@ class Muscle(Task):
             }
         # Initialize task
         Task.__init__(self, cladeid, "alg", "muscle", base_args, args)
-        
-        # Prepare required jobs
-        self.load_jobs()
 
-        # Set task information, such as task working dir and taskid
-        self.load_task_info()
-
-        # Set the working dir for all jobs
-        self.set_jobs_wd(self.taskdir)
+        # Load task data
+        self.init()
 
         # Set Task specific attributes
         main_job = self.jobs[0]

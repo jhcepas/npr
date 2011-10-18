@@ -33,10 +33,9 @@ class BionjModelChooser(Task):
 
         self.seqtype = "aa"
         self.models = args["_models"]
+
         # Prepare jobs and task
-        self.load_jobs()
-        self.load_task_info()
-        self.set_jobs_wd(self.taskdir)
+        self.init()
 
         # Phyml cannot write the output in a different directory that
         # the original alg file. So I use relative path to alg file
