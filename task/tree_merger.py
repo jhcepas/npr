@@ -14,8 +14,7 @@ from ete_dev import PhyloTree
 __all__ = ["TreeMerger"]
 
 class TreeMerger(Task):
-    def __init__(self, cladeid, task_tree, main_tree,
-                 rooting_dict=None):
+    def __init__(self, cladeid, task_tree, main_tree, args):
         # Initialize task
         Task.__init__(self, cladeid, "mergetree", "tree_merger")
         log.debug("Task Tree: %s", task_tree)
@@ -56,9 +55,6 @@ class TreeMerger(Task):
             # informative topology
             t.detach()
 
-        elif rooting_dict:
-            log.info("Rooting new tree using a rooting dictionary")
-            t.set_outgroup(t.get_farthest_oldest_node(rooting_dict))
         else:
             log.info("Rooting new tree using midpoint outgroup")
             t.set_outgroup(t.get_midpoint_outgroup())
@@ -91,21 +87,33 @@ class TreeMerger(Task):
         # Then we can sort outgroups prioritizing sequences whose
         # distances are close to the mean (avoiding the closest and
         # farthest sequences).
-        mean_to_b_dist = numpy.mean([d[0] for d in  to_b_dists])
-        mean_to_a_dist = numpy.mean([d[0] for d in  to_a_dists])
-        rank_outs_a = sorted(to_a_dists, lambda x,y: cmp(abs(x[0] - mean_to_a_dist),
-                                                        abs(y[0] - mean_to_a_dist),
+        if args["_outgroup_selection_policy"] == "mean_dist":
+            dist_fn = numpy.mean
+        elif args["_outgroup_selection_policy"] == "median_dist":
+            dist_fn = numpy.median
+        elif args["_outgroup_selection_policy"] == "max_dist":
+            dist_fn = numpy.max
+        elif args["_outgroup_selection_policy"] == "min_dist":
+            dist_fn = numpy.min
+
+
+        best_dist_to_b = dist_fn([d[0] for d in  to_b_dists])
+        best_dist_to_a = dist_fn([d[0] for d in  to_a_dists])
+
+        rank_outs_a = sorted(to_a_dists, lambda x,y: cmp(abs(x[0] - best_dist_to_a),
+                                                        abs(y[0] - best_dist_to_a),
                                                         ))
 
-        rank_outs_b = sorted(to_b_dists, lambda x,y: cmp(abs(x[0] - mean_to_b_dist),
-                                                        abs(y[0] - mean_to_b_dist),
+        rank_outs_b = sorted(to_b_dists, lambda x,y: cmp(abs(x[0] - best_dist_to_b),
+                                                        abs(y[0] - best_dist_to_b),
                                                         ))
         outs_a = [e[1] for e in rank_outs_a]
         outs_b = [e[1] for e in rank_outs_b]
-        log.debug("Mean distance to node A: %s" %mean_to_a_dist)
-        log.debug("Best outgroup for A: %s" %rank_outs_a[:2])
-        log.debug("Mean distance to node B: %s" %mean_to_b_dist)
-        log.debug("Best outgroup for B: %s" %rank_outs_b[:2])
+
+        log.debug("Best distance to node A: %s" %best_dist_to_a)
+        log.debug("Best outgroup for A: %s" %rank_outs_a[:5])
+        log.debug("Best distance to node B: %s" %best_dist_to_b)
+        log.debug("Best outgroup for B: %s" %rank_outs_b[:5])
 
         # Annotate current tree
         for n in t.traverse():

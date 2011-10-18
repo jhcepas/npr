@@ -22,7 +22,7 @@ class Muscle(Task):
             '-out': None,
             }
         # Initialize task
-        Task.__init__(self, cladeid, "alg", "muscle_alg", base_args, args)
+        Task.__init__(self, cladeid, "alg", "muscle", base_args, args)
         
         # Prepare required jobs
         self.load_jobs()
@@ -48,7 +48,6 @@ class Muscle(Task):
     def load_jobs(self):
         # Only one Muscle job is necessary to run this task
         args = self.args.copy()
-        print args
         args["-in"] = self.multiseq_file
         args["-out"] = "alg.fasta"
         job = Job(self.bin, args)

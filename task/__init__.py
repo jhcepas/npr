@@ -6,3 +6,4 @@ from raxml import *
 from bionj_model_chooser import *
 from tree_merger import *
 from modeltest import *
+from phyml import *

@@ -32,7 +32,7 @@ class Raxml(Task):
             '-s': alg_file,
             '-n': cladeid,
             }
-        Task.__init__(self, cladeid, "tree", "raxml_tree", base_args, args)
+        Task.__init__(self, cladeid, "tree", "raxml", base_args, args)
 
         self.load_jobs()
         self.load_task_info()

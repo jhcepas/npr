@@ -22,7 +22,7 @@ class Trimal(Task):
             '-fasta': "", 
             }
         # Initialize task
-        Task.__init__(self, cladeid, "acleaner", "trimal_cleaner", 
+        Task.__init__(self, cladeid, "acleaner", "trimal", 
                       base_args, args)
 
         # Prepare required jobs

@@ -1,7 +1,6 @@
 import os
 import sys
 import re
-
 import logging
 log = logging.getLogger("main")
 
@@ -16,8 +15,8 @@ __all__ = ["BionjModelChooser"]
 
 class BionjModelChooser(Task):
     def __init__(self, cladeid, alg_file, args):
-        self.alg_file = alg_file
-        self.alg_basename = basename(self.alg_file)
+        self.alg_phylip_file = alg_file
+        self.alg_basename = basename(self.alg_phylip_file)
         self.bin = args["_path"]
         base_args = {
             "--datatype": "aa",
@@ -29,7 +28,7 @@ class BionjModelChooser(Task):
             "--quiet": ""
             }
 
-        Task.__init__(self, cladeid, "mchooser", "model_chooser", base_args, args)
+        Task.__init__(self, cladeid, "mchooser", "bionj_model_chooser", base_args, args)
         self.best_model = None
 
         self.seqtype = "aa"
@@ -47,7 +46,7 @@ class BionjModelChooser(Task):
             fake_alg_file = os.path.join(j.jobdir, self.alg_basename)
             if os.path.exists(fake_alg_file):
                 os.remove(fake_alg_file)
-            os.symlink(self.alg_file, fake_alg_file)
+            os.symlink(self.alg_phylip_file, fake_alg_file)
 
     def load_jobs(self):
         for m in self.models:
@@ -55,7 +54,7 @@ class BionjModelChooser(Task):
             args["--model"] = m
             job = Job(self.bin, args)
             self.jobs.append(job)
-
+        log.info(self.models)
     def finish(self):
         lks = []
         for j in self.jobs:

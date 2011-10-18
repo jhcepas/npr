@@ -19,7 +19,7 @@ class JModeltest(Task):
         base_args = {
             '-d': alg_file, 
             }
-        Task.__init__(self, cladeid, "tree", "jmodeltest_tree", base_args, args)
+        Task.__init__(self, cladeid, "tree", "jmodeltest", base_args, args)
         # set app arguments and options
         self.bin = args["_path"]
         self.alg_file = alg_file

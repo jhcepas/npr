@@ -15,7 +15,7 @@ __all__ = ["Msf"]
 class Msf(Task):
     def __init__(self, cladeid, seed_file, seqtype, format="fasta"):
         # Initialize task
-        Task.__init__(self, cladeid, "msf", "msf-task")
+        Task.__init__(self, cladeid, "msf", "MSF")
 
         # Set basic information
         self.seqtype = seqtype

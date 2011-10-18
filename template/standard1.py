@@ -67,15 +67,20 @@ def pipeline(task, main_tree, config):
             
     elif task.ttype == "mchooser":
         if task.seqtype == "aa":
-            new_tasks.append(Raxml(task.cladeid, task.alg_file, 
+            #new_tasks.append(Raxml(task.cladeid, task.alg_phylip_file, 
+            #                       task.best_model, "aa", 
+            #                       config["raxml"]))
+            new_tasks.append(Phyml(task.cladeid, task.alg_phylip_file, 
                                        task.best_model, "aa", 
-                                       config["raxml"]))
+                                       config["phyml"]))
+
+
         else:
             raise Exception("Not implemented yet!!")
 
     elif task.ttype == "tree":
         t = PhyloTree(task.tree_file)
-        merge = TreeMerger(task.cladeid, t, main_tree)
+        merge = TreeMerger(task.cladeid, t, main_tree, config["treemerger"])
         main_tree = merge.main_tree
                        
         for part in [merge.set_a, merge.set_b]:

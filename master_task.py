@@ -12,7 +12,7 @@ log = logging.getLogger("main")
 class Task(object):
     global_config = {"basedir": "./test"}
     def __repr__(self):
-        return "Task (%s-%s-%s)" %(self.ttype, self.tname, self.taskid[:8])
+        return "Task %s (%s-%s)" %(self.ttype, self.tname, self.taskid[:6])
 
     def __init__(self, cladeid, task_type, task_name, base_args={}, extra_args={}):
         # Cladeid is used to identify the tree node associated with

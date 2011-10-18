@@ -55,7 +55,7 @@ class Job(object):
         if not os.path.exists(self.jobdir):
             os.makedirs(self.jobdir)
         open(self.cmd_file, "w").write(script)
-        log.debug(script)
+        #log.debug(script)
  
     def status(self):
         if not os.path.exists(self.status_file):
