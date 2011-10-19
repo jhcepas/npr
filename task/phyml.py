@@ -25,7 +25,7 @@ class Phyml(Task):
             "--datatype": seqtype,
             "--input": self.alg_basename,
             "--bootstrap": "0",
-            #"--no_memory_check": "", 
+            "--no_memory_check": "", 
             "--quiet": "" }
 
         Task.__init__(self, cladeid, "tree", "phyml", base_args, args)

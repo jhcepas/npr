@@ -1,6 +1,49 @@
 [general]
 basedir = ./prueba
 pipeline = template/standard1.py
+max_dna_partition_size = 20
+min_column_conservation_for_DNA = 0.9
+clean_alignments = True
+large_alg_length = 200
+
+[muscle]
+_path = /home/jhuerta/_Projects/npr/external_apps/muscle
+-maxhours = 24
+-maxiters = 16
+
+[mafft]
+_path = "MAFFT_BINARIES=~/_Projects/npr/external_apps/mafft-6.861-without-extensions/binaries/  /home/jhuerta/_Projects/npr/external_apps/mafft"
+--quiet = ""
+--auto = ""
+
+[clustalo]
+_path = /home/jhuerta/_Projects/npr/external_apps/clustalo
+-v = ""
+--threads = 1 
+
+[metaaligner]
+aligners = muscle, mafft
+use_reverse = True
+
+[trimal]
+_path = trimal
+-gt = 0.1
+
+[mcoffee]
+_path = /home/jhuerta/_Projects/npr/external_apps/tcoffee
+-mode = mcoffee
+-output = fasta
+-aln = g0.aln g5.aln g10.aln g15.aln
+
+[bionj_modelchooser]
+_path = /home/jhuerta/_Projects/npr/external_apps/phyml
+_models = "JTT", "WAG" 
+-f = m            # char freq (m)odel or (e)stimated
+--pinv = e        # Proportion of invariant sites
+--alpha = e       # 
+--nclasses =  4   # Number of classes
+--no_memory_check = ""
+--quite = ""
 
 [phyml]
 _path = /home/jhuerta/_Projects/npr/external_apps/phyml
@@ -27,34 +70,6 @@ _model = JTT # Used only if no model selection is performed
 -T = 2
 -p = 31416 # Random seed to generate starting tree. Make results reproducible 
 
-[muscle]
-_path = /home/jhuerta/_Projects/npr/external_apps/muscle
--maxhours = 24
--maxiters = 16
-
-[mafft]
-_path = "MAFFT_BINARIES=~/_Projects/npr/external_apps/mafft-6.861-without-extensions/binaries/  /home/jhuerta/_Projects/npr/external_apps/mafft"
---quiet = ""
---auto = ""
-
-[clustalo]
-_path = /home/jhuerta/_Projects/npr/external_apps/clustalo
--v = ""
---threads = 1 
-
-[bionj_modelchooser]
-_path = /home/jhuerta/_Projects/npr/external_apps/phyml
-_models = "JTT", "WAG" 
--f = m            # char freq (m)odel or (e)stimated
---pinv = e        # Proportion of invariant sites
---alpha = e       # 
---nclasses =  4   # Number of classes
---no_memory_check = ""
---quite = ""
-[trimal]
-_path = trimal
--gt = 0.1
-
 [jmodeltest]
 _path = "JMODELTEST_HOME=~/_Projects/npr/external_apps/jmodeltest2; cd $JMODELTEST_HOME; java -jar $JMODELTEST_HOME/jModelTest.jar"
 -tr = 1 
@@ -66,7 +81,7 @@ _path = "JMODELTEST_HOME=~/_Projects/npr/external_apps/jmodeltest2; cd $JMODELTE
 -a = ""
 
 [treemerger]
-_min_size_to_split = 5
-_min_outgroups = 1
-_outgroup_selection_policy = "mean_dist" # avrg_dist, max_dist, min_dist, median_dist
+_min_seqs_for_optimization = 4
+_min_outgroups_for_optimization = 1
+_outgroup_selection_policy = "mean_dist" # mean_dist, max_dist, min_dist, median_dist
 

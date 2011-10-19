@@ -8,10 +8,9 @@ import sys
 sys.path.insert(0, "/home/jhuerta/_Devel/ete/2.2/")
 from ete_dev import PhyloTree, SeqGroup
 
-MAX_SEQS_FOR_MUSCLE = 200
+LARGE_ALG_LENGTH = 200
 MAX_AA_COLUMN_CONSERVATION = 0.9
 MAX_SEQS_TO_USE_NT = 20
-SEQS_lIMIT = 4
 CLEAN_ALG = True
 
 def pipeline(task, main_tree, config):
@@ -31,7 +30,7 @@ def pipeline(task, main_tree, config):
             raise Exception("I need at least one seed file")
 
     elif task.ttype == "msf":
-        if task.nseqs <= MAX_SEQS_FOR_MUSCLE:
+        if task.nseqs < LARGE_ALG_LENGTH:
             #new_tasks.append(Muscle(task.cladeid, task.multiseq_file, 
             #                        task.seqtype, config["muscle"]))
             new_tasks.append(Mafft(task.cladeid, task.multiseq_file, 
@@ -78,7 +77,6 @@ def pipeline(task, main_tree, config):
                                        task.best_model, "aa", 
                                        config["phyml"]))
 
-
         else:
             raise Exception("Not implemented yet!!")
 
@@ -91,7 +89,9 @@ def pipeline(task, main_tree, config):
             part_cladeid, seqs, outgroups = part
 
             # Partition size limit
-            if len(seqs) < SEQS_lIMIT:
+            if len(seqs) < int(config["treemerger"]["_min_seqs_for_optimization"]) or \
+                    len(outgroups) < int(config["treemerger"]["_min_outgroups_for_optimization"]):
+                print len(seqs)
                 continue
             
             # Shall I switch to DNA?

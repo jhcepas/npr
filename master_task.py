@@ -31,8 +31,10 @@ class Task(object):
         # messages
         self.tname = task_name
 
+        # =========================================================
         # The following attributes are expected to be filled by the
-        # different subclasses
+        # subclasses
+        # =========================================================
 
         # List of associated jobs necessary to complete the task
         self.jobs = []
@@ -51,7 +53,6 @@ class Task(object):
         self.status_file = None
         self.status = "W"
         self.args = merge_dicts(extra_args, base_args, parent=self)
-
 
     def init(self):
         # Prepare required jobs
