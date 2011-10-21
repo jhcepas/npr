@@ -1,6 +1,7 @@
 import os 
 import numpy 
-
+import logging
+log = logging.getLogger("main")
 from .utils import del_gaps
 from .task import *
 
@@ -12,6 +13,7 @@ LARGE_ALG_LENGTH = 200
 MAX_AA_COLUMN_CONSERVATION = 0.9
 MAX_SEQS_TO_USE_NT = 20
 CLEAN_ALG = True
+
 
 def pipeline(task, main_tree, config):
     # new tasks is a list of Task instances that are returned to the
@@ -43,6 +45,15 @@ def pipeline(task, main_tree, config):
                                                  config["clustalo"]))
 
     elif task.ttype == "alg":
+        # Check conservation of columns. If too many identities,
+        # switch to codon alignment and make the tree with DNA. 
+        # Mixed models is another possibility.
+        cons_mean, cons_std = get_conservation(task.alg_fasta_file)
+        log.info("Conservation %0.2f +-%0.2f",cons_mean, cons_std)
+        if task.seqtype == "aa" and nt_seed_file \
+                and cons_mean > config["general"]["DNA_sct"]:
+            log.info("switching to codon alignment")
+
         if CLEAN_ALG:
             new_tasks.append(\
                 Trimal(task.cladeid, task.alg_fasta_file, task.seqtype, 
@@ -70,8 +81,9 @@ def pipeline(task, main_tree, config):
             
     elif task.ttype == "mchooser":
         if task.seqtype == "aa":
-            #new_tasks.append(Raxml(task.cladeid, task.alg_phylip_file, 
-            #                       task.best_model, "aa", 
+            # new_tasks.append(Raxml(task.cladeid,
+            #                       task.alg_phylip_file,
+            #                       task.best_model, "aa",
             #                       config["raxml"]))
             new_tasks.append(Phyml(task.cladeid, task.alg_phylip_file, 
                                        task.best_model, "aa", 
@@ -95,12 +107,12 @@ def pipeline(task, main_tree, config):
                 continue
             
             # Shall I switch to DNA?
-            if nt_seed_file and len(seqs) <= MAX_SEQS_TO_USE_NT: 
-                alg = SeqGroup(nt_seed_file)
-                seqtype = "nt"
-            else:
+            if aa_seed_file: 
                 alg = SeqGroup(aa_seed_file)
                 seqtype = "aa"
+            else:
+                alg = SeqGroup(nt_seed_file)
+                seqtype = "nt"
 
             msf_seqs = seqs + outgroups[:3]
             new_msf_file = os.path.join(task.taskdir, 
@@ -123,6 +135,5 @@ def get_conservation(alg_file):
         conservation.append(b)
     mean = numpy.mean(conservation)
     std =  numpy.std(conservation)
-    print mean, "+-", std 
     return mean, std
          

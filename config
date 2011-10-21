@@ -2,7 +2,7 @@
 basedir = ./prueba
 pipeline = template/standard1.py
 max_dna_partition_size = 20
-min_column_conservation_for_DNA = 0.9
+DNA_sct = 0.3 # DNA switching conservation threshold
 clean_alignments = True
 large_alg_length = 200
 
