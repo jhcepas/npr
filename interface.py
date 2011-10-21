@@ -89,6 +89,7 @@ def init_curses(main_scr):
     curses.init_pair(5, curses.COLOR_RED, curses.COLOR_BLACK)
     curses.init_pair(6, curses.COLOR_RED, curses.COLOR_WHITE)
 
+    # Creates layout
     dbg_h = 40
     WIN = {}
     WIN[0] = main_scr
@@ -129,6 +130,17 @@ def main(main_screen, func, args):
     # Start logger, pointing to the selected screen
     log = get_main_log(screen)
 
-    # Call main function
-    func(args)
+    # Call main function as lower thread
+    if NCURSES:
+        import threading
+        import time
+        t = threading.Thread(target=func, args=[args])
+        t.daemon = True
+        t.start()
+        while 1: 
+            screen.windows[0].addstr(".")
+            screen.windows[0].refresh()
+            time.sleep(1)
+    else:
+        func(args)
 
