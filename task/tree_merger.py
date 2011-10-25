@@ -5,7 +5,7 @@ log = logging.getLogger("main")
 
 from .master_task import Task
 from .master_job import Job
-from .utils import get_cladeid
+from .utils import get_cladeid, load_node_size
 
 import sys
 sys.path.insert(0, "/home/jhuerta/_Devel/ete/2.2/")
@@ -38,16 +38,14 @@ class TreeMerger(Task):
         if outgroup_seqs:
             log.info("Rooting new tree using %d custom seqs" %
                      len(outgroup_seqs))
+
             if len(outgroup_seqs) > 1:
+                # Root to a non-outgroup leave to leave all outgroups
+                # in one side.
+                t.set_outgroup(list(core_seqs)[0])
                 outgroup = t.get_common_ancestor(outgroup_seqs)
             else:
                 outgroup = t & list(outgroup_seqs)[0]
-
-            # If outcrop_seqs are split by current root node, outgroup
-            # cannot be found. Let's find it from a different
-            # perspective using non-outgroup seqs.
-            if outgroup is t:
-                outgroup = t.get_common_ancestor(core_seqs)
 
             t.set_outgroup(outgroup)
             t = t.get_common_ancestor(core_seqs)
@@ -58,6 +56,24 @@ class TreeMerger(Task):
         else:
             log.info("Rooting new tree using midpoint outgroup")
             t.set_outgroup(t.get_midpoint_outgroup())
+            load_node_size(t)
+            supports = []
+            for n in t.get_descendants("levelorder"):
+                if n.is_leaf():
+                    continue
+                st = n.get_sisters()
+                if len(st) == 1:
+                    min_size = min([st[0].size, n.size])
+                    min_support = min([st[0].support, n.support])
+                    supports.append([min_support, min_size, n])
+                else:
+                    log.warning("skipping multifurcation in basal tree")
+
+            # Roots to the best supported and larger partitions
+            supports.sort()
+            supports.reverse()
+            t.set_outgroup(supports[0][2])
+            print supports
 
         log.debug("Pruned Task_Tree: %s", t)
 

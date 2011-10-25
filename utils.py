@@ -20,3 +20,13 @@ def merge_dicts(source, target, parent=""):
             else:
                 log.warning("%s: [%s] argument cannot be manually set" %(parent,k))
     return target
+
+def load_node_size(n):
+    if n.is_leaf():
+        size = 1
+    else:
+        size = 0
+        for ch in n.children: 
+            size += load_node_size(ch)
+    n.add_feature("size", size)
+    return size

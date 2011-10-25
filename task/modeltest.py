@@ -15,14 +15,15 @@ from ete_dev import PhyloTree
 __all__ = ["JModeltest"]
 
 class JModeltest(Task):
-    def __init__(self, cladeid, alg_file, args):
+    def __init__(self, cladeid, alg_fasta_file, alg_phylip_file, args):
         base_args = {
-            '-d': alg_file, 
+            '-d': alg_fasta_file, 
             }
         Task.__init__(self, cladeid, "tree", "jmodeltest", base_args, args)
         # set app arguments and options
         self.bin = args["_path"]
-        self.alg_file = alg_file
+        self.alg_fasta_file = alg_fasta_file
+        self.alg_phylip_file = alg_phylip_file
         self.seqtype = "nt"
         self.best_model = None
 

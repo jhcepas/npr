@@ -14,7 +14,7 @@ else:
     NCURSES = True
 
 class Screen(StringIO):
-    # TAG USED TO CHANGE COLOR OF STRINGS
+    # TAG USED TO CHANGE COLOR OF STRINGS AND SELECT WINDOW
     TAG = re.compile("@@(\d+)?,?(\d+):", re.MULTILINE)
     def __init__(self, windows):
         StringIO.__init__(self)
@@ -75,7 +75,6 @@ class Screen(StringIO):
         for w in self.windows.values():
             w.refresh()
 
-
 def init_curses(main_scr):
     if not NCURSES or not main_scr:
         # curses disabled, no multi windows
@@ -94,9 +93,11 @@ def init_curses(main_scr):
     WIN = {}
     WIN[0] = main_scr
     h, w = WIN[0].getmaxyx()
-    WIN[1] = curses.newwin(h-2, w/2, 1,1)
+
+    WIN[1] = curses.newwin(h-1, w/2, 1,1)
     WIN[2] = curses.newwin(h-dbg_h, (w/2)-1, 1, (w/2)+2)
     WIN[3] = curses.newwin(dbg_h, (w/2)-1, h-dbg_h-1, (w/2)+2)
+
     WIN[3].box()
 
     for w in WIN.values():
@@ -137,10 +138,15 @@ def main(main_screen, func, args):
         t = threading.Thread(target=func, args=[args])
         t.daemon = True
         t.start()
+        ln = 0           
+        chars = "\\|/-\\|/-"
         while 1: 
-            screen.windows[0].addstr(".")
+            if ln >= len(chars):
+                ln = 0
+            screen.windows[0].addstr(0,0, chars[ln])
             screen.windows[0].refresh()
-            time.sleep(1)
+            time.sleep(0.2)
+            ln += 1
     else:
         func(args)
 

@@ -14,8 +14,9 @@ from ete_dev import PhyloTree
 __all__ = ["BionjModelChooser"]
 
 class BionjModelChooser(Task):
-    def __init__(self, cladeid, alg_file, args):
-        self.alg_phylip_file = alg_file
+    def __init__(self, cladeid, alg_fasta_file, alg_phylip_file, args):
+        self.alg_phylip_file = alg_phylip_file
+        self.alg_fasta_file = alg_fasta_file
         self.alg_basename = basename(self.alg_phylip_file)
         self.bin = args["_path"]
         base_args = {

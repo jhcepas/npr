@@ -2,6 +2,7 @@ import curses
 import time
 from collections import deque
 
+
 class CursesList():
     def __init__(self, win):
         self._win = win
@@ -19,6 +20,19 @@ class CursesList():
         if self._top != pos:
             self._top = pos
             self.refresh()
+
+    def goto(self, n):
+        if n >= 0 and n < len(self._items):
+            self._top = pos
+            self.refresh()
+
+    def goto_end(self):
+        self._top = len(self._items)-1
+        self.refresh()
+
+    def goto_start(self):
+        self._top = 0
+        self.refresh()
 
     def refresh(self):
         self._win.clear()
@@ -47,8 +61,7 @@ def main(scr):
     WIN[1] = curses.newwin(h-2, w/2, 1,1)
     WIN[2] = curses.newwin(h-dbg_h, (w/2)-1, 1, (w/2)+2)
     WIN[3] = curses.newwin(dbg_h, (w/2)-1, h-dbg_h-1, (w/2)-2)
-    WIN[3].box()
-
+ 
     for w in WIN.values():
         w.keypad(1)
         w.idlok(True)
@@ -62,6 +75,7 @@ def main(scr):
     while 1:
         key = WIN[2].getch()
         WIN[1].addstr("%s (%d)" %(key, C._top))
+        WIN[1].refresh()
         if key == 113: 
             break
         elif key == curses.KEY_UP:
@@ -72,6 +86,10 @@ def main(scr):
             C.scroll(10)
         elif key == curses.KEY_PPAGE:
             C.scroll(-10)
+        elif key == curses.KEY_END:
+            C.goto_end()
+        elif key == curses.KEY_HOME:
+            C.goto_start()
         else:
             C.refresh()
 

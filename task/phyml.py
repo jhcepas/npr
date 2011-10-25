@@ -24,7 +24,6 @@ class Phyml(Task):
             "--model": best_model, 
             "--datatype": seqtype,
             "--input": self.alg_basename,
-            "--bootstrap": "0",
             "--no_memory_check": "", 
             "--quiet": "" }
 
@@ -63,8 +62,8 @@ class Phyml(Task):
         tree.add_feature("model", j.args["--model"])
 
         self.tree_file = os.path.join(j.jobdir,
-                                      "phylml_tree."+self.cladeid)
-
+                                      "phyml_tree."+self.cladeid)
+        
         tree.write(outfile=self.tree_file)
 
     def check(self):

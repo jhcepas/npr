@@ -9,7 +9,9 @@ from utils import get_cladeid
 
 def schedule(config, processer, schedule_time, execution, retry):
     """ Main pipeline scheduler """ 
+
     WAITING_TIME = schedule_time
+    config["_alg_conversion"] = {}
     # Pass seed files to processer to generate the initial task
     pending_tasks, main_tree = processer(None, None, 
                                          config)
@@ -64,11 +66,14 @@ def schedule(config, processer, schedule_time, execution, retry):
                 if retry:
                     log.info("Remarking task as undone to retry")
                     task.retry()
+                else:
+                    raise Exception("ERROR FOUND")
             elif task.status == "D":
                 log.info("Task is DONE")
             
         sleep(WAITING_TIME)
         print 
+
     for n in main_tree.traverse():
         n.cladeid = get_cladeid(n.get_leaf_names())
         print n.cladeid

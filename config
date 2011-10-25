@@ -2,7 +2,7 @@
 basedir = ./prueba
 pipeline = template/standard1.py
 max_dna_partition_size = 20
-DNA_sct = 0.3 # DNA switching conservation threshold
+DNA_sct = 0.37 # DNA switching conservation threshold
 clean_alignments = True
 large_alg_length = 200
 
@@ -59,6 +59,8 @@ _path = /home/jhuerta/_Projects/npr/external_apps/phyml
 -m = "LG"         # Default model if no model-selection step is executed
 -f = m            # e: estiamte character frequencies.  m: character
                   # frequencies from model
+--bootstrap = -2  #  approximate likelihood ratio test returning
+                  #  Chi2-based parametric branch supports.
 
 [raxml]
 _path = /home/jhuerta/_Projects/npr/external_apps/raxmlHPC-PTHREADS-SSE3
@@ -74,7 +76,7 @@ _model = JTT # Used only if no model selection is performed
 _path = "JMODELTEST_HOME=~/_Projects/npr/external_apps/jmodeltest2; cd $JMODELTEST_HOME; java -jar $JMODELTEST_HOME/jModelTest.jar"
 -tr = 1 
 -s = 3  # Selection of models to test? 
--g = 4
+#-g = 4
 -i = ""
 -f = ""
 -AIC = ""
