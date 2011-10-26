@@ -56,7 +56,7 @@ _path = /home/jhuerta/_Projects/npr/external_apps/phyml
 --quite = ""
 --nclasses =  4   # Number of rate categories
 -o = tlr          # optimization
--m = "LG"         # Default model if no model-selection step is executed
+-m = LG         # Default model if no model-selection step is executed
 -f = m            # e: estiamte character frequencies.  m: character
                   # frequencies from model
 --bootstrap = -2  #  approximate likelihood ratio test returning
@@ -64,23 +64,24 @@ _path = /home/jhuerta/_Projects/npr/external_apps/phyml
 
 [raxml]
 _path = /home/jhuerta/_Projects/npr/external_apps/raxmlHPC-PTHREADS-SSE3
-_method = "GAMMA" # GAMMA or CAT
+_method = GAMMA # GAMMA or CAT
 #_pinv = I # If True, estimates the proportion of invariable sites. 
 #_ebf = F # Empirical base frequencies
 -f = d 
-_model = JTT # Used only if no model selection is performed
+_aa_model = JTT # Used only if no model selection is performed
 -T = 2
 -p = 31416 # Random seed to generate starting tree. Make results reproducible 
 
 [jmodeltest]
 _path = "JMODELTEST_HOME=~/_Projects/npr/external_apps/jmodeltest2; cd $JMODELTEST_HOME; java -jar $JMODELTEST_HOME/jModelTest.jar"
--tr = 1 
--s = 3  # Selection of models to test? 
-#-g = 4
--i = ""
--f = ""
--AIC = ""
--a = ""
+#-t = BIONJ  # ML, BIONJ or fixed
+-tr = 1      # Threads
+-s = 3       # Number of substitution schemes {3,5,7,11}
+#-g = 4      # Include models with rate variation among sites and number of categories (e.g., -g 4)
+#-i = ""     # Include models with a proportion invariable sites
+#-f = ""     # Include models with unequals base frecuencies
+-AIC = ""    # 
+#-a = ""
 
 [treemerger]
 _min_seqs_for_optimization = 4

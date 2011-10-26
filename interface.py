@@ -93,18 +93,19 @@ def init_curses(main_scr):
     WIN = {}
     WIN[0] = main_scr
     h, w = WIN[0].getmaxyx()
-
+    
     WIN[1] = curses.newwin(h-1, w/2, 1,1)
-    WIN[2] = curses.newwin(h-dbg_h, (w/2)-1, 1, (w/2)+2)
-    WIN[3] = curses.newwin(dbg_h, (w/2)-1, h-dbg_h+1, (w/2)+2)
+    WIN[2] = curses.newwin(h-dbg_h-1, (w/2)-1, 1, (w/2)+2)
+    WIN[3] = curses.newwin(dbg_h-1, (w/2)-1, h-dbg_h+1, (w/2)+2)
 
-    WIN[3].box()
 
-    for w in WIN.values():
+    for i in xrange(1, len(WIN)):
+        w = WIN[i]
         w.keypad(1)
         w.idlok(True)
         w.scrollok(True)
-
+        w.border()
+        w.refresh()
     return WIN
 
 def app_wrapper(func, args):

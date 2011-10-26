@@ -74,6 +74,9 @@ def schedule(config, processer, schedule_time, execution, retry):
         sleep(WAITING_TIME)
         print 
 
+    final_tree_file = os.path.join(config["general"]["basedir"], \
+                                       "final_tree.nw")
+    main_tree.write(outfile=final_tree_file)
     for n in main_tree.traverse():
         n.cladeid = get_cladeid(n.get_leaf_names())
         print n.cladeid

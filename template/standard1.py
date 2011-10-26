@@ -95,15 +95,20 @@ def pipeline(task, main_tree, config):
                                    alg_phylip_file,
                                    model, "aa",
                                    config["raxml"]))
-
+            
             #new_tasks.append(Phyml(cladeid, alg_phylip_file, 
             #                           model, "aa", 
             #                           config["phyml"]))
 
         else:
-            new_tasks.append(Raxml(cladeid,
+            if model:
+                new_tasks.append(Phyml(cladeid, alg_phylip_file, 
+                                       model, "nt", 
+                                       config["phyml"]))
+            else:
+                new_tasks.append(Raxml(cladeid,
                                    alg_phylip_file,
-                                   moel, "nt",
+                                   "GTR", "nt",
                                    config["raxml"]))
 
     elif task.ttype == "tree":
@@ -151,6 +156,7 @@ def get_conservation(alg_file):
     mean = numpy.mean(conservation)
     std =  numpy.std(conservation)
     return mean, std
+
          
 def switch_to_codon(alg_fasta_file, alg_phylip_file, nt_seed_file, kept_columns=[]):
     # Check conservation of columns. If too many identities,
