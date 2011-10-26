@@ -26,7 +26,7 @@ aligners = muscle, mafft
 use_reverse = True
 
 [trimal]
-_path = trimal
+_path = /home/jhuerta/_Projects/npr/external_apps/trimal
 -gt = 0.1
 
 [mcoffee]

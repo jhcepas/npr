@@ -2,7 +2,7 @@ import os
 import numpy 
 import logging
 log = logging.getLogger("main")
-from .utils import del_gaps
+from .utils import del_gaps, GENCODE
 from .task import *
 
 import sys
@@ -45,32 +45,28 @@ def pipeline(task, main_tree, config):
 
     elif CLEAN_ALG and task.ttype == "alg":
         new_tasks.append(\
-            Trimal(task.cladeid, task.alg_fasta_file, task.seqtype, 
+            Trimal(task.cladeid, task.alg_fasta_file, task.alg_phylip_file, task.seqtype, 
                    config["trimal"]))
                                
     elif MODEL_TEST and (task.ttype == "alg" or task.ttype == "acleaner"):
-        # Should I use clean or raw alignment 
-        if task.ttype == "acleaner":
-            alg_fasta_file = task.clean_alg_fasta_file
-            alg_phylip_file = task.clean_alg_phylip_file
-        else:
-            alg_fasta_file = task.alg_fasta_file
-            alg_phylip_file = task.alg_phylip_file
-
         seqtype = task.seqtype
         cladeid = task.cladeid
-
+        kept_columns = getattr(task, "kept_columns", None)
+            
+        cons_mean, cons_std = get_conservation(task.alg_fasta_file)
+        log.info("Conservation%0.2f +-%0.2f", cons_mean, cons_std)
         # Converts aa alignment into nt if necessary
-        if seqtype == "aa" and nt_seed_file:
-            cons_mean, cons_std = get_conservation(alg_fasta_file)
-            log.info("Conservation %0.2f +-%0.2f",cons_mean, cons_std)
-            if cons_mean > config["general"]["DNA_sct"]:
-                log.info("switching to codon alignment")
-                # switchs to codon alg
-                alg_fasta_file, alg_phylip_file = \
-                    switch_to_codon(alg_fasta_file, alg_phylip_file, 
-                                    nt_seed_file)
-                seqtype = "nt"
+        if seqtype == "aa" and nt_seed_file and \
+                cons_mean > config["general"]["DNA_sct"]:
+            log.info("switching to codon alignment")
+            alg_fasta_file, alg_phylip_file = switch_to_codon(\
+                task.alg_fasta_file, task.alg_phylip_file, 
+                nt_seed_file, kept_columns)
+            seqtype = "nt"
+        # Should I use clean or raw alignment 
+        else:
+            alg_fasta_file = getattr(task, "clean_alg_fasta_file", task.alg_fasta_file)
+            alg_phylip_file = getattr(task, "clean_alg_phylip_file", task.alg_phylip_file)
 
         # Register model testing task
         if seqtype == "aa":
@@ -155,58 +151,38 @@ def get_conservation(alg_file):
     mean = numpy.mean(conservation)
     std =  numpy.std(conservation)
     return mean, std
-
-
-
-gencode = {
-    'ATA':'I', 'ATC':'I', 'ATT':'I', 'ATG':'M',
-    'ACA':'T', 'ACC':'T', 'ACG':'T', 'ACT':'T',
-    'AAC':'N', 'AAT':'N', 'AAA':'K', 'AAG':'K',
-    'AGC':'S', 'AGT':'S', 'AGA':'R', 'AGG':'R',
-    'CTA':'L', 'CTC':'L', 'CTG':'L', 'CTT':'L',
-    'CCA':'P', 'CCC':'P', 'CCG':'P', 'CCT':'P',
-    'CAC':'H', 'CAT':'H', 'CAA':'Q', 'CAG':'Q',
-    'CGA':'R', 'CGC':'R', 'CGG':'R', 'CGT':'R',
-    'GTA':'V', 'GTC':'V', 'GTG':'V', 'GTT':'V',
-    'GCA':'A', 'GCC':'A', 'GCG':'A', 'GCT':'A',
-    'GAC':'D', 'GAT':'D', 'GAA':'E', 'GAG':'E',
-    'GGA':'G', 'GGC':'G', 'GGG':'G', 'GGT':'G',
-    'TCA':'S', 'TCC':'S', 'TCG':'S', 'TCT':'S',
-    'TTC':'F', 'TTT':'F', 'TTA':'L', 'TTG':'L',
-    'TAC':'Y', 'TAT':'Y', 'TAA':'*', 'TAG':'*',
-    'TGC':'C', 'TGT':'C', 'TGA':'*', 'TGG':'W'
-    }
          
-def switch_to_codon(alg_fasta_file, alg_phylip_file, nt_seed_file):
+def switch_to_codon(alg_fasta_file, alg_phylip_file, nt_seed_file, kept_columns=[]):
     # Check conservation of columns. If too many identities,
     # switch to codon alignment and make the tree with DNA. 
     # Mixed models is another possibility.
-
+    kept_columns = set(map(int, kept_columns))
     all_nt_alg = SeqGroup(nt_seed_file)
     aa_alg = SeqGroup(alg_fasta_file)
     nt_alg = SeqGroup()
 
     for seqname, aaseq, comments in aa_alg.iter_entries():
         ntseq = all_nt_alg.get_seq(seqname).upper()
-        ntalgseq = ""
-        current_pos = 0
-        for ch in aaseq.upper():
-            if ch in GAP_CHARS: 
+        ntalgseq = []
+        nt_pos = 0
+        for pos, ch in enumerate(aaseq):
+            if ch in GAP_CHARS:
                 codon = "---"
             else:
-                codon = ntseq[current_pos:current_pos+3]
-                current_pos += 3
-            ntalgseq += codon
-            # If codon does not contain wildcard, check that
-            # translation is correct
-            if not (set(codon) - NUCLETIDES) and gencode[codon] != ch:
-                raise ValueError("[%s] CDS does not match protein sequence" \
-                                     %seqname)
+                codon = ntseq[nt_pos:nt_pos+3]
+                nt_pos += 3
+
+            if not kept_columns or pos in kept_columns: 
+                ntalgseq.append(codon)
+                # If codon does not contain wildcard, check that
+                # translation is correct
+                if not (set(codon) - NUCLETIDES) and GENCODE[codon] != ch:
+                    log.error("[%s] CDS does not match protein sequence: %s = %s not %s at pos %d" \
+                                         %(seqname, codon, GENCODE[codon], ch, nt_pos))
+                    raise ValueError()
+
+        ntalgseq = "".join(ntalgseq)
         nt_alg.set_seq(seqname, ntalgseq)
-        if len(ntalgseq)/3.0 != len(aaseq):
-            raise ValueError("[%s] CDS does not match protein sequence" \
-                                 %seqname)
-            
 
     alg_fasta_filename = alg_fasta_file + ".nt"
     alg_phylip_filename = alg_phylip_file + ".nt"

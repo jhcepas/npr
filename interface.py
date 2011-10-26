@@ -96,7 +96,7 @@ def init_curses(main_scr):
 
     WIN[1] = curses.newwin(h-1, w/2, 1,1)
     WIN[2] = curses.newwin(h-dbg_h, (w/2)-1, 1, (w/2)+2)
-    WIN[3] = curses.newwin(dbg_h, (w/2)-1, h-dbg_h-1, (w/2)+2)
+    WIN[3] = curses.newwin(dbg_h, (w/2)-1, h-dbg_h+1, (w/2)+2)
 
     WIN[3].box()
 
