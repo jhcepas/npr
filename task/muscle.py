@@ -16,6 +16,7 @@ class Muscle(Task):
         self.bin = args["_path"]
         self.seqtype = seqtype
         self.multiseq_file = multiseq_file
+        self.nseqs = 0
         # fixed options for running this task
         base_args = {
             '-in': None,
@@ -37,6 +38,7 @@ class Muscle(Task):
         # interleaved phylip format. Both files, fasta and phylip,
         # remain accessible.
         alg = SeqGroup(self.alg_fasta_file)
+        self.nseqs = len(alg.id2seq)
         alg.write(outfile=self.alg_phylip_file, format="iphylip_relaxed")
 
     def load_jobs(self):

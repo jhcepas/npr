@@ -17,6 +17,7 @@ class Mafft(Task):
     def __init__(self, cladeid, multiseq_file, seqtype, args):
         self.bin = args["_path"]
         self.seqtype = seqtype
+        self.nseqs = 0
         self.multiseq_file = multiseq_file
         # Mafft command needs ordered arguments. This is, input file
         # must be the last argument. Extra args come from config file
@@ -40,6 +41,7 @@ class Mafft(Task):
         # interleaved phylip format. Both files, fasta and phylip,
         # remain accessible.
         alg = SeqGroup(self.jobs[0].stdout_file)
+        self.nseqs = len(alg.id2seq)
         alg.write(outfile=self.alg_fasta_file, format="fasta")
         alg.write(outfile=self.alg_phylip_file, format="iphylip_relaxed")
 

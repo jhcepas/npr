@@ -1,5 +1,7 @@
 import os 
 import numpy 
+import re
+
 import logging
 log = logging.getLogger("main")
 from .utils import del_gaps, GENCODE
@@ -52,17 +54,29 @@ def pipeline(task, main_tree, config):
         seqtype = task.seqtype
         cladeid = task.cladeid
         kept_columns = getattr(task, "kept_columns", None)
-            
-        cons_mean, cons_std = get_conservation(task.alg_fasta_file)
-        log.info("Conservation%0.2f +-%0.2f", cons_mean, cons_std)
+
+
+
+           
+        cons_mean, cons_std = get_conservation(task.alg_fasta_file, config["trimal"]["_path"])
+        max_identity = get_max_identity(task.alg_fasta_file, config["trimal"]["_path"])
+
+        log.info("Conservation: %0.2f +-%0.2f", cons_mean, cons_std)
+        log.info("Max. Identity: %0.2f", max_identity)
+        log.info("Seqs: %d", task.nseqs)
+
+        sst = config["general"]["DNA_sst"]
+        sit = config["general"]["DNA_sit"]
+        sct = config["general"]["DNA_sct"]
+
         # Converts aa alignment into nt if necessary
         if seqtype == "aa" and nt_seed_file and \
-                cons_mean > config["general"]["DNA_sct"]:
-            log.info("switching to codon alignment")
-            alg_fasta_file, alg_phylip_file = switch_to_codon(\
-                task.alg_fasta_file, task.alg_phylip_file, 
-                nt_seed_file, kept_columns)
-            seqtype = "nt"
+                task.nseqs <= sst and max_identity > sit and cons_mean >= sct:
+                log.info("switching to codon alignment")
+                alg_fasta_file, alg_phylip_file = switch_to_codon(\
+                    task.alg_fasta_file, task.alg_phylip_file, 
+                    nt_seed_file, kept_columns)
+                seqtype = "nt"
         # Should I use clean or raw alignment 
         else:
             alg_fasta_file = getattr(task, "clean_alg_fasta_file", task.alg_fasta_file)
@@ -147,8 +161,8 @@ def pipeline(task, main_tree, config):
 
 
 import commands
-def get_conservation(alg_file):
-    output = commands.getoutput("trimal -ssc -in %s" %alg_file)
+def get_conservation(alg_file, trimal_bin):
+    output = commands.getoutput("%s -ssc -in %s" %(trimal_bin, alg_file))
     conservation = []
     for line in output.split("\n")[3:]:
         a, b = map(float, line.split())
@@ -156,6 +170,15 @@ def get_conservation(alg_file):
     mean = numpy.mean(conservation)
     std =  numpy.std(conservation)
     return mean, std
+
+def get_max_identity(alg_file, trimal_bin):
+    output = commands.getoutput("%s -sident -in %s" %(trimal_bin, alg_file))
+    conservation = []
+    for line in output.split("\n"):
+        m = re.search("#MaxIdentity\s+(\d+\.\d+)", line)
+        if m: 
+            max_identity = float(m.groups()[0])
+    return max_identity
 
          
 def switch_to_codon(alg_fasta_file, alg_phylip_file, nt_seed_file, kept_columns=[]):

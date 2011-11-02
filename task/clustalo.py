@@ -13,6 +13,7 @@ class Clustalo(Task):
         self.seqtype = "aa" # only aa supported
         self.multiseq_file = multiseq_file
         self.bin = args["_path"]
+        self.nseqs = 0
         base_args = {
             '-i': None,
             '-o': None,
@@ -34,6 +35,7 @@ class Clustalo(Task):
         # interleaved phylip format. Both files, fasta and phylip,
         # remain accessible.
         alg = fasta.read_fasta(self.alg_fasta_file, header_delimiter=" ")
+        self.nseqs = len(alg.id2seq)
         alg.write(outfile=self.alg_phylip_file, format="iphylip_relaxed")
 
     def load_jobs(self):

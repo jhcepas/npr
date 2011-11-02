@@ -65,7 +65,6 @@ class JModeltest(Task):
         self.model = best_model
         log.info("Best model: %s" %self.best_model)
 
-
     def check(self):
         if not self.best_model or (self.tree_file and not \
                                       (os.path.exists(self.tree_file) and\

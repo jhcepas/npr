@@ -1,8 +1,11 @@
 [general]
 basedir = ./prueba
 pipeline = template/standard1.py
-max_dna_partition_size = 20
-DNA_sct = 0.37 # DNA switching conservation threshold
+DNA_sst = 20 # DNA switching size threshold
+DNA_sct = 0.0 # DNA switching conservation threshold
+DNA_sit = 0.95 # DNA switching identity threshold
+
+
 clean_alignments = True
 large_alg_length = 200
 
@@ -64,6 +67,8 @@ _path = /home/jhuerta/_Projects/npr/external_apps/phyml
 
 [raxml]
 _path = /home/jhuerta/_Projects/npr/external_apps/raxmlHPC-PTHREADS-SSE3
+_phyml_bin = /home/jhuerta/_Projects/npr/external_apps/phyml
+
 _method = GAMMA # GAMMA or CAT
 #_pinv = I # If True, estimates the proportion of invariable sites. 
 #_ebf = F # Empirical base frequencies
@@ -74,7 +79,7 @@ _aa_model = JTT # Used only if no model selection is performed
 
 [jmodeltest]
 _path = "JMODELTEST_HOME=~/_Projects/npr/external_apps/jmodeltest2; cd $JMODELTEST_HOME; java -jar $JMODELTEST_HOME/jModelTest.jar"
-#-t = BIONJ  # ML, BIONJ or fixed
+-t = BIONJ  # ML, BIONJ or fixed
 -tr = 1      # Threads
 -s = 3       # Number of substitution schemes {3,5,7,11}
 #-g = 4      # Include models with rate variation among sites and number of categories (e.g., -g 4)

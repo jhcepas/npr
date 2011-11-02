@@ -1,5 +1,7 @@
 [general]
-max_dna_partition_size = integer()
 DNA_sct = float()
+DNA_sst = integer()
+DNA_sit = float()
+
 clean_alignments = boolean()
 large_alg_length = integer()
