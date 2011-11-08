@@ -5,7 +5,7 @@ import logging
 from logger import set_logindent, logindent
 log = logging.getLogger("main")
 
-from utils import get_cladeid
+from utils import get_cladeid, render_tree
 
 def schedule(config, processer, schedule_time, execution, retry):
     """ Main pipeline scheduler """ 
@@ -24,7 +24,7 @@ def schedule(config, processer, schedule_time, execution, retry):
             set_logindent(0)
             log.info(task)
             logindent(2)
-            tdir = task.taskdir.replace(config["general"]["basedir"], "")
+            tdir = task.taskdir.replace(config["main"]["basedir"], "")
             tdir = tdir.lstrip("/")
             log.info("TaskDir: %s" %tdir)
             log.info("TaskJobs: %d" %len(task.jobs))
@@ -70,11 +70,21 @@ def schedule(config, processer, schedule_time, execution, retry):
                     raise Exception("ERROR FOUND")
             elif task.status == "D":
                 log.info("Task is DONE")
+
+            # If last task processed a new tree node, dump snapshots
+            if task.ttype == "treemerger":
+                nw_file = os.path.join(config["main"]["basedir"],
+                                       "tree_snapshots", task.cladeid+".nw")
+                main_tree.write(outfile=nw_file, features=[])
+                if config["main"]["render_tree_images"]:
+                    img_file = os.path.join(config["main"]["basedir"], 
+                                            "gallery", task.cladeid+".png")
+                    render_tree(main_tree, img_file)
             
         sleep(WAITING_TIME)
         print 
 
-    final_tree_file = os.path.join(config["general"]["basedir"], \
+    final_tree_file = os.path.join(config["main"]["basedir"], \
                                        "final_tree.nw")
     main_tree.write(outfile=final_tree_file)
     for n in main_tree.traverse():
@@ -82,3 +92,4 @@ def schedule(config, processer, schedule_time, execution, retry):
         print n.cladeid
         for ts in clade2tasks.get(n.cladeid, []):
             print "   ", ts
+

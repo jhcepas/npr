@@ -1,13 +1,17 @@
-[general]
+[main]
 basedir = ./prueba
 pipeline = template/standard1.py
 DNA_sst = 20 # DNA switching size threshold
 DNA_sct = 0.0 # DNA switching conservation threshold
 DNA_sit = 0.95 # DNA switching identity threshold
 
+aligner = mafft
+aligner_max_seqs = 200 # When to switch to clustalO
+clean_alg = true
+test_aa_models = true
+test_nt_models = true
 
-clean_alignments = True
-large_alg_length = 200
+render_tree_images = true
 
 [muscle]
 _path = /home/jhuerta/_Projects/npr/external_apps/muscle
@@ -46,7 +50,7 @@ _models = "JTT", "WAG"
 --alpha = e       # 
 --nclasses =  4   # Number of classes
 --no_memory_check = ""
---quite = ""
+--quiet = ""
 
 [phyml]
 _path = /home/jhuerta/_Projects/npr/external_apps/phyml
@@ -54,12 +58,11 @@ _path = /home/jhuerta/_Projects/npr/external_apps/phyml
                   # [0,1] range or "e" for estimated
 --alpha = e       # Gamma distribution shape parameter. fixed value or
                   # "e" for "estimated"
---model = JTT
 --no_memory_check = ""
---quite = ""
+--quiet = ""
 --nclasses =  4   # Number of rate categories
 -o = tlr          # optimization
--m = LG         # Default model if no model-selection step is executed
+--model = LG      # Default model if no model-selection step is executed
 -f = m            # e: estiamte character frequencies.  m: character
                   # frequencies from model
 --bootstrap = -2  #  approximate likelihood ratio test returning
@@ -89,7 +92,7 @@ _path = "JMODELTEST_HOME=~/_Projects/npr/external_apps/jmodeltest2; cd $JMODELTE
 #-a = ""
 
 [treemerger]
-_min_seqs_for_optimization = 4
-_min_outgroups_for_optimization = 1
-_outgroup_selection_policy = "mean_dist" # mean_dist, max_dist, min_dist, median_dist
+_min_size = 4
+_min_outgroups = 1
+_outgroup_policy = "mean_dist" # mean_dist, max_dist, min_dist, median_dist
 

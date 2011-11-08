@@ -1,8 +1,12 @@
+import sys
 import os
 from string import strip
 import hashlib
 import logging
 log = logging.getLogger("main")
+
+sys.path.insert(0, "/home/jhuerta/_Devel/ete/2.2/")
+from ete_dev import PhyloTree, SeqGroup, TreeStyle, NodeStyle, faces
 
 GENCODE = {
     'ATA':'I', 'ATC':'I', 'ATT':'I', 'ATG':'M',
@@ -51,4 +55,23 @@ def load_node_size(n):
     n.add_feature("size", size)
     return size
 
+def render_tree(tree, fname):
+    # Generates tree snapshot 
+    npr_nodestyle = NodeStyle()
+    npr_nodestyle["fgcolor"] = "red"
+    for n in tree.traverse():
+        if hasattr(n, "cladeid"):
+            n.set_style(npr_nodestyle)
+    ts = TreeStyle()
+    ts.show_leaf_name = True
+    ts.show_branch_length = True
+    ts.show_branch_support = True
+    ts.mode = "c"
+    iterface = faces.TextFace("iter")
+    ts.legend.add_face(iterface, 0)
+
+    tree.dist = 0
+    tree.sort_descendants()
+    tree.ladderize()
+    tree.render(fname, tree_style = ts, w = 700)
 

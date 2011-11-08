@@ -1,27 +1,31 @@
-import os 
+from os import path
 import numpy 
 import re
-
+import commands
 import logging
 log = logging.getLogger("main")
-from .utils import del_gaps, GENCODE
+from .utils import del_gaps, GENCODE, PhyloTree, SeqGroup, TreeStyle
 from .task import *
-
-import sys
-sys.path.insert(0, "/home/jhuerta/_Devel/ete/2.2/")
-from ete_dev import PhyloTree, SeqGroup
 
 CLEAN_ALG = True
 MODEL_TEST = True
 GAP_CHARS = set(".-")
 NUCLETIDES = set("ATCG") 
 
-def pipeline(task, main_tree, config):
+def create_alg_task(cladeid, msf, seqtype, app_conf):
+    pass
+
+def create_msf_task(seed_file, seqtype):
+    return Msf(None, seed_file, seqtype)
+
+def create_tree_task(cladeid, msf, seqtype, app_conf):
+    pass
+
+def pipeline(task, main_tree, conf):
     # new tasks is a list of Task instances that are returned to the
     # scheduler.
-
-    aa_seed_file = config["general"]["aa_seed"]
-    nt_seed_file = config["general"]["nt_seed"]
+    aa_seed_file = conf["main"]["aa_seed"]
+    nt_seed_file = conf["main"]["nt_seed"]
 
     new_tasks = []
     if not task:
@@ -33,45 +37,45 @@ def pipeline(task, main_tree, config):
             raise Exception("I need at least one seed file")
 
     elif task.ttype == "msf":
-        if task.nseqs < config["general"]["large_alg_length"]:
-            #new_tasks.append(Muscle(task.cladeid, task.multiseq_file, 
-            #                        task.seqtype, config["muscle"]))
+        if task.nseqs < conf["main"]["aligner_max_seqs"]:
+            # new_tasks.append(Muscle(task.cladeid, task.multiseq_file, 
+            #                        task.seqtype, conf["muscle"]))
             new_tasks.append(Mafft(task.cladeid, task.multiseq_file, 
-                                   task.seqtype, config["mafft"]))
-
-
+                                   task.seqtype, conf["mafft"]))
         else:
             new_tasks.append(Clustalo(task.cladeid, 
                                                  task.multiseq_file, 
-                                                 config["clustalo"]))
+                                                 conf["clustalo"]))
 
-    elif CLEAN_ALG and task.ttype == "alg":
+    elif conf["main"]["clean_alg"] and task.ttype == "alg":
         new_tasks.append(\
-            Trimal(task.cladeid, task.alg_fasta_file, task.alg_phylip_file, task.seqtype, 
-                   config["trimal"]))
+            Trimal(task.cladeid, task.alg_fasta_file, task.alg_phylip_file,
+                   task.seqtype, 
+                   conf["trimal"]))
                                
-    elif MODEL_TEST and (task.ttype == "alg" or task.ttype == "acleaner"):
+    elif (task.ttype == "alg" or task.ttype == "acleaner"):
         seqtype = task.seqtype
         cladeid = task.cladeid
         kept_columns = getattr(task, "kept_columns", None)
-
-
-
            
-        cons_mean, cons_std = get_conservation(task.alg_fasta_file, config["trimal"]["_path"])
-        max_identity = get_max_identity(task.alg_fasta_file, config["trimal"]["_path"])
+        cons_mean, cons_std = get_conservation(task.alg_fasta_file, 
+                                               conf["trimal"]["_path"])
+        max_identity = get_max_identity(task.alg_fasta_file, 
+                                        conf["trimal"]["_path"])
 
         log.info("Conservation: %0.2f +-%0.2f", cons_mean, cons_std)
         log.info("Max. Identity: %0.2f", max_identity)
         log.info("Seqs: %d", task.nseqs)
 
-        sst = config["general"]["DNA_sst"]
-        sit = config["general"]["DNA_sit"]
-        sct = config["general"]["DNA_sct"]
+        sst = conf["main"]["DNA_sst"]
+        sit = conf["main"]["DNA_sit"]
+        sct = conf["main"]["DNA_sct"]
 
         # Converts aa alignment into nt if necessary
         if seqtype == "aa" and nt_seed_file and \
-                task.nseqs <= sst and max_identity > sit and cons_mean >= sct:
+                task.nseqs <= sst and max_identity > sit and \
+                cons_mean >= sct:
+
                 log.info("switching to codon alignment")
                 alg_fasta_file, alg_phylip_file = switch_to_codon(\
                     task.alg_fasta_file, task.alg_phylip_file, 
@@ -79,20 +83,22 @@ def pipeline(task, main_tree, config):
                 seqtype = "nt"
         # Should I use clean or raw alignment 
         else:
-            alg_fasta_file = getattr(task, "clean_alg_fasta_file", task.alg_fasta_file)
-            alg_phylip_file = getattr(task, "clean_alg_phylip_file", task.alg_phylip_file)
+            alg_fasta_file = getattr(task, "clean_alg_fasta_file", 
+                                     task.alg_fasta_file)
+            alg_phylip_file = getattr(task, "clean_alg_phylip_file", 
+                                      task.alg_phylip_file)
 
         # Register model testing task
         if seqtype == "aa":
             new_tasks.append(BionjModelChooser(cladeid,
                                                alg_fasta_file, 
                                                alg_phylip_file, 
-                                               config["bionj_modelchooser"]))
+                                               conf["bionj_modelchooser"]))
         elif seqtype == "nt":
             new_tasks.append(JModeltest(cladeid, 
                                         alg_fasta_file, 
                                         alg_phylip_file,
-                                        config["jmodeltest"]))
+                                        conf["jmodeltest"]))
             
     elif task.ttype in set(["mchooser", "alg", "acleaner"]):
         seqtype = task.seqtype
@@ -108,36 +114,38 @@ def pipeline(task, main_tree, config):
             new_tasks.append(Raxml(cladeid,
                                    alg_phylip_file,
                                    model, "aa",
-                                   config["raxml"]))
+                                   conf["raxml"]))
             
             #new_tasks.append(Phyml(cladeid, alg_phylip_file, 
             #                           model, "aa", 
-            #                           config["phyml"]))
+            #                           conf["phyml"]))
 
         else:
             if model:
                 new_tasks.append(Phyml(cladeid, alg_phylip_file, 
                                        model, "nt", 
-                                       config["phyml"]))
+                                       conf["phyml"]))
             else:
                 new_tasks.append(Raxml(cladeid,
                                    alg_phylip_file,
                                    "GTR", "nt",
-                                   config["raxml"]))
+                                   conf["raxml"]))
 
     elif task.ttype == "tree":
         t = PhyloTree(task.tree_file)
-        merge = TreeMerger(task.cladeid, t, main_tree, config["treemerger"])
-        main_tree = merge.main_tree
-                       
-        for part in [merge.set_a, merge.set_b]:
+        treemerge_task = TreeMerger(task.cladeid, t, main_tree, conf["treemerger"])
+        new_tasks.append(treemerge_task)
+
+    elif task.ttype == "treemerger":
+        main_tree = task.main_tree
+                      
+        for part in [task.set_a, task.set_b]:
             part_cladeid, seqs, outgroups = part
-
             # Partition size limit
-            if len(seqs) >= int(config["treemerger"]["_min_seqs_for_optimization"]) and \
-                    len(outgroups) >= int(config["treemerger"]["_min_outgroups_for_optimization"]):
+            if len(seqs) >= int(conf["treemerger"]["_min_size"]) and \
+                    len(outgroups) >= int(conf["treemerger"]["_min_outgroups"]):
 
-                # Creates msf file for the new partitions. IF
+                # Creates msf file for the new partitions. If
                 # possible, it always uses aa, even when previous tree
                 # was done with a codon alignment.
                 if aa_seed_file: 
@@ -148,7 +156,7 @@ def pipeline(task, main_tree, config):
                     seqtype = "nt"
 
                 msf_seqs = seqs + outgroups[:3]
-                new_msf_file = os.path.join(task.taskdir, 
+                new_msf_file = path.join(task.taskdir, 
                                             "children_%s.msf" %part_cladeid)
                 fasta = '\n'.join([">%s\n%s" %
                                    (n,del_gaps(alg.get_seq(n)))
@@ -156,13 +164,13 @@ def pipeline(task, main_tree, config):
                 open(new_msf_file, "w").write(fasta)
                 new_tasks.append(\
                     Msf(part_cladeid, new_msf_file, seqtype))
-            
+           
     return new_tasks, main_tree
 
 
-import commands
 def get_conservation(alg_file, trimal_bin):
-    output = commands.getoutput("%s -ssc -in %s" %(trimal_bin, alg_file))
+    output = commands.getoutput("%s -ssc -in %s" %\
+                                    (trimal_bin, alg_file))
     conservation = []
     for line in output.split("\n")[3:]:
         a, b = map(float, line.split())
@@ -172,7 +180,8 @@ def get_conservation(alg_file, trimal_bin):
     return mean, std
 
 def get_max_identity(alg_file, trimal_bin):
-    output = commands.getoutput("%s -sident -in %s" %(trimal_bin, alg_file))
+    output = commands.getoutput("%s -sident -in %s" %\
+                                    (trimal_bin, alg_file))
     conservation = []
     for line in output.split("\n"):
         m = re.search("#MaxIdentity\s+(\d+\.\d+)", line)
@@ -181,7 +190,8 @@ def get_max_identity(alg_file, trimal_bin):
     return max_identity
 
          
-def switch_to_codon(alg_fasta_file, alg_phylip_file, nt_seed_file, kept_columns=[]):
+def switch_to_codon(alg_fasta_file, alg_phylip_file, nt_seed_file, 
+                    kept_columns=[]):
     # Check conservation of columns. If too many identities,
     # switch to codon alignment and make the tree with DNA. 
     # Mixed models is another possibility.
@@ -203,11 +213,12 @@ def switch_to_codon(alg_fasta_file, alg_phylip_file, nt_seed_file, kept_columns=
 
             if not kept_columns or pos in kept_columns: 
                 ntalgseq.append(codon)
-                # If codon does not contain wildcard, check that
-                # translation is correct
+                # If codon does not contain unknown symbols, check
+                # that translation is correct
                 if not (set(codon) - NUCLETIDES) and GENCODE[codon] != ch:
-                    log.error("[%s] CDS does not match protein sequence: %s = %s not %s at pos %d" \
-                                         %(seqname, codon, GENCODE[codon], ch, nt_pos))
+                    log.error("[%s] CDS does not match protein sequence:"
+                              " %s = %s not %s at pos %d" %\
+                                  (seqname, codon, GENCODE[codon], ch, nt_pos))
                     raise ValueError()
 
         ntalgseq = "".join(ntalgseq)

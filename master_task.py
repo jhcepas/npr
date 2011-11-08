@@ -1,13 +1,8 @@
 import os
-import re
-import numpy
-import sys
-sys.path.insert(0, "/home/jhuerta/_Devel/ete/2.2/")
-from ete_dev import PhyloTree, SeqGroup
-from ete_dev.parser import fasta
-from utils import get_md5, merge_dicts
 import logging
 log = logging.getLogger("main")
+
+from utils import get_md5, merge_dicts, PhyloTree, SeqGroup
 
 class Task(object):
     global_config = {"basedir": "./test"}
@@ -109,6 +104,12 @@ class Task(object):
         ''' Customizable function. It must process all jobs and set
         the resulting values of the task. For instance, set variables
         pointing to the resulting file '''
+
+    def check(self):
+        ''' Customizable function. Return true if task is done and
+        expected results are available. '''
+        return True
+
 
 
 

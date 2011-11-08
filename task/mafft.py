@@ -6,10 +6,7 @@ from .ordereddict import OrderedDict
 
 from .master_task import Task
 from .master_job import Job
-
-import sys
-sys.path.insert(0, "/home/jhuerta/_Devel/ete/2.2/")
-from ete_dev import SeqGroup
+from .utils import SeqGroup
 
 __all__ = ["Mafft"]
 

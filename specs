@@ -1,7 +1,11 @@
-[general]
+[main]
 DNA_sct = float()
 DNA_sst = integer()
 DNA_sit = float()
 
-clean_alignments = boolean()
-large_alg_length = integer()
+clean_alg = boolean()
+aligner_max_seqs = integer()
+test_aa_models = boolean()
+test_nt_models = boolean()
+render_tree_images = boolean()
+

@@ -1,14 +1,10 @@
 import os
-import sys
 import logging
 log = logging.getLogger("main")
 
 from .master_task import Task
-from .utils import get_cladeid
-
-sys.path.insert(0, "/home/jhuerta/_Devel/ete/2.2/")
 from .master_job import Job
-from ete_dev import PhyloTree, SeqGroup
+from .utils import get_cladeid, PhyloTree, SeqGroup
 
 __all__ = ["Msf"]
 

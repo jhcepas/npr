@@ -1,36 +1,40 @@
-import os
 import numpy
 import logging
 log = logging.getLogger("main")
 
 from .master_task import Task
 from .master_job import Job
-from .utils import get_cladeid, load_node_size
-
-import sys
-sys.path.insert(0, "/home/jhuerta/_Devel/ete/2.2/")
-from ete_dev import PhyloTree
+from .utils import get_cladeid, load_node_size, PhyloTree
 
 __all__ = ["TreeMerger"]
 
 class TreeMerger(Task):
     def __init__(self, cladeid, task_tree, main_tree, args):
         # Initialize task
-        Task.__init__(self, cladeid, "mergetree", "tree_merger")
-        log.debug("Task Tree: %s", task_tree)
-        log.debug("Main Tree: %s", main_tree)
+        Task.__init__(self, cladeid, "treemerger", "tree_merger")
+        self.args = args
+        self.task_tree = task_tree
+        self.main_tree = main_tree
+        self.init()
+
+    def finish(self):
+        ttree = self.task_tree
+        mtree = self.main_tree
+
+        log.debug("Task Tree: %s", ttree)
+        log.debug("Main Tree: %s", mtree)
+
         # Process current main tree and the new generated tree
         # (task_tree) to find out the outgroups used in task_tree. The
         # trick lies on the fact that cladeid is always calculated
         # ignoring the IDs of outgroups seqs.
-        if main_tree:
-            target_node = main_tree.search_nodes(cladeid=cladeid)[0]
+        if mtree:
+            target_node = mtree.search_nodes(cladeid=self.cladeid)[0]
             core_seqs = set(target_node.get_leaf_names())
-            outgroup_seqs = set(task_tree.get_leaf_names()) - core_seqs
+            outgroup_seqs = set(ttree.get_leaf_names()) - core_seqs
         else:
             outgroup_seqs = None
 
-        t = task_tree
         # Root task_tree. If outgroup_seqs are available, uses manual
         # rooting. Otherwise, it means that task_tree is the result of
         # the first iteration, so it will try automatic rooting based
@@ -42,23 +46,24 @@ class TreeMerger(Task):
             if len(outgroup_seqs) > 1:
                 # Root to a non-outgroup leave to leave all outgroups
                 # in one side.
-                t.set_outgroup(list(core_seqs)[0])
-                outgroup = t.get_common_ancestor(outgroup_seqs)
+                ttree.set_outgroup(list(core_seqs)[0])
+                outgroup = ttree.get_common_ancestor(outgroup_seqs)
             else:
-                outgroup = t & list(outgroup_seqs)[0]
+                outgroup = ttree & list(outgroup_seqs)[0]
 
-            t.set_outgroup(outgroup)
-            t = t.get_common_ancestor(core_seqs)
+            ttree.set_outgroup(outgroup)
+            ttree = ttree.get_common_ancestor(core_seqs)
             # Let's forget about outgroups, we want only the
             # informative topology
-            t.detach()
+            ttree.detach()
 
         else:
             log.info("Rooting new tree using midpoint outgroup")
-            t.set_outgroup(t.get_midpoint_outgroup())
-            load_node_size(t)
+            ttree.set_outgroup(ttree.get_midpoint_outgroup())
+            # Pre load node size for better performance
+            load_node_size(ttree)
             supports = []
-            for n in t.get_descendants("levelorder"):
+            for n in ttree.get_descendants("levelorder"):
                 if n.is_leaf():
                     continue
                 st = n.get_sisters()
@@ -72,16 +77,16 @@ class TreeMerger(Task):
             # Roots to the best supported and larger partitions
             supports.sort()
             supports.reverse()
-            t.set_outgroup(supports[0][2])
+            ttree.set_outgroup(supports[0][2])
             print supports
 
-        log.debug("Pruned Task_Tree: %s", t)
+        log.debug("Pruned Task_Tree: %s", ttree)
 
         # Extract the two new partitions (potentially representing two
         # new iterations in the pipeline). Note that outgroup node was
         # detached previously.
-        a = t.children[0]
-        b = t.children[1]
+        a = ttree.children[0]
+        b = ttree.children[1]
 
         # Sequences grouped by each of the new partitions
         seqs_a = a.get_leaf_names()
@@ -103,26 +108,27 @@ class TreeMerger(Task):
         # Then we can sort outgroups prioritizing sequences whose
         # distances are close to the mean (avoiding the closest and
         # farthest sequences).
-        if args["_outgroup_selection_policy"] == "mean_dist":
+        if self.args["_outgroup_policy"] == "mean_dist":
             dist_fn = numpy.mean
-        elif args["_outgroup_selection_policy"] == "median_dist":
+        elif self.args["_outgroup_policy"] == "median_dist":
             dist_fn = numpy.median
-        elif args["_outgroup_selection_policy"] == "max_dist":
+        elif self.args["_outgroup_policy"] == "max_dist":
             dist_fn = numpy.max
-        elif args["_outgroup_selection_policy"] == "min_dist":
+        elif self.args["_outgroup_policy"] == "min_dist":
             dist_fn = numpy.min
-
 
         best_dist_to_b = dist_fn([d[0] for d in  to_b_dists])
         best_dist_to_a = dist_fn([d[0] for d in  to_a_dists])
 
-        rank_outs_a = sorted(to_a_dists, lambda x,y: cmp(abs(x[0] - best_dist_to_a),
-                                                        abs(y[0] - best_dist_to_a),
-                                                        ))
+        rank_outs_a = sorted(to_a_dists, 
+                             lambda x,y: cmp(abs(x[0] - best_dist_to_a),
+                                             abs(y[0] - best_dist_to_a),
+                                             ))
 
-        rank_outs_b = sorted(to_b_dists, lambda x,y: cmp(abs(x[0] - best_dist_to_b),
-                                                        abs(y[0] - best_dist_to_b),
-                                                        ))
+        rank_outs_b = sorted(to_b_dists, 
+                             lambda x,y: cmp(abs(x[0] - best_dist_to_b),
+                                             abs(y[0] - best_dist_to_b),
+                                             ))
         outs_a = [e[1] for e in rank_outs_a]
         outs_b = [e[1] for e in rank_outs_b]
 
@@ -132,23 +138,23 @@ class TreeMerger(Task):
         log.debug("Best outgroup for B: %s" %rank_outs_b[:5])
 
         # Annotate current tree
-        for n in t.traverse():
+        for n in ttree.traverse():
             n.add_features(cladeid=get_cladeid(n.get_leaf_names()))
 
         # Updates main tree with the results extracted from task_tree
-        if main_tree is None:
-            main_tree = t
+        if mtree is None:
+            mtree = ttree
         else:
             log.info("Merging trees")
-            target = main_tree.search_nodes(cladeid=cladeid)[0]
+            target = mtree.search_nodes(cladeid=self.cladeid)[0]
             # Switch nodes in the main_tree so current tree topology
             # is incorporated.
             up = target.up
             target.detach()
-            up.add_child(t)
+            up.add_child(ttree)
 
         self.set_a = [a.cladeid, seqs_a, outs_a]
         self.set_b = [b.cladeid, seqs_b, outs_b]
-        self.main_tree = main_tree
-        log.debug("Final Merged Main_Tree: %s", main_tree)
+        self.main_tree = mtree
+        log.debug("Final Merged Main_Tree: %s", self.main_tree)
 

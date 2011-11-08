@@ -61,11 +61,28 @@ def main(scr):
     WIN[1] = curses.newwin(h-2, w/2, 1,1)
     WIN[2] = curses.newwin(h-dbg_h, (w/2)-1, 1, (w/2)+2)
     WIN[3] = curses.newwin(dbg_h, (w/2)-1, h-dbg_h-1, (w/2)-2)
+
+
+
+
+    p = curses.newpad(1000, 1000)
+    p.addstr("HOLA\n")
+    p.addstr("AMIGO\n")
+    p.addstr("DE VIGO")
+    p.refresh(0, 0, 5, 30, 5, 35)
+    key = p.getch()
+    return 
+
+    
  
     for w in WIN.values():
         w.keypad(1)
         w.idlok(True)
         w.scrollok(True)
+    p.refresh(0, 0, 10, 10, 20, 20)
+    return 
+
+
 
     C = CursesList(WIN[2])
     for line in open("/var/log/Xorg.0.log"):
