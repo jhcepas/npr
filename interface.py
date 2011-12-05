@@ -13,56 +13,65 @@ except ImportError:
 else:
     NCURSES = True
 
-def newwin(nlines, ncols, begin_y, begin_x):
-    border = curses.newwin(nlines, ncols, begin_y, begin_x)
-    border.border()
-    
-    #win = curses.newwin(nlines-2, ncols-2, begin_y+1, begin_x+1)
-    pad = curses.newwin(1000, 1000)
-    print pad
-    return pad, border
-
 class Screen(StringIO):
-    # TAG USED TO CHANGE COLOR OF STRINGS AND SELECT WINDOW
+    # tags used to control color of strings and select buffer
     TAG = re.compile("@@(\d+)?,?(\d+):", re.MULTILINE)
     def __init__(self, windows):
         StringIO.__init__(self)
         self.windows = windows
         self.pos = {}
-        for w in windows:
-            self.pos[w] = [0, 0]
-
         if NCURSES:
-            # Resize window signal
-            signal(SIGWINCH, self.sigwinch_handler) 
+            for w in windows:
+                self.pos[w] = [0, 0]
 
-    def scroll(self, win, alpha):
-        try:
-            line, col = self.pos[win]
-        except:
-            raise Exception(self.pos)
+    def scroll(self, win, vt, hz=0):
+        line, col = self.pos[win]
 
-        pos = line + alpha
-        if pos < 0:
-            pos = 0
-        elif pos >= 1000:
-            pos = 1000 - 1
+        hz_pos = col + hz
+        if hz_pos < 0: 
+            hz_pos = 0
+        elif hz_pos >= 1000:
+            hz_pos = 999
 
-        if line != pos:
-            self.pos[win][0] = pos
+        vt_pos = line + vt
+        if vt_pos < 0:
+            vt_pos = 0
+        elif vt_pos >= 1000:
+            vt_pos = 1000 - 1
+
+        if line != vt_pos or col != hz_pos:
+            self.pos[win] = [vt_pos, hz_pos]
             self.refresh()
 
+    def scroll_to(self, win, vt, hz=0):
+        line, col = self.pos[win]
+
+        hz_pos = hz
+        if hz_pos < 0: 
+            hz_pos = 0
+        elif hz_pos >= 1000:
+            hz_pos = 999
+
+        vt_pos = vt
+        if vt_pos < 0:
+            vt_pos = 0
+        elif vt_pos >= 1000:
+            vt_pos = 1000 - 1
+
+        if line != vt_pos or col != hz_pos:
+            self.pos[win] = [vt_pos, hz_pos]
+            self.refresh()
 
     def refresh(self):
         for windex, (win, dim) in self.windows.iteritems():
             h, w, sy, sx = dim
             line, col = self.pos[windex]
             if h is not None: 
-                win.refresh(line, col, sy, sx, sy+h-1, sx+w-1)
+                win.touchwin()
+                win.noutrefresh(line, col, sy+1, sx+1, sy+h-2, sx+w-2)
             else: 
-                win.refresh()
-            #w.noutrefresh()
-            #w.doupdate()
+                win.noutrefresh()
+        curses.doupdate()
 
     def write(self, text):
         if NCURSES: 
@@ -109,30 +118,25 @@ class Screen(StringIO):
                 windex = next_windex
         self.refresh()
 
-    def sigwinch_handler(self, s, frame):
-        curses.endwin()
+    def resize_screen(self, s, frame):
+
+        import sys,fcntl,termios,struct 
+        data = fcntl.ioctl(self.stdout.fileno(), termios.TIOCGWINSZ, '1234') 
+        h, w = struct.unpack('hh', data) 
+
         win = self.windows
-        main = curses.initscr()
-        h, w = main.getmaxyx()
-        win[0] = (main, (None, None, 0, 0))
+        #main = curses.initscr()
+        #h, w = main.getmaxyx()
+        #win[0] = (main, (None, None, 0, 0))
+        #curses.resizeterm(h, w)
 
-        curses.resizeterm(h, w)
-
+        win[0][0].resize(h, w)
+        win[0][0].clear()
         info_win, error_win, debug_win = setup_layout(h, w)
-        win[0][0].addstr(str([h, w, "--", info_win, error_win, debug_win])+" "*50)
-        win[0][0].refresh()
-        win[1].resize(info_win[0], info_win[1])
-        win[1].mvwin(info_win[2], info_win[3])
-        
-        win[2].resize(error_win[0], error_win[1])
-        win[2].mvwin(error_win[2], error_win[3])
-
-        win[3].resize(debug_win[0], debug_win[1])
-        win[3].mvwin(debug_win[2], debug_win[3])
-
-        
+        win[1][1] = info_win
+        win[2][1] = error_win
+        win[3][1] = debug_win
         self.refresh()
-
 
 def init_curses(main_scr):
     if not NCURSES or not main_scr:
@@ -155,12 +159,10 @@ def init_curses(main_scr):
     # Creates layout
     info_win, error_win, debug_win = setup_layout(h, w)
      
-    WIN[1] = (curses.newpad(1000, 1000), info_win)
-    WIN[2] = (curses.newpad(1000, 1000), error_win)   
-    WIN[3] = (curses.newpad(1000, 1000), debug_win)
-
-   
-    
+    WIN[1] = [curses.newpad(5000, 1000), info_win]
+    WIN[2] = [curses.newpad(5000, 1000), error_win]
+    WIN[3] = [curses.newpad(5000, 1000), debug_win]
+     
 
     #WIN[1], WIN[11] = newwin(h-1, w/2, 1,1)
     #WIN[2], WIN[12] = newwin(h-dbg_h-1, (w/2)-1, 1, (w/2)+2)
@@ -206,29 +208,39 @@ def main(main_screen, func, args):
         t.start()
         ln = 0           
         chars = "\\|/-\\|/-"
-
+        cbuff = 1
         while 1: 
             mwin = screen.windows[0][0]
             key = mwin.getch()
-            mwin.addstr(0, 0, "%s (%s)" %(key, screen.pos) + " "*50)
+            mwin.addstr(0, 0, "%s (%s) (%s)" %(key, screen.pos, screen.windows) + " "*50)
             mwin.refresh()
             if key == 113: 
                 break
+            if key == 9: 
+                cbuff += 1
+                if cbuff>3: 
+                    cbuff = 1
             elif key == curses.KEY_UP:
-                screen.scroll(1, -1)
+                screen.scroll(cbuff, -1)
             elif key == curses.KEY_DOWN:
-                screen.scroll(1, 1)
+                screen.scroll(cbuff, 1)
+            elif key == curses.KEY_LEFT:
+                screen.scroll(cbuff, 0, -1)
+            elif key == curses.KEY_RIGHT:
+                screen.scroll(cbuff, 0, 1)
             elif key == curses.KEY_NPAGE:
-                screen.scroll(1, 10)
+                screen.scroll(cbuff, 10)
             elif key == curses.KEY_PPAGE:
-                screen.scroll(1, -10)
+                screen.scroll(cbuff, -10)
             elif key == curses.KEY_END:
-                C.goto_end()
+                screen.scroll_to(cbuff, 999, 0)
             elif key == curses.KEY_HOME:
-                C.goto_start()
+                screen.scroll_to(cbuff, 0, 0)
+            elif key == curses.KEY_RESIZE:
+                screen.resize_screen(None, None)
             else:
-                screen.refresh()
-
+                pass
+            #screen.refresh()
 
         #while 1: 
         #    if ln >= len(chars):
@@ -242,9 +254,10 @@ def main(main_screen, func, args):
 
 def setup_layout(h, w):
     # Creates layout
-
-    start_x = 2
-    start_y = 2
+    header = 4
+    
+    start_x = 0
+    start_y = header
     h -= start_y
     w -= start_x
 
@@ -256,9 +269,9 @@ def setup_layout(h, w):
         # |___|___|
         w1 = w/2 + w%2
         w2 = w/2 
-        info_win = (h, w1, start_y, start_x)
-        error_win = (h1, w2, start_y, w1)
-        debug_win = (h2, w2, h1, w1)
+        info_win = [h, w1, start_y, start_x]
+        error_win = [h1, w2, start_y, w1]
+        debug_win = [h2, w2, h1, w1]
     else:
         #  ___
         # |___|
@@ -266,8 +279,10 @@ def setup_layout(h, w):
         # |___|
         h2a = h2/2 + h2%2 
         h2b = h2/2
-        info_win = (h1, w, start_y, start_x)
-        error_win = (h2a, w, h1, start_x)
-        debug_win = (h2b, w, h2a, start_x)
+        info_win = [h1, w, start_y, start_x]
+        error_win = [h2a, w, h1, start_x]
+        debug_win = [h2b, w, h1+h2a, start_x]
    
     return info_win, error_win, debug_win
+
+
