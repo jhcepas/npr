@@ -3,6 +3,7 @@ import logging
 log = logging.getLogger("main")
 
 from utils import get_md5, merge_dicts, PhyloTree, SeqGroup
+from master_job import Job
 
 class Task(object):
     global_config = {"basedir": "./test"}
@@ -49,6 +50,22 @@ class Task(object):
         self.status = "W"
         self.args = merge_dicts(extra_args, base_args, parent=self)
 
+    def get_status(self):
+
+        job_status = self.get_jobs_status()
+        if "E" in job_status: 
+            return "E"
+        elif "W" in job_status: 
+            return "E"
+        elif set("D") == job_status: 
+            self.finish()
+            if self.check():
+                return "D"
+            else:
+                return "E"
+        else:
+            return "?"
+
     def init(self):
         # Prepare required jobs
         self.load_jobs()
@@ -61,23 +78,37 @@ class Task(object):
         
     def get_jobs_status(self):
         if self.jobs:
-            return set([j.status() for j in self.jobs])
+            return set([j.get_status() for j in self.jobs])
         else:
             return set(["D"])
 
     def dump_job_commands(self):
-        JOBS = open(self.jobs_file, "w")
+        FILE = open(self.jobs_file, "w")
         for job in self.jobs:
-            job.dump_script()
-            JOBS.write("sh %s >%s 2>%s\n" %\
+            if isinstance(job, Job):
+                job.dump_script()
+                FILE.write("sh %s >%s 2>%s\n" %\
                            (job.cmd_file, job.stdout_file, job.stderr_file))
-        JOBS.close()
+                print job.cmd_file
+            elif isinstance(job, Task):
+                job.dump_job_commands()
+                FILE.write("sh %s \n" %\
+                           (job.jobs_file))
+            else:
+                log.error("Unsupported job type", job)
+        #for job in self.jobs:
+        #    job.dump_script()
+        #    JOBS.write("sh %s >%s 2>%s\n" %\
+        #                   (job.cmd_file, job.stdout_file, job.stderr_file))
+
+        FILE.close()
 
     def load_task_info(self):
         # Creates a task id based on its jobs
         if not self.taskid:
-            unique_id = get_md5(','.join(sorted([j.jobid for j in self.jobs])))
+            unique_id = get_md5(','.join(sorted([getattr(j, "jobid", "taskid") for j in self.jobs])))
             self.taskid = unique_id
+
         self.taskdir = os.path.join(self.global_config["basedir"], self.cladeid,
                                     self.tname+"_"+self.taskid)
         if not os.path.exists(self.taskdir):
@@ -88,7 +119,8 @@ class Task(object):
 
     def set_jobs_wd(self, path):
         for j in self.jobs:
-            j.set_jobdir(path)
+            if issubclass(Job, j.__class__):
+                j.set_jobdir(path)
 
     def retry(self):
         self.status = "W"

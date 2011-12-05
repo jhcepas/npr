@@ -57,7 +57,7 @@ class Job(object):
         open(self.cmd_file, "w").write(script)
         #log.debug(script)
  
-    def status(self):
+    def get_status(self):
         if not os.path.exists(self.status_file):
             return "W"
         else:

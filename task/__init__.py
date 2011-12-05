@@ -8,3 +8,4 @@ from tree_merger import *
 from modeltest import *
 from phyml import *
 from mafft import *
+from meta_alg import *

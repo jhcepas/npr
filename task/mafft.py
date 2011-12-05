@@ -2,11 +2,9 @@ import os
 import logging
 log = logging.getLogger("main")
 
-from .ordereddict import OrderedDict
-
 from .master_task import Task
 from .master_job import Job
-from .utils import SeqGroup
+from .utils import SeqGroup, OrderedDict
 
 __all__ = ["Mafft"]
 

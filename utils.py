@@ -5,6 +5,11 @@ import hashlib
 import logging
 log = logging.getLogger("main")
 
+try: 
+    from collections import OrderedDict
+except ImportError: 
+    from ordereddict import OrderedDict
+
 sys.path.insert(0, "/home/jhuerta/_Devel/ete/2.x/")
 from ete_dev import PhyloTree, SeqGroup, TreeStyle, NodeStyle, faces
 

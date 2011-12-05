@@ -67,7 +67,7 @@ def schedule(config, processer, schedule_time, execution, retry):
                     log.info("Remarking task as undone to retry")
                     task.retry()
                 else:
-                    raise Exception("ERROR FOUND")
+                    raise Exception("ERROR FOUND in", task.taskdir)
             elif task.status == "D":
                 log.info("Task is DONE")
 

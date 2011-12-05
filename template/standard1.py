@@ -7,11 +7,6 @@ log = logging.getLogger("main")
 from .utils import del_gaps, GENCODE, PhyloTree, SeqGroup, TreeStyle
 from .task import *
 
-CLEAN_ALG = True
-MODEL_TEST = True
-GAP_CHARS = set(".-")
-NUCLETIDES = set("ATCG") 
-
 def create_alg_task(cladeid, msf, seqtype, app_conf):
     pass
 
@@ -40,8 +35,11 @@ def pipeline(task, main_tree, conf):
         if task.nseqs < conf["main"]["aligner_max_seqs"]:
             # new_tasks.append(Muscle(task.cladeid, task.multiseq_file, 
             #                        task.seqtype, conf["muscle"]))
-            new_tasks.append(Mafft(task.cladeid, task.multiseq_file, 
-                                   task.seqtype, conf))
+            # new_tasks.append(Mafft(task.cladeid, task.multiseq_file, 
+            #                        task.seqtype, conf))
+            new_tasks.append(MetaAligner(task.cladeid, task.multiseq_file, 
+                                         task.seqtype, conf))
+
         else:
             new_tasks.append(Clustalo(task.cladeid, 
                                                  task.multiseq_file, 
@@ -192,6 +190,8 @@ def get_max_identity(alg_file, trimal_bin):
          
 def switch_to_codon(alg_fasta_file, alg_phylip_file, nt_seed_file, 
                     kept_columns=[]):
+    GAP_CHARS = set(".-")
+    NUCLEOTIDES = set("ATCG") 
     # Check conservation of columns. If too many identities,
     # switch to codon alignment and make the tree with DNA. 
     # Mixed models is another possibility.
@@ -215,7 +215,7 @@ def switch_to_codon(alg_fasta_file, alg_phylip_file, nt_seed_file,
                 ntalgseq.append(codon)
                 # If codon does not contain unknown symbols, check
                 # that translation is correct
-                if not (set(codon) - NUCLETIDES) and GENCODE[codon] != ch:
+                if not (set(codon) - NUCLEOTIDES) and GENCODE[codon] != ch:
                     log.error("[%s] CDS does not match protein sequence:"
                               " %s = %s not %s at pos %d" %\
                                   (seqname, codon, GENCODE[codon], ch, nt_pos))
