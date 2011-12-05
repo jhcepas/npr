@@ -9,11 +9,13 @@ from .utils import basename, PhyloTree
 __all__ = ["JModeltest"]
 
 class JModeltest(Task):
-    def __init__(self, cladeid, alg_fasta_file, alg_phylip_file, args):
+    def __init__(self, cladeid, alg_fasta_file, alg_phylip_file, conf):
+        self.conf = conf
         base_args = {
             '-d': alg_fasta_file, 
             }
 
+        args = self.conf["jmodeltest"]
         if args.get("-t", "ML") == "ML":
             task_type = "tree"
         else:
@@ -21,7 +23,6 @@ class JModeltest(Task):
             
         Task.__init__(self, cladeid, task_type, "jmodeltest", base_args, args)
         # set app arguments and options
-        self.bin = args["_path"]
         self.alg_fasta_file = alg_fasta_file
         self.alg_phylip_file = alg_phylip_file
         self.seqtype = "nt"
@@ -31,7 +32,7 @@ class JModeltest(Task):
         self.init()
 
     def load_jobs(self):
-        tree_job = Job(self.bin, self.args)
+        tree_job = Job(self.conf["app"]["jmodeltest"], self.args)
         self.jobs.append(tree_job)
 
     def finish(self):

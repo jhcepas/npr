@@ -13,37 +13,52 @@ test_nt_models = true
 
 render_tree_images = true
 
+[app]
+muscle     = "/home/jhuerta/_Projects/npr/external_apps/muscle"
+mafft      = "MAFFT_BINARIES=~/_Projects/npr/external_apps/mafft-6.861-without-extensions/binaries/  /home/jhuerta/_Projects/npr/external_apps/mafft"
+clustalo   = "/home/jhuerta/_Projects/npr/external_apps/clustalo"
+trimal     = "/home/jhuerta/_Projects/npr/external_apps/trimal"
+tcoffee    = "/home/jhuerta/_Projects/npr/external_apps/tcoffee"
+phyml      = "/home/jhuerta/_Projects/npr/external_apps/phyml"
+raxml      = "/home/jhuerta/_Projects/npr/external_apps/raxmlHPC-PTHREADS-SSE3"
+jmodeltest = "JMODELTEST_HOME=~/_Projects/npr/external_apps/jmodeltest2; cd $JMODELTEST_HOME; java -jar $JMODELTEST_HOME/jModelTest.jar"
+
 [muscle]
-_path = /home/jhuerta/_Projects/npr/external_apps/muscle
 -maxhours = 24
 -maxiters = 16
 
 [mafft]
-_path = "MAFFT_BINARIES=~/_Projects/npr/external_apps/mafft-6.861-without-extensions/binaries/  /home/jhuerta/_Projects/npr/external_apps/mafft"
 --quiet = ""
 --auto = ""
 
 [clustalo]
-_path = /home/jhuerta/_Projects/npr/external_apps/clustalo
 -v = ""
 --threads = 1 
 
-[metaaligner]
+[meta_aligner]
 aligners = muscle, mafft
 use_reverse = True
+  [[mafft]]
+  --quiet = ""
+  --auto = ""
+  [[muscle]]
+  -maxhours = 24
+  -maxiters = 16
+  [[clustalo]]
+  -v = ""
+  --threads = 1 
+                    
+
 
 [trimal]
-_path = /home/jhuerta/_Projects/npr/external_apps/trimal
 -gt = 0.1
 
 [mcoffee]
-_path = /home/jhuerta/_Projects/npr/external_apps/tcoffee
 -mode = mcoffee
 -output = fasta
 -aln = g0.aln g5.aln g10.aln g15.aln
 
 [bionj_modelchooser]
-_path = /home/jhuerta/_Projects/npr/external_apps/phyml
 _models = "JTT", "WAG" 
 -f = m            # char freq (m)odel or (e)stimated
 --pinv = e        # Proportion of invariant sites
@@ -53,7 +68,6 @@ _models = "JTT", "WAG"
 --quiet = ""
 
 [phyml]
-_path = /home/jhuerta/_Projects/npr/external_apps/phyml
 --pinv = e        # Proportion of invariant sites.  Fixed value in the
                   # [0,1] range or "e" for estimated
 --alpha = e       # Gamma distribution shape parameter. fixed value or
@@ -69,7 +83,6 @@ _path = /home/jhuerta/_Projects/npr/external_apps/phyml
                   #  Chi2-based parametric branch supports.
 
 [raxml]
-_path = /home/jhuerta/_Projects/npr/external_apps/raxmlHPC-PTHREADS-SSE3
 _phyml_bin = /home/jhuerta/_Projects/npr/external_apps/phyml
 
 _method = GAMMA # GAMMA or CAT
@@ -81,7 +94,6 @@ _aa_model = JTT # Used only if no model selection is performed
 -p = 31416 # Random seed to generate starting tree. Make results reproducible 
 
 [jmodeltest]
-_path = "JMODELTEST_HOME=~/_Projects/npr/external_apps/jmodeltest2; cd $JMODELTEST_HOME; java -jar $JMODELTEST_HOME/jModelTest.jar"
 -t = BIONJ  # ML, BIONJ or fixed
 -tr = 1      # Threads
 -s = 3       # Number of substitution schemes {3,5,7,11}
@@ -91,7 +103,7 @@ _path = "JMODELTEST_HOME=~/_Projects/npr/external_apps/jmodeltest2; cd $JMODELTE
 -AIC = ""    # 
 #-a = ""
 
-[treemerger]
+[tree_merger]
 _min_size = 4
 _min_outgroups = 1
 _outgroup_policy = "mean_dist" # mean_dist, max_dist, min_dist, median_dist

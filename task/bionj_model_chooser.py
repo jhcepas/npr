@@ -10,11 +10,11 @@ from .utils import basename, PhyloTree
 __all__ = ["BionjModelChooser"]
 
 class BionjModelChooser(Task):
-    def __init__(self, cladeid, alg_fasta_file, alg_phylip_file, args):
+    def __init__(self, cladeid, alg_fasta_file, alg_phylip_file, conf):
         self.alg_phylip_file = alg_phylip_file
         self.alg_fasta_file = alg_fasta_file
         self.alg_basename = basename(self.alg_phylip_file)
-        self.bin = args["_path"]
+        self.conf = conf
         base_args = {
             "--datatype": "aa",
             "--input": self.alg_basename,
@@ -25,11 +25,12 @@ class BionjModelChooser(Task):
             "--quiet": ""
             }
 
-        Task.__init__(self, cladeid, "mchooser", "bionj_model_chooser", base_args, args)
-        self.best_model = None
+        Task.__init__(self, cladeid, "mchooser", "bionj_model_chooser", 
+                      base_args, conf["bionj_modelchooser"])
 
+        self.best_model = None
         self.seqtype = "aa"
-        self.models = args["_models"]
+        self.models = self.conf["bionj_modelchooser"]["_models"]
 
         # Prepare jobs and task
         self.init()
@@ -48,7 +49,7 @@ class BionjModelChooser(Task):
         for m in self.models:
             args = self.args.copy()
             args["--model"] = m
-            job = Job(self.bin, args)
+            job = Job(self.conf["app"]["phyml"], args)
             self.jobs.append(job)
         log.info(self.models)
     def finish(self):

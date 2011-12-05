@@ -10,11 +10,11 @@ from .utils import SeqGroup
 __all__ = ["Trimal"]
 
 class Trimal(Task):
-    def __init__(self, cladeid, alg_fasta_file, alg_phylip_file, seqtype, args):
+    def __init__(self, cladeid, alg_fasta_file, alg_phylip_file, seqtype, conf):
+        self.conf = conf
         self.seqtype = seqtype
         self.alg_fasta_file = alg_fasta_file
         self.alg_phylip_file = alg_phylip_file
-        self.bin = args["_path"]
         self.kept_columns = []
         self.nseqs = 0
         base_args = {
@@ -25,7 +25,7 @@ class Trimal(Task):
             }
         # Initialize task
         Task.__init__(self, cladeid, "acleaner", "trimal", 
-                      base_args, args)
+                      base_args, conf["trimal"])
 
         # Load task data
         self.init()
@@ -51,7 +51,7 @@ class Trimal(Task):
         args = self.args.copy()
         args["-in"] = self.alg_fasta_file
         args["-out"] = "clean.alg.fasta"
-        job = Job(self.bin, args)
+        job = Job(self.conf["app"]["trimal"], args)
         self.jobs.append(job)
 
     def check(self):

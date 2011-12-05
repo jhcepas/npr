@@ -5,7 +5,7 @@ import hashlib
 import logging
 log = logging.getLogger("main")
 
-sys.path.insert(0, "/home/jhuerta/_Devel/ete/2.2/")
+sys.path.insert(0, "/home/jhuerta/_Devel/ete/2.x/")
 from ete_dev import PhyloTree, SeqGroup, TreeStyle, NodeStyle, faces
 
 GENCODE = {

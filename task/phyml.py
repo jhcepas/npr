@@ -12,11 +12,12 @@ from .utils import basename, PhyloTree
 __all__ = ["Phyml"]
 
 class Phyml(Task):
-    def __init__(self, cladeid, alg_file, best_model, seqtype, args):
+    def __init__(self, cladeid, alg_file, best_model, seqtype, conf):
+        self.conf = conf
         self.alg_phylip_file = alg_file
         self.alg_basename = basename(self.alg_phylip_file)
         self.seqtype = seqtype
-        self.bin = args["_path"]
+
         base_args = {
             "--model": best_model, 
             "--datatype": seqtype,
@@ -24,7 +25,8 @@ class Phyml(Task):
             "--no_memory_check": "", 
             "--quiet": "" }
 
-        Task.__init__(self, cladeid, "tree", "phyml", base_args, args)
+        Task.__init__(self, cladeid, "tree", "phyml", 
+                      base_args, conf["phyml"])
 
         # Prepare jobs and task
         self.init()
@@ -41,7 +43,7 @@ class Phyml(Task):
 
     def load_jobs(self):
         args = self.args.copy()
-        job = Job(self.bin, args)
+        job = Job(self.conf["app"]["phyml"], args)
         self.jobs.append(job)
 
     def finish(self):

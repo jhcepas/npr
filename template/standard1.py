@@ -41,17 +41,17 @@ def pipeline(task, main_tree, conf):
             # new_tasks.append(Muscle(task.cladeid, task.multiseq_file, 
             #                        task.seqtype, conf["muscle"]))
             new_tasks.append(Mafft(task.cladeid, task.multiseq_file, 
-                                   task.seqtype, conf["mafft"]))
+                                   task.seqtype, conf))
         else:
             new_tasks.append(Clustalo(task.cladeid, 
                                                  task.multiseq_file, 
-                                                 conf["clustalo"]))
+                                                 conf))
 
     elif conf["main"]["clean_alg"] and task.ttype == "alg":
         new_tasks.append(\
             Trimal(task.cladeid, task.alg_fasta_file, task.alg_phylip_file,
                    task.seqtype, 
-                   conf["trimal"]))
+                   conf))
                                
     elif (task.ttype == "alg" or task.ttype == "acleaner"):
         seqtype = task.seqtype
@@ -59,9 +59,9 @@ def pipeline(task, main_tree, conf):
         kept_columns = getattr(task, "kept_columns", None)
            
         cons_mean, cons_std = get_conservation(task.alg_fasta_file, 
-                                               conf["trimal"]["_path"])
+                                               conf["app"]["trimal"])
         max_identity = get_max_identity(task.alg_fasta_file, 
-                                        conf["trimal"]["_path"])
+                                        conf["app"]["trimal"])
 
         log.info("Conservation: %0.2f +-%0.2f", cons_mean, cons_std)
         log.info("Max. Identity: %0.2f", max_identity)
@@ -93,12 +93,12 @@ def pipeline(task, main_tree, conf):
             new_tasks.append(BionjModelChooser(cladeid,
                                                alg_fasta_file, 
                                                alg_phylip_file, 
-                                               conf["bionj_modelchooser"]))
+                                               conf))
         elif seqtype == "nt":
             new_tasks.append(JModeltest(cladeid, 
                                         alg_fasta_file, 
                                         alg_phylip_file,
-                                        conf["jmodeltest"]))
+                                        conf))
             
     elif task.ttype in set(["mchooser", "alg", "acleaner"]):
         seqtype = task.seqtype
@@ -114,26 +114,26 @@ def pipeline(task, main_tree, conf):
             new_tasks.append(Raxml(cladeid,
                                    alg_phylip_file,
                                    model, "aa",
-                                   conf["raxml"]))
+                                   conf))
             
             #new_tasks.append(Phyml(cladeid, alg_phylip_file, 
             #                           model, "aa", 
-            #                           conf["phyml"]))
+            #                           conf))
 
         else:
             if model:
                 new_tasks.append(Phyml(cladeid, alg_phylip_file, 
                                        model, "nt", 
-                                       conf["phyml"]))
+                                       conf))
             else:
                 new_tasks.append(Raxml(cladeid,
                                    alg_phylip_file,
                                    "GTR", "nt",
-                                   conf["raxml"]))
+                                   conf))
 
     elif task.ttype == "tree":
         t = PhyloTree(task.tree_file)
-        treemerge_task = TreeMerger(task.cladeid, t, main_tree, conf["treemerger"])
+        treemerge_task = TreeMerger(task.cladeid, t, main_tree, conf)
         new_tasks.append(treemerge_task)
 
     elif task.ttype == "treemerger":
@@ -142,8 +142,8 @@ def pipeline(task, main_tree, conf):
         for part in [task.set_a, task.set_b]:
             part_cladeid, seqs, outgroups = part
             # Partition size limit
-            if len(seqs) >= int(conf["treemerger"]["_min_size"]) and \
-                    len(outgroups) >= int(conf["treemerger"]["_min_outgroups"]):
+            if len(seqs) >= int(conf["tree_merger"]["_min_size"]) and \
+                    len(outgroups) >= int(conf["tree_merger"]["_min_outgroups"]):
 
                 # Creates msf file for the new partitions. If
                 # possible, it always uses aa, even when previous tree

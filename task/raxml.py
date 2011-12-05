@@ -12,13 +12,15 @@ from .utils import basename, PhyloTree
 __all__ = ["Raxml"]
 
 class Raxml(Task):
-    def __init__(self, cladeid, alg_file, model, seqtype, args):
+    def __init__(self, cladeid, alg_file, model, seqtype, conf):
+        self.conf = conf
+        args = self.conf["raxml"]
+
+        # Process raxml options
         method = args.get("method", "GAMMA").upper()
         inv = args.get("pinv", "").upper()
         freq = args.get("ebf", "").upper()
-        # set app arguments and options
-        self.bin = args["_path"]
-        self.phyml_bin = args["_phyml_bin"]
+
         self.alg_file = alg_file
         self.model = model
         self.compute_alrt = True
@@ -58,7 +60,8 @@ class Raxml(Task):
                                                basename(self.alg_file) +"_phyml_tree.txt")
 
     def load_jobs(self):
-        tree_job = Job(self.bin, self.args)
+
+        tree_job = Job(self.conf["app"]["raxml"], self.args)
         self.jobs.append(tree_job)
         if self.compute_alrt:
             alrt_args = {
@@ -69,7 +72,7 @@ class Raxml(Task):
                 "-n": self.cladeid,
                 "-s": self.args["-s"],
                 }
-            alrt_job = Job(self.bin, alrt_args)       
+            alrt_job = Job(self.conf["app"]["raxml"], alrt_args)       
             self.jobs.append(alrt_job)
 
 
@@ -84,7 +87,7 @@ class Raxml(Task):
                 "--no_memory_check": "",
                 }
 
-            alrt_job = Job(self.phyml_bin, alrt_args)       
+            alrt_job = Job(self.conf["app"]["phyml"], alrt_args)       
             self.jobs.append(alrt_job)
 
     def finish(self):

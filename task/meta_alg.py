@@ -80,15 +80,16 @@ class MCoffee(Task):
 
 
 class MetaAligner(Task):
-    def __init__(self, cladeid, multiseq_file, seqtype, args):
+    def __init__(self, cladeid, multiseq_file, seqtype, conf):
+        self.conf = conf
         self.seqtype = seqtype
         self.multiseq_file = multiseq_file
         # fixed options for running this task
         base_args = {
             }
-
         # Initialize task
-        Task.__init__(self, cladeid, "alg", "meta-alg", base_args, args)
+        Task.__init__(self, cladeid, "alg", "meta-alg", 
+                      base_args, conf["meta_aligner"])
         # Load task data
         self.init()
 

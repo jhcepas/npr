@@ -11,8 +11,8 @@ from .utils import SeqGroup
 __all__ = ["Mafft"]
 
 class Mafft(Task):
-    def __init__(self, cladeid, multiseq_file, seqtype, args):
-        self.bin = args["_path"]
+    def __init__(self, cladeid, multiseq_file, seqtype, conf):
+        self.conf = conf
         self.seqtype = seqtype
         self.nseqs = 0
         self.multiseq_file = multiseq_file
@@ -23,7 +23,8 @@ class Mafft(Task):
         # input file at the last position.
         base_args = OrderedDict()
         # Initialize task
-        Task.__init__(self, cladeid, "alg", "mafft", base_args, args)
+        Task.__init__(self, cladeid, "alg", "mafft", 
+                      base_args, conf["mafft"])
 
         # Init task information, such as taskname, taskid, etc.
         self.init()
@@ -48,7 +49,7 @@ class Mafft(Task):
         # arguments is important, input file must be the last
         # one. Read above.
         args[""] = self.multiseq_file
-        job = Job(self.bin, args)
+        job = Job(self.conf["app"]["mafft"], args)
         self.jobs.append(job)
 
     def check(self):

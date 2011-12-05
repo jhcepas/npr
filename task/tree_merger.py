@@ -9,10 +9,11 @@ from .utils import get_cladeid, load_node_size, PhyloTree
 __all__ = ["TreeMerger"]
 
 class TreeMerger(Task):
-    def __init__(self, cladeid, task_tree, main_tree, args):
+    def __init__(self, cladeid, task_tree, main_tree, conf):
         # Initialize task
         Task.__init__(self, cladeid, "treemerger", "tree_merger")
-        self.args = args
+        self.conf = conf
+        self.args = conf["tree_merger"]
         self.task_tree = task_tree
         self.main_tree = main_tree
         self.init()

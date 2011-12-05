@@ -9,8 +9,8 @@ from .utils import SeqGroup
 __all__ = ["Muscle"]
 
 class Muscle(Task):
-    def __init__(self, cladeid, multiseq_file, seqtype, args):
-        self.bin = args["_path"]
+    def __init__(self, cladeid, multiseq_file, seqtype, conf):
+        self.conf = conf
         self.seqtype = seqtype
         self.multiseq_file = multiseq_file
         self.nseqs = 0
@@ -20,7 +20,8 @@ class Muscle(Task):
             '-out': None,
             }
         # Initialize task
-        Task.__init__(self, cladeid, "alg", "muscle", base_args, args)
+        Task.__init__(self, cladeid, "alg", "muscle", 
+                      base_args, conf["muscle"])
 
         # Load task data
         self.init()
@@ -43,7 +44,7 @@ class Muscle(Task):
         args = self.args.copy()
         args["-in"] = self.multiseq_file
         args["-out"] = "alg.fasta"
-        job = Job(self.bin, args)
+        job = Job(self.conf["app"]["muscle"], args)
         self.jobs.append(job)
 
     def check(self):

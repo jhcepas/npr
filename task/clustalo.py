@@ -9,10 +9,10 @@ from .master_job import Job
 __all__ = ["Clustalo"]
 
 class Clustalo(Task):
-    def __init__(self, cladeid, multiseq_file, args):
+    def __init__(self, cladeid, multiseq_file, conf):
         self.seqtype = "aa" # only aa supported
         self.multiseq_file = multiseq_file
-        self.bin = args["_path"]
+        self.conf = conf
         self.nseqs = 0
         base_args = {
             '-i': None,
@@ -20,7 +20,8 @@ class Clustalo(Task):
             '--outfmt': "fa",
             }
         # Initialize task
-        Task.__init__(self, cladeid, "alg", "clustal_omega", base_args, args)
+        Task.__init__(self, cladeid, "alg", "clustal_omega", 
+                      base_args, conf["clustalo"])
 
         # Load task data
         self.init()
@@ -43,7 +44,7 @@ class Clustalo(Task):
         args = self.args.copy()
         args["-i"] = self.multiseq_file
         args["-o"] = "alg.fasta"
-        job = Job(OCLUSTAL_BIN, args)
+        job = Job(self.conf["app"]["clustalo"], args)
         self.jobs.append(job)
 
     def check(self):
