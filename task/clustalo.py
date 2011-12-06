@@ -6,10 +6,14 @@ log = logging.getLogger("main")
 from .master_task import Task
 from .master_job import Job
 
+from .utils import read_fasta
+
 __all__ = ["Clustalo"]
 
 class Clustalo(Task):
-    def __init__(self, cladeid, multiseq_file, conf):
+    def __init__(self, cladeid, multiseq_file, seqtype, conf):
+        if seqtype != "aa":
+            raise Exception("Clustal Omega does only support aa seqtype")
         self.seqtype = "aa" # only aa supported
         self.multiseq_file = multiseq_file
         self.conf = conf
@@ -35,7 +39,7 @@ class Clustalo(Task):
         # Once executed, alignment is converted into relaxed
         # interleaved phylip format. Both files, fasta and phylip,
         # remain accessible.
-        alg = fasta.read_fasta(self.alg_fasta_file, header_delimiter=" ")
+        alg = read_fasta(self.alg_fasta_file, header_delimiter=" ")
         self.nseqs = len(alg.id2seq)
         alg.write(outfile=self.alg_phylip_file, format="iphylip_relaxed")
 

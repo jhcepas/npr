@@ -41,9 +41,8 @@ def pipeline(task, main_tree, conf):
                                          task.seqtype, conf))
 
         else:
-            new_tasks.append(Clustalo(task.cladeid, 
-                                                 task.multiseq_file, 
-                                                 conf))
+            new_tasks.append(Clustalo(task.cladeid, task.multiseq_file, 
+                                      "aa", conf))
 
     elif conf["main"]["clean_alg"] and task.ttype == "alg":
         new_tasks.append(\

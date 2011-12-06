@@ -3,9 +3,9 @@ from clustalo import *
 from muscle import *
 from trimal import *
 from raxml import *
-from bionj_model_chooser import *
+from bionj_modelchooser import *
 from tree_merger import *
-from modeltest import *
+from jmodeltest import *
 from phyml import *
 from mafft import *
-from meta_alg import *
+from meta_aligner import *

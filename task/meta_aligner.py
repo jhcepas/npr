@@ -5,7 +5,7 @@ log = logging.getLogger("main")
 from .master_task import Task
 from .master_job import Job
 from .utils import SeqGroup, OrderedDict
-from . import *
+import __init__ as task
 
 __all__ = ["MetaAligner"]
 
@@ -52,16 +52,6 @@ class MCoffee(Task):
             return True
         return False
 
-def seq_reverser_job(multiseq_file, outfile, trimal_bin):
-    reversion_args = {"-in": multiseq_file,
-                      "-out": outfile,
-                      "-reverse": "",
-                      "-fasta": "",
-                      }
-    job = Job(trimal_bin, reversion_args)
-    return job
-
-
 class MetaAligner(Task):
     def __init__(self, cladeid, multiseq_file, seqtype, conf):
         self.conf = conf
@@ -78,9 +68,8 @@ class MetaAligner(Task):
         self.init()
 
         # Set Task specific attributes
-        main_job = self.jobs[0]
-        self.alg_fasta_file = os.path.join(main_job.jobdir, "alg.fasta")
-        self.alg_phylip_file = os.path.join(main_job.jobdir, "alg.iphylip")
+        self.alg_fasta_file = None
+        self.alg_phylip_file = None
 
     def load_jobs(self):
         multiseq_file_r = self.multiseq_file+".reversed"
@@ -88,16 +77,17 @@ class MetaAligner(Task):
                                           self.conf["app"]["readal"]))
         all_alg_files = []
         for alg in self.conf["meta_aligner"]["_aligners"]:
-            _aligner = Muscle
+            print alg
+            _aligner = getattr(task, alg)
 
             # Normal alg
-            task1 = _aligner(self.cladeid, self.multiseq_file, "aa",
+            task1 = _aligner(self.cladeid, self.multiseq_file, self.seqtype,
                              self.conf)
             self.jobs.append(task1)
             all_alg_files.append(task1.alg_fasta_file)
 
             # Alg of the reverse
-            task2 = _aligner(self.cladeid, multiseq_file_r, "aa",
+            task2 = _aligner(self.cladeid, multiseq_file_r, self.seqtype,
                              self.conf)
             self.jobs.append(task2)
 
@@ -109,8 +99,7 @@ class MetaAligner(Task):
 
 
         # Combine signal from all algs using Mcoffee
-
-        self.final_task = MCoffee(self.cladeid,"aa", all_alg_files,
+        self.final_task = MCoffee(self.cladeid, self.seqtype, all_alg_files,
                              self.conf)
         self.jobs.append(self.final_task)
         
@@ -124,3 +113,15 @@ class MetaAligner(Task):
 
     def check(self):
         return True
+
+def seq_reverser_job(multiseq_file, outfile, trimal_bin):
+    """ Returns a job reversing all sequences in MSF or MSA. """
+    reversion_args = {"-in": multiseq_file,
+                      "-out": outfile,
+                      "-reverse": "",
+                      "-fasta": "",
+                      }
+    job = Job(trimal_bin, reversion_args)
+    return job
+
+

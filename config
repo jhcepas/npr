@@ -37,7 +37,7 @@ jmodeltest = "JMODELTEST_HOME=~/_Projects/npr/external_apps/jmodeltest2; cd $JMO
 --threads = 1 
 
 [meta_aligner]
-_aligners = Muscle, mafft
+_aligners = Muscle, Mafft, Clustalo
 _use_reverse = True
             
 [trimal]

@@ -12,6 +12,7 @@ except ImportError:
 
 sys.path.insert(0, "/home/jhuerta/_Devel/ete/2.x/")
 from ete_dev import PhyloTree, SeqGroup, TreeStyle, NodeStyle, faces
+from ete_dev.parser.fasta import read_fasta
 
 GENCODE = {
     'ATA':'I', 'ATC':'I', 'ATT':'I', 'ATG':'M',

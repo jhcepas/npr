@@ -36,9 +36,8 @@ def schedule(config, processer, schedule_time, execution, retry):
             if task.status == "W":
                 task.dump_job_commands()
                 task.status = "R"
-                if execution: 
-                    log.info("Running jobs..")
-                    os.system("sh %s" %task.jobs_file)
+                if execution:
+                    task.exec_jobs()
 
             if task.status == "R":
                 log.info("Task is marked as Running")

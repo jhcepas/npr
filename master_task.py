@@ -1,9 +1,17 @@
 import os
 import logging
+from logger import logindent
 log = logging.getLogger("main")
 
 from utils import get_md5, merge_dicts, PhyloTree, SeqGroup
 from master_job import Job
+
+
+### __init__
+### init()
+###    load_jobs
+###    load_task_info
+###    set_jobs_wd
 
 class Task(object):
     global_config = {"basedir": "./test"}
@@ -14,7 +22,8 @@ class Task(object):
             tid = "?"
         return "Task (%s-%s, %s)" %(self.ttype, self.tname, tid)
 
-    def __init__(self, cladeid, task_type, task_name, base_args={}, extra_args={}):
+    def __init__(self, cladeid, task_type, task_name, base_args={}, 
+                 extra_args={}):
         # Cladeid is used to identify the tree node associated with
         # the task. It is calculated as a hash string based on the
         # list of sequence IDs grouped by the node.
@@ -27,12 +36,13 @@ class Task(object):
         # messages
         self.tname = task_name
 
-        # =========================================================
-        # The following attributes are expected to be filled by the
+        # =============================================================
+        # The following attributes are expected to be completed by the
         # subclasses
-        # =========================================================
+        # =============================================================
 
-        # List of associated jobs necessary to complete the task
+        # List of associated jobs necessary to complete the task. Job
+        # and Task classes are accepted as elements in the list.
         self.jobs = []
 
         # Working directory for the task
@@ -48,10 +58,11 @@ class Task(object):
         # or (W)aiting
         self.status_file = None
         self.status = "W"
+
+        # Intialize job arguments 
         self.args = merge_dicts(extra_args, base_args, parent=self)
 
     def get_status(self):
-
         job_status = self.get_jobs_status()
         if "E" in job_status: 
             return "E"
@@ -77,33 +88,33 @@ class Task(object):
         self.set_jobs_wd(self.taskdir)
         
     def get_jobs_status(self):
+        ''' Check the status of all children jobs. '''
         if self.jobs:
             return set([j.get_status() for j in self.jobs])
         else:
             return set(["D"])
 
     def dump_job_commands(self):
+        ''' Generates a shell script (__jobs__) to launch all job
+        commands. ''' 
         FILE = open(self.jobs_file, "w")
         for job in self.jobs:
             if isinstance(job, Job):
                 job.dump_script()
                 FILE.write("sh %s >%s 2>%s\n" %\
                            (job.cmd_file, job.stdout_file, job.stderr_file))
-                print job.cmd_file
             elif isinstance(job, Task):
                 job.dump_job_commands()
                 FILE.write("sh %s \n" %\
                            (job.jobs_file))
             else:
                 log.error("Unsupported job type", job)
-        #for job in self.jobs:
-        #    job.dump_script()
-        #    JOBS.write("sh %s >%s 2>%s\n" %\
-        #                   (job.cmd_file, job.stdout_file, job.stderr_file))
-
         FILE.close()
 
     def load_task_info(self):
+        ''' Initialize task information. It generates a unique taskID
+        based on the sibling jobs and sets task working directory. ''' 
+
         # Creates a task id based on its jobs
         if not self.taskid:
             unique_id = get_md5(','.join(sorted([getattr(j, "jobid", "taskid") for j in self.jobs])))
@@ -118,15 +129,35 @@ class Task(object):
         self.jobs_file = os.path.join(self.taskdir, "__jobs__")
 
     def set_jobs_wd(self, path):
+        ''' Sets working directory of all sibling jobs '''
         for j in self.jobs:
+            # Only if job is not another Task instance
             if issubclass(Job, j.__class__):
                 j.set_jobdir(path)
 
     def retry(self):
         self.status = "W"
         for job in self.jobs:
-            if job.status() == "E":
+            if job.get_status() == "E":
                 job.clean()
+
+    def exec_jobs(self):
+        self.status = "R"
+        for j in self.jobs:
+            if isinstance(j, Job):
+                log.info("Running job  %s", j)
+                os.system("sh %s >%s 2>%s\n" %\
+                              (j.cmd_file, j.stdout_file, j.stderr_file))
+            elif isinstance(j, Task):
+                log.info("Running subtask %s", j)
+                logindent(+2)
+                j.exec_jobs()
+                log.info("Finishing subtask %s", j)
+                self.finish()
+                logindent(-2)
+            status = j.get_status()
+            if status != "D": 
+                raise Exception("Error in ", j)
 
     def load_jobs(self):
         ''' Customizable function. It must create all job objects and add

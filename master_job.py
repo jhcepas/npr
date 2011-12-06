@@ -6,13 +6,24 @@ import logging
 log = logging.getLogger("main")
 
 class Job(object):
-    ''' A generic program launcher prepared to interact with the Task
-    class.
+    ''' A generic program launcher.
 
-    A job is executed and monitored. Execution time,
-    standard output and error are tracked in log files. The final
-    status of the application is also logged. Possible status for
-    process status are (W)aiting, (R)unning, (E)rror and (D)one.
+    A job is executed and monitored. Execution time, standard output
+    and error are tracked into log files. The final status of the
+    application is also logged. Possible status for process status are
+    (W)aiting, (R)unning, (E)rror and (D)one.
+
+    Each job generates the following info files: 
+
+      self.status_file = join(self.jobdir, "__status__")
+      self.time_file = join(self.jobdir, "__time__")
+      self.stdout_file = join(self.jobdir, "__stdout__")
+      self.stderr_file = join(self.jobdir, "__stderr__")
+
+    In addition, job launching command is stored in: 
+
+      self.cmd_file = join(self.jobdir, "__cmd__")
+
     '''
     def __repr__(self):
         return "Job (%s, %s)" %(basename(self.bin), self.jobid[:6])
@@ -32,6 +43,9 @@ class Job(object):
         self.iffail_cmd = ""
 
     def set_jobdir(self, basepath):
+        ''' Initialize the base path for all info files associated to
+        the job. '''
+
         self.jobdir = os.path.join(basepath, self.jobid)
         if not os.path.exists(self.jobdir):
             os.makedirs(self.jobdir)
@@ -42,6 +56,8 @@ class Job(object):
         self.stderr_file = os.path.join(self.jobdir, "__stderr__")
         
     def dump_script(self):
+        ''' Generates the shell script launching the job. ''' 
+        
         launch_cmd = ' '.join([self.bin] + ["%s %s" %(k,v) for k,v in self.args.iteritems() if v is not None])
         lines = [
             "#!/bin/sh",
