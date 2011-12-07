@@ -23,6 +23,7 @@ tcoffee    = "export DIR_4_TCOFFEE=/home/jhuerta/_Projects/npr/external_apps/t_c
 phyml      = "/home/jhuerta/_Projects/npr/external_apps/phyml"
 raxml      = "/home/jhuerta/_Projects/npr/external_apps/raxmlHPC-PTHREADS-SSE3"
 jmodeltest = "JMODELTEST_HOME=~/_Projects/npr/external_apps/jmodeltest2; cd $JMODELTEST_HOME; java -jar $JMODELTEST_HOME/jModelTest.jar"
+dialigntx  = "/home/jhuerta/_Projects/npr/external_apps/dialign-tx /home/jhuerta/_Projects/npr/external_apps/DIALIGN-TX_1.0.2/conf/"
 
 [muscle]
 -maxhours = 24
@@ -36,8 +37,11 @@ jmodeltest = "JMODELTEST_HOME=~/_Projects/npr/external_apps/jmodeltest2; cd $JMO
 -v = ""
 --threads = 1 
 
+[dialigntx]
+
+
 [meta_aligner]
-_aligners = Muscle, Mafft, Clustalo
+_aligners = Muscle, Mafft, Clustalo, Dialigntx
 _use_reverse = True
             
 [trimal]

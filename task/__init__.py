@@ -9,3 +9,4 @@ from jmodeltest import *
 from phyml import *
 from mafft import *
 from meta_aligner import *
+from dialigntx import *
