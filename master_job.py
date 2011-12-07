@@ -32,6 +32,7 @@ class Job(object):
         # Used at execution time
         self.jobdir = None
         self.status_file = None
+        self.status = "W"
         # How to run the app
         self.bin = bin
         self.args = args
@@ -41,6 +42,7 @@ class Job(object):
                                               self.args.iteritems()])))
         self.ifdone_cmd = ""
         self.iffail_cmd = ""
+        self.dependencies = set()
 
     def set_jobdir(self, basepath):
         ''' Initialize the base path for all info files associated to
@@ -57,7 +59,7 @@ class Job(object):
         
     def dump_script(self):
         ''' Generates the shell script launching the job. ''' 
-        
+       
         launch_cmd = ' '.join([self.bin] + ["%s %s" %(k,v) for k,v in self.args.iteritems() if v is not None])
         lines = [
             "#!/bin/sh",
@@ -74,10 +76,10 @@ class Job(object):
         #log.debug(script)
  
     def get_status(self):
-        if not os.path.exists(self.status_file):
-            return "W"
-        else:
-            return open(self.status_file).read(1)
+        if os.path.exists(self.status_file):
+            st = open(self.status_file).read(1)
+            self.status = st
+        return self.status
    
     def clean(self):
         shutil.rmtree(self.jobdir)

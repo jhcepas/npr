@@ -178,7 +178,7 @@ def init_curses(main_scr):
 def app_wrapper(func, args):
     global NCURSES
 
-    if args.disable_interface:
+    if not args.enable_interface:
         NCURSES = False
 
     if NCURSES:

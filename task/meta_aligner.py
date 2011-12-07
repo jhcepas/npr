@@ -73,11 +73,11 @@ class MetaAligner(Task):
 
     def load_jobs(self):
         multiseq_file_r = self.multiseq_file+".reversed"
-        self.jobs.append(seq_reverser_job(self.multiseq_file, multiseq_file_r, 
-                                          self.conf["app"]["readal"]))
+        first = seq_reverser_job(self.multiseq_file, multiseq_file_r, 
+                                          self.conf["app"]["readal"])
+        self.jobs.append(first)
         all_alg_files = []
         for alg in self.conf["meta_aligner"]["_aligners"]:
-            print alg
             _aligner = getattr(task, alg)
 
             # Normal alg
@@ -89,19 +89,24 @@ class MetaAligner(Task):
             # Alg of the reverse
             task2 = _aligner(self.cladeid, multiseq_file_r, self.seqtype,
                              self.conf)
+            task2.dependencies.add(first)
             self.jobs.append(task2)
 
+           
             # Restore reverse alg
-            self.jobs.append(seq_reverser_job(task2.alg_fasta_file,
-                                              task2.alg_fasta_file+".reverse", 
-                                              self.conf["app"]["readal"]))
+            task3 = seq_reverser_job(task2.alg_fasta_file,
+                                     task2.alg_fasta_file+".reverse", 
+                                     self.conf["app"]["readal"])
+            task3.dependencies.add(task2)
+            self.jobs.append(task3)
             all_alg_files.append(task2.alg_fasta_file+".reverse")
-
 
         # Combine signal from all algs using Mcoffee
         self.final_task = MCoffee(self.cladeid, self.seqtype, all_alg_files,
                              self.conf)
+        self.final_task.dependencies.update(self.jobs)
         self.jobs.append(self.final_task)
+
         
     def finish(self):
         # Once executed, alignment is converted into relaxed

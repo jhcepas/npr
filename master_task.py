@@ -6,6 +6,8 @@ log = logging.getLogger("main")
 from utils import get_md5, merge_dicts, PhyloTree, SeqGroup
 from master_job import Job
 
+isjob = lambda j: isinstance(j, Job)
+istask = lambda j: isinstance(j, Task)
 
 ### __init__
 ### init()
@@ -55,27 +57,33 @@ class Task(object):
         self.jobs_file = None
 
         # Path to the file containing task status: (D)one, (R)unning
-        # or (W)aiting
+        # or (W)aiting or (Un)Finished
         self.status_file = None
         self.status = "W"
-
-        # Intialize job arguments 
+        self._donejobs = set()
+        self.dependencies = set()
+        # Initialize job arguments 
         self.args = merge_dicts(extra_args, base_args, parent=self)
 
     def get_status(self):
         job_status = self.get_jobs_status()
+        # Order matters
         if "E" in job_status: 
-            return "E"
+            st = "E"
         elif "W" in job_status: 
-            return "E"
+            st =  "W"
+        elif "R" in job_status: 
+            st = "R"
         elif set("D") == job_status: 
             self.finish()
             if self.check():
-                return "D"
+                st = "D"
             else:
-                return "E"
+                st = "E"
         else:
-            return "?"
+            st = "?"
+        self.status = st
+        return st
 
     def init(self):
         # Prepare required jobs
@@ -89,27 +97,17 @@ class Task(object):
         
     def get_jobs_status(self):
         ''' Check the status of all children jobs. '''
+        all_states = set()
         if self.jobs:
-            return set([j.get_status() for j in self.jobs])
-        else:
-            return set(["D"])
-
-    def dump_job_commands(self):
-        ''' Generates a shell script (__jobs__) to launch all job
-        commands. ''' 
-        FILE = open(self.jobs_file, "w")
-        for job in self.jobs:
-            if isinstance(job, Job):
-                job.dump_script()
-                FILE.write("sh %s >%s 2>%s\n" %\
-                           (job.cmd_file, job.stdout_file, job.stderr_file))
-            elif isinstance(job, Task):
-                job.dump_job_commands()
-                FILE.write("sh %s \n" %\
-                           (job.jobs_file))
-            else:
-                log.error("Unsupported job type", job)
-        FILE.close()
+            for j in self.jobs:
+                if j not in self._donejobs:
+                    st = j.get_status()
+                    all_states.add(st)
+                    if st == "D": 
+                        self._donejobs.add(j)
+        if not all_states:
+            all_states.add("D")
+        return all_states
 
     def load_task_info(self):
         ''' Initialize task information. It generates a unique taskID
@@ -136,28 +134,25 @@ class Task(object):
                 j.set_jobdir(path)
 
     def retry(self):
-        self.status = "W"
         for job in self.jobs:
             if job.get_status() == "E":
                 job.clean()
 
-    def exec_jobs(self):
-        self.status = "R"
+    def launch_jobs(self):
         for j in self.jobs:
-            if isinstance(j, Job):
-                log.info("Running job  %s", j)
-                os.system("sh %s >%s 2>%s\n" %\
-                              (j.cmd_file, j.stdout_file, j.stderr_file))
-            elif isinstance(j, Task):
-                log.info("Running subtask %s", j)
-                logindent(+2)
-                j.exec_jobs()
-                log.info("Finishing subtask %s", j)
-                self.finish()
-                logindent(-2)
-            status = j.get_status()
-            if status != "D": 
-                raise Exception("Error in ", j)
+            # Skip done jobs and those that depend on unfinished
+            if j in self._donejobs or \
+                    (j.dependencies - self._donejobs): 
+                continue
+            # Process the rest
+            if isjob(j):
+                j.dump_script()
+                cmd = "sh %s >%s 2>%s\n" %\
+                    (j.cmd_file, j.stdout_file, j.stderr_file)
+                yield j, cmd
+            elif istask(j):
+                for subj, cmd in j.launch_jobs():
+                    yield j, cmd
 
     def load_jobs(self):
         ''' Customizable function. It must create all job objects and add
@@ -172,7 +167,6 @@ class Task(object):
         ''' Customizable function. Return true if task is done and
         expected results are available. '''
         return True
-
 
 
 

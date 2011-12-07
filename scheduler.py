@@ -28,23 +28,28 @@ def schedule(config, processer, schedule_time, execution, retry):
             tdir = tdir.lstrip("/")
             log.info("TaskDir: %s" %tdir)
             log.info("TaskJobs: %d" %len(task.jobs))
+            task.status = task.get_status()
+
             logindent(2)
             for j in task.jobs:
-                log.info(j)
+                if j.status != "D":
+                    log.info("%s: %s", j.status, j)
             logindent(-2)
 
             if task.status == "W":
-                task.dump_job_commands()
+                log.info("missing %d jobs." %len(set(task.jobs)-task._donejobs))
                 task.status = "R"
-                if execution:
-                    task.exec_jobs()
-
-            if task.status == "R":
+                for j, cmd in task.launch_jobs():
+                    if execution:
+                        log.info("Running %s" %j)
+                        os.system(cmd)
+                    else:
+                        print cmd
+            elif task.status == "R":
                 log.info("Task is marked as Running")
-                jobs_status = task.get_jobs_status()
-                log.info("JobStatus: %s" %jobs_status)
-                if jobs_status == set("D"):
-                    task.finish()
+
+            elif task.status == "D":
+                #task.finish()
                     if task.check():
                         logindent(3)
                         new_tasks, main_tree = processer(task, main_tree, 
@@ -57,9 +62,6 @@ def schedule(config, processer, schedule_time, execution, retry):
                     else: 
                         log.error("Task looks done but result files are not found")
                         task.status = "E"
-                elif "E" in jobs_status:
-                    task.status = "E"
-
             elif task.status == "E":
                 log.error("Task is marked as ERROR")
                 if retry:
@@ -67,8 +69,6 @@ def schedule(config, processer, schedule_time, execution, retry):
                     task.retry()
                 else:
                     raise Exception("ERROR FOUND in", task.taskdir)
-            elif task.status == "D":
-                log.info("Task is DONE")
 
             # If last task processed a new tree node, dump snapshots
             if task.ttype == "treemerger":
