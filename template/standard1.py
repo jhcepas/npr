@@ -7,6 +7,16 @@ log = logging.getLogger("main")
 from .utils import del_gaps, GENCODE, PhyloTree, SeqGroup, TreeStyle
 from .task import *
 
+name2class = {
+    "meta_aligner":MetaAligner, 
+    "mafft":Mafft, 
+    "muscle":Muscle, 
+    "dialigntx":Dialigntx, 
+    "clustalo": Clustalo, 
+    "raxml": Raxml,
+    "phyml": Phyml,
+}
+
 def create_alg_task(cladeid, msf, seqtype, app_conf):
     pass
 
@@ -33,12 +43,13 @@ def pipeline(task, main_tree, conf):
 
     elif task.ttype == "msf":
         if task.nseqs < conf["main"]["aligner_max_seqs"]:
+            _aligner = name2class[conf["main"]["aligner"]]
             # new_tasks.append(Muscle(task.cladeid, task.multiseq_file, 
             #                        task.seqtype, conf["muscle"]))
             # new_tasks.append(Mafft(task.cladeid, task.multiseq_file, 
             #                        task.seqtype, conf))
-            new_tasks.append(MetaAligner(task.cladeid, task.multiseq_file, 
-                                         task.seqtype, conf))
+            new_tasks.append(_aligner(task.cladeid, task.multiseq_file, 
+                                      task.seqtype, conf))
 
         else:
             new_tasks.append(Clustalo(task.cladeid, task.multiseq_file, 

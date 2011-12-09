@@ -49,19 +49,19 @@ def schedule(config, processer, schedule_time, execution, retry):
                 log.info("Task is marked as Running")
 
             elif task.status == "D":
-                #task.finish()
-                    if task.check():
-                        logindent(3)
-                        new_tasks, main_tree = processer(task, main_tree, 
-                                                         config)
-                        logindent(-3)
-                        pending_tasks.extend(new_tasks)
-                        pending_tasks.remove(task)
-                        task.status = "D"
-                        clade2tasks[task.cladeid].append(task)
-                    else: 
-                        log.error("Task looks done but result files are not found")
-                        task.status = "E"
+                if task.check():
+                    logindent(3)
+                    new_tasks, main_tree = processer(task, main_tree, 
+                                                     config)
+                    logindent(-3)
+                    pending_tasks.extend(new_tasks)
+                    pending_tasks.remove(task)
+                    task.status = "D"
+                    clade2tasks[task.cladeid].append(task)
+                else: 
+                    log.error("Task looks done but result files are not found")
+                    task.status = "E"
+
             elif task.status == "E":
                 log.error("Task is marked as ERROR")
                 if retry:
@@ -91,4 +91,3 @@ def schedule(config, processer, schedule_time, execution, retry):
         print n.cladeid
         for ts in clade2tasks.get(n.cladeid, []):
             print "   ", ts
-

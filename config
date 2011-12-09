@@ -6,7 +6,7 @@ DNA_sst = 20 # DNA switching size threshold
 DNA_sct = 0.0 # DNA switching conservation threshold
 DNA_sit = 0.95 # DNA switching identity threshold
 
-aligner = mafft
+aligner = meta_aligner
 aligner_max_seqs = 200 # When to switch to clustalO
 clean_alg = true
 test_aa_models = true
@@ -25,6 +25,10 @@ raxml      = "/home/jhuerta/_Projects/npr/external_apps/raxmlHPC-PTHREADS-SSE3"
 jmodeltest = "JMODELTEST_HOME=~/_Projects/npr/external_apps/jmodeltest2; cd $JMODELTEST_HOME; java -jar $JMODELTEST_HOME/jModelTest.jar"
 dialigntx  = "/home/jhuerta/_Projects/npr/external_apps/dialign-tx /home/jhuerta/_Projects/npr/external_apps/DIALIGN-TX_1.0.2/conf/"
 
+# ----------------------------
+# application config section
+# ----------------------------
+
 [muscle]
 -maxhours = 24
 -maxiters = 16
@@ -39,7 +43,6 @@ dialigntx  = "/home/jhuerta/_Projects/npr/external_apps/dialign-tx /home/jhuerta
 
 [dialigntx]
 
-
 [meta_aligner]
 _aligners = Muscle, Mafft, Clustalo, Dialigntx
 _use_reverse = True
@@ -51,7 +54,6 @@ _use_reverse = True
 -mode = mcoffee
 -output = fasta
 -n_core = 1
-
 
 [bionj_modelchooser]
 _models = "JTT", "WAG" 
