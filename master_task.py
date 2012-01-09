@@ -3,7 +3,7 @@ import logging
 from logger import logindent
 log = logging.getLogger("main")
 
-from utils import get_md5, merge_dicts, PhyloTree, SeqGroup
+from utils import get_md5, merge_dicts, PhyloTree, SeqGroup, random_string
 from master_job import Job
 
 isjob = lambda j: isinstance(j, Job)
@@ -17,12 +17,23 @@ istask = lambda j: isinstance(j, Task)
 
 class Task(object):
     global_config = {"basedir": "./test"}
+
     def __repr__(self):
         if self.taskid:
             tid = self.taskid[:6]
         else:
             tid = "?"
         return "Task (%s-%s, %s)" %(self.ttype, self.tname, tid)
+
+    def summary(self):
+        print "Type:", self.ttype
+        print "Name:", self.tname
+        print "Id:", self.taskid
+        print "Dir:", self.taskdir
+        print "Jobs", len(self.jobs)
+        print "Status", self.status
+        for tag, value in self.args.iteritems():
+            print tag,":", value
 
     def __init__(self, cladeid, task_type, task_name, base_args={}, 
                  extra_args={}):
@@ -48,7 +59,9 @@ class Task(object):
         self.jobs = []
 
         # Working directory for the task
-        self.taskdir = None
+        self.taskdir = os.path.join(self.global_config["basedir"], self.cladeid,
+                                     self.tname+"_"+random_string(8))
+
 
         # Unique id based on the parameters set for each task
         self.taskid = None
@@ -117,14 +130,17 @@ class Task(object):
         if not self.taskid:
             unique_id = get_md5(','.join(sorted([getattr(j, "jobid", "taskid") for j in self.jobs])))
             self.taskid = unique_id
-
-        self.taskdir = os.path.join(self.global_config["basedir"], self.cladeid,
-                                    self.tname+"_"+self.taskid)
+        #
+        # I now set the dir as a random string
+        # self.taskdir = os.path.join(self.global_config["basedir"], self.cladeid,
+        #                             self.tname+"_"+self.taskid)
         if not os.path.exists(self.taskdir):
             os.makedirs(self.taskdir)
 
         self.status_file = os.path.join(self.taskdir, "__status__")
         self.jobs_file = os.path.join(self.taskdir, "__jobs__")
+        self.id_file = os.path.join(self.taskdir, "__id__")
+        open(self.id_file, "w").write(self.taskid)
 
     def set_jobs_wd(self, path):
         ''' Sets working directory of all sibling jobs '''

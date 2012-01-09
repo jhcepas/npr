@@ -11,7 +11,7 @@ __all__ = ["TreeMerger"]
 class TreeMerger(Task):
     def __init__(self, cladeid, task_tree, main_tree, conf):
         # Initialize task
-        Task.__init__(self, cladeid, "treemerger", "tree_merger")
+        Task.__init__(self, cladeid, "treemerger", "standard tree merge")
         self.conf = conf
         self.args = conf["tree_merger"]
         self.task_tree = task_tree
@@ -69,7 +69,7 @@ class TreeMerger(Task):
                     continue
                 st = n.get_sisters()
                 if len(st) == 1:
-                    min_size = min([st[0].size, n.size])
+                    min_size = min([st[0]._size, n._size])
                     min_support = min([st[0].support, n.support])
                     supports.append([min_support, min_size, n])
                 else:
@@ -79,7 +79,8 @@ class TreeMerger(Task):
             supports.sort()
             supports.reverse()
             ttree.set_outgroup(supports[0][2])
-            print supports
+
+        self.outgroup_topology = ttree.children[0].__str__()
 
         log.debug("Pruned Task_Tree: %s", ttree)
 

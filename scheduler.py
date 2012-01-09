@@ -58,6 +58,9 @@ def schedule(config, processer, schedule_time, execution, retry):
                     pending_tasks.remove(task)
                     task.status = "D"
                     clade2tasks[task.cladeid].append(task)
+                    if main_tree:
+                        annotate_tree(main_tree, clade2tasks)
+                        #main_tree.show()
                 else: 
                     log.error("Task looks done but result files are not found")
                     task.status = "E"
@@ -86,8 +89,46 @@ def schedule(config, processer, schedule_time, execution, retry):
     final_tree_file = os.path.join(config["main"]["basedir"], \
                                        "final_tree.nw")
     main_tree.write(outfile=final_tree_file)
-    for n in main_tree.traverse():
-        n.cladeid = get_cladeid(n.get_leaf_names())
-        print n.cladeid
-        for ts in clade2tasks.get(n.cladeid, []):
-            print "   ", ts
+
+def annotate_tree(t, clade2tasks):
+    for n in t.traverse():
+        
+        cladeid = get_cladeid(n.get_leaf_names())
+        n.add_feature("cladeid", cladeid)
+
+        for task in clade2tasks.get(n.cladeid, []):
+            params = ["%s %s" %(k,v) for k,v in  task.args.iteritems() 
+                      if not k.startswith("_")]
+            params = " ".join(params)
+
+            if task.ttype == "msf":
+                n.add_features(nseqs=task.nseqs, 
+                               msf_file=task.seed_file)
+            elif task.ttype == "acleaner":
+                n.add_features(clean_alg_conservation=task.mean_conservation, 
+                               clean_alg_conservation_std=task.std_conservation, 
+                               clean_alg_max_identity=task.max_identity, 
+                               clean_alg_type=task.tname, 
+                               clean_alg_cmd=params)
+            elif task.ttype == "alg":
+                n.add_features(alg_conservation=task.mean_conservation, 
+                               alg_conservation_std=task.std_conservation, 
+                               alg_max_identity=task.max_identity, 
+                               alg_type=task.tname, 
+                               alg_cmd=params)
+            elif task.ttype == "tree":
+                n.add_features(tree_model=task.model, 
+                               tree_seqtype=task.seqtype, 
+                               tree_type=task.tname, 
+                               tree_cmd=params)
+            elif task.ttype == "mchooser":
+                n.add_features(modeltester_models=task.model, 
+                               modeltester_type=task.tname, 
+                               modeltester_params=params, 
+                               )
+            elif task.ttype == "tree_merger":
+                n.add_features(treemerger_type=task.tname, 
+                               treemerger_hidden_outgroup=task.outgroup_topology, 
+                               )
+
+

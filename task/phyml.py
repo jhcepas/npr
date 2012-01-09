@@ -12,14 +12,16 @@ from .utils import basename, PhyloTree
 __all__ = ["Phyml"]
 
 class Phyml(Task):
-    def __init__(self, cladeid, alg_file, best_model, seqtype, conf):
+    def __init__(self, cladeid, alg_file, model, seqtype, conf):
         self.conf = conf
         self.alg_phylip_file = alg_file
         self.alg_basename = basename(self.alg_phylip_file)
         self.seqtype = seqtype
+        self.model = model 
+        self.lk = None
 
         base_args = {
-            "--model": best_model, 
+            "--model": model, 
             "--datatype": seqtype,
             "--input": self.alg_basename,
             "--no_memory_check": "", 
@@ -53,16 +55,14 @@ class Phyml(Task):
                                  self.alg_basename+"_phyml_tree.txt")
         stats_file = os.path.join(j.jobdir,
                                   self.alg_basename+"_phyml_stats.txt")
-        tree = PhyloTree(tree_file)
+
         m = re.search('Log-likelihood:\s+(-?\d+\.\d+)',
                       open(stats_file).read())
         lk = float(m.groups()[0])
-        tree.add_feature("lk", lk)
-        tree.add_feature("model", j.args["--model"])
-
+        self.lk =  lk
         self.tree_file = os.path.join(j.jobdir,
                                       "phyml_tree."+self.cladeid)
-        
+        tree = PhyloTree(tree_file)        
         tree.write(outfile=self.tree_file)
 
     def check(self):

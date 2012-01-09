@@ -15,6 +15,7 @@ class MCoffee(Task):
         self.seqtype = seqtype
         self.alg_fasta_file =  "alg.fasta"
         self.alg_phylip_file = "alg.iphylip"
+        self.nseqs = None
 
         base_args = {
             "-output": "fasta",

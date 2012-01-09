@@ -11,20 +11,12 @@ name2class = {
     "meta_aligner":MetaAligner, 
     "mafft":Mafft, 
     "muscle":Muscle, 
+    "uhire":Uhire, 
     "dialigntx":Dialigntx, 
     "clustalo": Clustalo, 
     "raxml": Raxml,
     "phyml": Phyml,
 }
-
-def create_alg_task(cladeid, msf, seqtype, app_conf):
-    pass
-
-def create_msf_task(seed_file, seqtype):
-    return Msf(None, seed_file, seqtype)
-
-def create_tree_task(cladeid, msf, seqtype, app_conf):
-    pass
 
 def pipeline(task, main_tree, conf):
     # new tasks is a list of Task instances that are returned to the
@@ -44,28 +36,15 @@ def pipeline(task, main_tree, conf):
     elif task.ttype == "msf":
         if task.nseqs < conf["main"]["aligner_max_seqs"]:
             _aligner = name2class[conf["main"]["aligner"]]
-            # new_tasks.append(Muscle(task.cladeid, task.multiseq_file, 
-            #                        task.seqtype, conf["muscle"]))
-            # new_tasks.append(Mafft(task.cladeid, task.multiseq_file, 
-            #                        task.seqtype, conf))
             new_tasks.append(_aligner(task.cladeid, task.multiseq_file, 
                                       task.seqtype, conf))
-
         else:
             new_tasks.append(Clustalo(task.cladeid, task.multiseq_file, 
                                       "aa", conf))
 
-    elif conf["main"]["clean_alg"] and task.ttype == "alg":
-        new_tasks.append(\
-            Trimal(task.cladeid, task.alg_fasta_file, task.alg_phylip_file,
-                   task.seqtype, 
-                   conf))
-                               
-    elif (task.ttype == "alg" or task.ttype == "acleaner"):
-        seqtype = task.seqtype
-        cladeid = task.cladeid
-        kept_columns = getattr(task, "kept_columns", None)
-           
+    elif task.ttype == "alg" and conf["main"]["clean_alg"]:
+
+        # Calculate alignment stats
         cons_mean, cons_std = get_conservation(task.alg_fasta_file, 
                                                conf["app"]["trimal"])
         max_identity = get_max_identity(task.alg_fasta_file, 
@@ -73,7 +52,33 @@ def pipeline(task, main_tree, conf):
 
         log.info("Conservation: %0.2f +-%0.2f", cons_mean, cons_std)
         log.info("Max. Identity: %0.2f", max_identity)
-        log.info("Seqs: %d", task.nseqs)
+       
+        task.max_identity = max_identity
+        task.mean_conservation = cons_mean
+        task.std_conservation = cons_std
+
+        new_tasks.append(\
+            Trimal(task.cladeid, task.alg_fasta_file, task.alg_phylip_file,
+                   task.seqtype, 
+                   conf))
+                               
+    elif (task.ttype == "alg" or task.ttype == "acleaner"):
+        print task, "ALG"
+        seqtype = task.seqtype
+        cladeid = task.cladeid
+
+        # Calculate alignment stats           
+        cons_mean, cons_std = get_conservation(task.alg_fasta_file, 
+                                               conf["app"]["trimal"])
+        max_identity = get_max_identity(task.alg_fasta_file, 
+                                        conf["app"]["trimal"])
+
+        log.info("Conservation: %0.2f +-%0.2f", cons_mean, cons_std)
+        log.info("Max. Identity: %0.2f", max_identity)
+       
+        task.max_identity = max_identity
+        task.mean_conservation = cons_mean
+        task.std_conservation = cons_std
 
         sst = conf["main"]["DNA_sst"]
         sit = conf["main"]["DNA_sit"]
@@ -85,9 +90,11 @@ def pipeline(task, main_tree, conf):
                 cons_mean >= sct:
 
                 log.info("switching to codon alignment")
+                # I could force the columns I want to keep
+                # kept_columns = getattr(task, "kept_columns", None)
                 alg_fasta_file, alg_phylip_file = switch_to_codon(\
                     task.alg_fasta_file, task.alg_phylip_file, 
-                    nt_seed_file, kept_columns)
+                    nt_seed_file)
                 seqtype = "nt"
         # Should I use clean or raw alignment 
         else:
@@ -95,20 +102,39 @@ def pipeline(task, main_tree, conf):
                                      task.alg_fasta_file)
             alg_phylip_file = getattr(task, "clean_alg_phylip_file", 
                                       task.alg_phylip_file)
-
         # Register model testing task
-        if seqtype == "aa":
+        if seqtype == "aa" and conf["main"]["test_aa_models"]:
             new_tasks.append(BionjModelChooser(cladeid,
                                                alg_fasta_file, 
                                                alg_phylip_file, 
                                                conf))
-        elif seqtype == "nt":
+            
+        elif seqtype == "nt" and conf["main"]["test_nt_models"]:
             new_tasks.append(JModeltest(cladeid, 
                                         alg_fasta_file, 
                                         alg_phylip_file,
                                         conf))
+        elif seqtype == "aa":
+            new_tasks.append(Raxml(cladeid,
+                                   alg_phylip_file,
+                                   model, "aa",
+                                   conf))
             
-    elif task.ttype in set(["mchooser", "alg", "acleaner"]):
+            #new_tasks.append(Phyml(cladeid, alg_phylip_file, 
+            #                           model, "aa", 
+            #                           conf))
+
+        elif seqtype == "nt":
+            if model:
+                new_tasks.append(Phyml(cladeid, alg_phylip_file, 
+                                       model, "nt", 
+                                       conf))
+            else:
+                new_tasks.append(Raxml(cladeid,
+                                   alg_phylip_file,
+                                   "GTR", "nt",
+                                   conf))
+    elif task.ttype == "mchooser":
         seqtype = task.seqtype
         alg_fasta_file = task.alg_fasta_file
         alg_phylip_file = task.alg_phylip_file

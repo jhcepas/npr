@@ -24,6 +24,7 @@ phyml      = "/home/jhuerta/_Projects/npr/external_apps/phyml"
 raxml      = "/home/jhuerta/_Projects/npr/external_apps/raxmlHPC-PTHREADS-SSE3"
 jmodeltest = "JMODELTEST_HOME=~/_Projects/npr/external_apps/jmodeltest2; cd $JMODELTEST_HOME; java -jar $JMODELTEST_HOME/jModelTest.jar"
 dialigntx  = "/home/jhuerta/_Projects/npr/external_apps/dialign-tx /home/jhuerta/_Projects/npr/external_apps/DIALIGN-TX_1.0.2/conf/"
+usearch    = "/home/jhuerta/_Projects/npr/external_apps/usearch"
 
 # ----------------------------
 # application config section
@@ -51,9 +52,12 @@ _use_reverse = True
 -gt = 0.1
 
 [mcoffee]
--mode = mcoffee
--output = fasta
 -n_core = 1
+
+
+# Makes large alignment by divide and conquer strategy
+[uhire]
+_aligner = Muscle
 
 [bionj_modelchooser]
 _models = "JTT", "WAG" 

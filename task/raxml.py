@@ -64,6 +64,7 @@ class Raxml(Task):
         tree_job = Job(self.conf["app"]["raxml"], self.args)
         self.jobs.append(tree_job)
         if self.compute_alrt:
+            # Compute alrt using both Raxml and Phyml 
             alrt_args = {
                 "-f": "J",
                 "-t": None,
@@ -74,7 +75,6 @@ class Raxml(Task):
                 }
             alrt_job = Job(self.conf["app"]["raxml"], alrt_args)       
             self.jobs.append(alrt_job)
-
 
             alrt_args = {
                 "-o": "n",

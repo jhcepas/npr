@@ -10,9 +10,6 @@ __all__ = ["Msf"]
 
 class Msf(Task):
     def __init__(self, cladeid, seed_file, seqtype, format="fasta"):
-        # Initialize task
-        Task.__init__(self, cladeid, "msf", "MSF")
-
         # Set basic information
         self.seqtype = seqtype
         self.seed_file = seed_file
@@ -30,6 +27,9 @@ class Msf(Task):
             self.cladeid = msf_id
         else:
             self.cladeid = cladeid
+
+        # Initialize task
+        Task.__init__(self, self.cladeid, "msf", "MSF")
 
         # taskid does not depend on jobs, so I set it manually
         self.taskid = msf_id

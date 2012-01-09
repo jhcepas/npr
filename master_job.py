@@ -1,7 +1,7 @@
 import os
 import shutil
-from utils import get_md5, basename
-
+from utils import get_md5, basename, random_string
+import re
 import logging
 log = logging.getLogger("main")
 
@@ -26,9 +26,9 @@ class Job(object):
 
     '''
     def __repr__(self):
-        return "Job (%s, %s)" %(basename(self.bin), self.jobid[:6])
+        return "Job (%s, %s)" %(self.jobname, self.jobid[:6])
 
-    def __init__(self, bin, args):
+    def __init__(self, bin, args, jobname=None):
         # Used at execution time
         self.jobdir = None
         self.status_file = None
@@ -36,10 +36,14 @@ class Job(object):
         # How to run the app
         self.bin = bin
         self.args = args
+        self.jobname = jobname
         # generates an unique job identifier based on the params of
         # the app.
         self.jobid = get_md5(','.join(sorted([get_md5(str(pair)) for pair in 
                                               self.args.iteritems()])))
+        if not self.jobname:
+            self.jobname = re.sub("[^0-9a-zA-Z]", "-", basename(self.bin))
+
         self.ifdone_cmd = ""
         self.iffail_cmd = ""
         self.dependencies = set()
@@ -47,8 +51,12 @@ class Job(object):
     def set_jobdir(self, basepath):
         ''' Initialize the base path for all info files associated to
         the job. '''
+        #self.jobdir = os.path.join(basepath, self.jobid)
+        jobname = "%s_%s" %(basename(self.bin), self.jobid[:6])
+        jobname = re.sub("[^0-9a-zA-Z]", "-",jobname)
 
-        self.jobdir = os.path.join(basepath, self.jobid)
+        self.jobdir = os.path.join(basepath, "%s_%s" %\
+                                       (self.jobname, self.jobid[:6]))
         if not os.path.exists(self.jobdir):
             os.makedirs(self.jobdir)
         self.status_file = os.path.join(self.jobdir, "__status__")

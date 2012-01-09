@@ -1,6 +1,8 @@
 import sys
 import os
 from string import strip
+import string 
+import random
 import hashlib
 import logging
 log = logging.getLogger("main")
@@ -10,7 +12,7 @@ try:
 except ImportError: 
     from ordereddict import OrderedDict
 
-sys.path.insert(0, "/home/jhuerta/_Devel/ete/2.x/")
+sys.path.insert(0, "/home/jhuerta/_Devel/ete/master/")
 from ete_dev import PhyloTree, SeqGroup, TreeStyle, NodeStyle, faces
 from ete_dev.parser.fasta import read_fasta
 
@@ -41,6 +43,8 @@ basename = lambda path: os.path.split(path)[-1]
 get_raxml_mem = lambda taxa,sites: (taxa-2) * sites * (80 * 8) * 9.3132e-10
 get_cladeid = lambda seqids: get_md5(','.join(sorted(map(strip, seqids))))
 del_gaps = lambda seq: seq.replace("-","").replace(".", "")
+random_string = lambda N: ''.join(random.choice(string.ascii_uppercase + string.digits) for x in range(N))
+
 
 def merge_dicts(source, target, parent=""):
     for k,v in source.iteritems(): 
@@ -58,7 +62,7 @@ def load_node_size(n):
         size = 0
         for ch in n.children: 
             size += load_node_size(ch)
-    n.add_feature("size", size)
+    n.add_feature("_size", size)
     return size
 
 def render_tree(tree, fname):
