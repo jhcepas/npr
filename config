@@ -6,8 +6,14 @@ DNA_sst = 20 # DNA switching size threshold
 DNA_sct = 0.0 # DNA switching conservation threshold
 DNA_sit = 0.95 # DNA switching identity threshold
 
+
 aligner = meta_aligner
-aligner_max_seqs = 200 # When to switch to clustalO
+aligner_large = clustalo
+aligner_huge = uhire
+
+alignment_large = 8
+alignment_huge = 5000
+
 clean_alg = true
 test_aa_models = true
 test_nt_models = true

@@ -4,7 +4,10 @@ DNA_sst = integer()
 DNA_sit = float()
 
 clean_alg = boolean()
-aligner_max_seqs = integer()
+
+alignment_large = integer()
+alignment_huge =  integer()
+
 test_aa_models = boolean()
 test_nt_models = boolean()
 render_tree_images = boolean()

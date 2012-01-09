@@ -34,13 +34,15 @@ def pipeline(task, main_tree, conf):
             raise Exception("I need at least one seed file")
 
     elif task.ttype == "msf":
-        if task.nseqs < conf["main"]["aligner_max_seqs"]:
-            _aligner = name2class[conf["main"]["aligner"]]
-            new_tasks.append(_aligner(task.cladeid, task.multiseq_file, 
-                                      task.seqtype, conf))
+        if task.nseqs >= conf["main"]["alignment_huge"]:
+            _aligner = name2class[conf["main"]["aligner_huge"]]
+        elif task.nseqs >= conf["main"]["alignment_large"]:
+            _aligner = name2class[conf["main"]["aligner_large"]]
         else:
-            new_tasks.append(Clustalo(task.cladeid, task.multiseq_file, 
-                                      "aa", conf))
+            _aligner = name2class[conf["main"]["aligner"]]
+
+        new_tasks.append(_aligner(task.cladeid, task.multiseq_file, 
+                                  task.seqtype, conf))
 
     elif task.ttype == "alg" and conf["main"]["clean_alg"]:
 
@@ -63,13 +65,13 @@ def pipeline(task, main_tree, conf):
                    conf))
                                
     elif (task.ttype == "alg" or task.ttype == "acleaner"):
-        print task, "ALG"
         seqtype = task.seqtype
         cladeid = task.cladeid
 
         # Calculate alignment stats           
         cons_mean, cons_std = get_conservation(task.alg_fasta_file, 
                                                conf["app"]["trimal"])
+
         max_identity = get_max_identity(task.alg_fasta_file, 
                                         conf["app"]["trimal"])
 
@@ -214,8 +216,11 @@ def get_conservation(alg_file, trimal_bin):
     return mean, std
 
 def get_max_identity(alg_file, trimal_bin):
+    #print "%s -sident -in %s" %\
+    #    (trimal_bin, alg_file)
     output = commands.getoutput("%s -sident -in %s" %\
                                     (trimal_bin, alg_file))
+    #print output
     conservation = []
     for line in output.split("\n"):
         m = re.search("#MaxIdentity\s+(\d+\.\d+)", line)
