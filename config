@@ -3,8 +3,8 @@ basedir  = ./prueba
 pipeline = template/standard1.py
 
 render_tree_images = true
-DNA_sst = 20 # DNA switching size threshold
-DNA_sct = 0.0 # DNA switching conservation threshold
+DNA_sst = 20   # DNA switching size threshold
+DNA_sct = 0.0  # DNA switching conservation threshold
 DNA_sit = 0.95 # DNA switching identity threshold
 
 medium = 5
@@ -17,7 +17,6 @@ test_aa_models =  true,           true,          false,         false
 test_nt_models =  true,           true,          false,         false 
 aligner        =  meta_aligner,   muscle,        clustalo,      uhire  
 tree_builder   =  raxml,          phyml,         fasttree,      fasttree
-
 
 [app]
 muscle     = "/home/jhuerta/_Projects/npr/external_apps/muscle"
@@ -56,13 +55,14 @@ _aligners = Muscle, Mafft, Clustalo, Dialigntx
 _use_reverse = True
             
 [trimal]
--gt = 0.1
+-gt = 0.1 
 
 [mcoffee]
 -n_core = 1
 
 [uhire]
-_aligner = Muscle
+_muscle_maxiters = 2 # maxiters allowes for the clump alignments
+
 [bionj_modelchooser]
 _models = "JTT", "WAG" 
 -f = m            # char freq (m)odel or (e)stimated
@@ -73,7 +73,7 @@ _models = "JTT", "WAG"
 --quiet = ""
 
 [fasttree]
-
+-wag = ""
 
 [phyml]
 --pinv = e        # Proportion of invariant sites.  Fixed value in the

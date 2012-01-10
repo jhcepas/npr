@@ -12,7 +12,7 @@ try:
 except ImportError: 
     from ordereddict import OrderedDict
 
-sys.path.insert(0, "/home/jhuerta/_Devel/ete/master/")
+sys.path.insert(0, "/home/jhuerta/_Devel/ete/gui/")
 from ete_dev import PhyloTree, SeqGroup, TreeStyle, NodeStyle, faces
 from ete_dev.parser.fasta import read_fasta
 

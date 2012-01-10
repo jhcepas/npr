@@ -49,8 +49,9 @@ class Uhire(Task):
         (cd ../;
         mkdir clumpalgs/;
         for fname in clump.* master;
-           do %s -in $fname -out clumpalgs/$fname -maxiters 4;
-        done;) """ %(self.conf["app"]["muscle"])
+           do %s -in $fname -out clumpalgs/$fname -maxiters %s;
+        done;) """ %(self.conf["app"]["muscle"], 
+                     self.conf["uhire"]["_muscle_maxiters"])
         alg_job = Job(cmd, {}, "uhire_muscle_algs")
         alg_job.dependencies.add(uhire_job)
 

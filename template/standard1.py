@@ -108,7 +108,7 @@ def pipeline(task, main_tree, conf):
                 task.nseqs <= sst and max_identity > sit and \
                 cons_mean >= sct:
                 log.info("switching to codon alignment")
-                # I could force the columns I want to keep
+                # You could force the columns that you want to keep
                 # kept_columns = getattr(task, "kept_columns", None)
                 alg_fasta_file, alg_phylip_file = switch_to_codon(\
                     task.alg_fasta_file, task.alg_phylip_file, 
