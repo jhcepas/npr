@@ -21,7 +21,7 @@ class Mafft(Task):
         # input file at the last position.
         base_args = OrderedDict()
         # Initialize task
-        Task.__init__(self, cladeid, "alg", "mafft", 
+        Task.__init__(self, cladeid, "alg", "Mafft", 
                       base_args, conf["mafft"])
 
         # Init task information, such as taskname, taskid, etc.

@@ -27,7 +27,7 @@ class Phyml(Task):
             "--no_memory_check": "", 
             "--quiet": "" }
 
-        Task.__init__(self, cladeid, "tree", "phyml", 
+        Task.__init__(self, cladeid, "tree", "Phyml", 
                       base_args, conf["phyml"])
 
         # Prepare jobs and task

@@ -24,7 +24,7 @@ class Trimal(Task):
             '-colnumbering': "", 
             }
         # Initialize task
-        Task.__init__(self, cladeid, "acleaner", "trimal", 
+        Task.__init__(self, cladeid, "acleaner", "Trimal", 
                       base_args, conf["trimal"])
 
         # Load task data

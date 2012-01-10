@@ -25,7 +25,7 @@ class BionjModelChooser(Task):
             "--quiet": ""
             }
 
-        Task.__init__(self, cladeid, "mchooser", "bionj_model_chooser", 
+        Task.__init__(self, cladeid, "mchooser", "Bionj-ModelChooser", 
                       base_args, conf["bionj_modelchooser"])
 
         self.best_model = None

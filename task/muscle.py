@@ -20,7 +20,7 @@ class Muscle(Task):
             '-out': None,
             }
         # Initialize task
-        Task.__init__(self, cladeid, "alg", "muscle", 
+        Task.__init__(self, cladeid, "alg", "Muscle", 
                       base_args, conf["muscle"])
 
         # Load task data

@@ -16,7 +16,7 @@ class Uhire(Task):
 
         base_args = {}
         # Initialize task
-        Task.__init__(self, cladeid, "alg", "uhire", 
+        Task.__init__(self, cladeid, "alg", "Usearch-Uhire", 
                       base_args, conf["uhire"])
 
         # Set Task specific attributes

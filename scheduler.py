@@ -60,7 +60,6 @@ def schedule(config, processer, schedule_time, execution, retry):
                     clade2tasks[task.cladeid].append(task)
                     if main_tree:
                         annotate_tree(main_tree, clade2tasks)
-                        #main_tree.show()
                 else: 
                     log.error("Task looks done but result files are not found")
                     task.status = "E"
@@ -89,6 +88,7 @@ def schedule(config, processer, schedule_time, execution, retry):
     final_tree_file = os.path.join(config["main"]["basedir"], \
                                        "final_tree.nw")
     main_tree.write(outfile=final_tree_file)
+    main_tree.show()
 
 def annotate_tree(t, clade2tasks):
     for n in t.traverse():

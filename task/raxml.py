@@ -36,7 +36,7 @@ class Raxml(Task):
             '-s': alg_file,
             '-n': cladeid,
             }
-        Task.__init__(self, cladeid, "tree", "raxml", base_args, args)
+        Task.__init__(self, cladeid, "tree", "RaxML", base_args, args)
 
         # Load task info
         self.init()
@@ -48,7 +48,6 @@ class Raxml(Task):
             self.alrt_tree_file = os.path.join(self.jobs[1].jobdir,
                                                "RAxML_fastTreeSH_Support." +\
                                                    self.cladeid)
-
 
             fake_alg_file = os.path.join(self.jobs[2].jobdir, basename(self.alg_file))
             if os.path.exists(fake_alg_file):

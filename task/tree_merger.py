@@ -11,7 +11,7 @@ __all__ = ["TreeMerger"]
 class TreeMerger(Task):
     def __init__(self, cladeid, task_tree, main_tree, conf):
         # Initialize task
-        Task.__init__(self, cladeid, "treemerger", "standard tree merge")
+        Task.__init__(self, cladeid, "treemerger", "Standard-TreeMerger")
         self.conf = conf
         self.args = conf["tree_merger"]
         self.task_tree = task_tree

@@ -23,7 +23,7 @@ class MCoffee(Task):
             }
         
         # Initialize task
-        Task.__init__(self, cladeid, "alg", "mcoffee", 
+        Task.__init__(self, cladeid, "alg", "Mcoffee", 
                       base_args, self.conf["meta_aligner"])
 
         # Load task data
@@ -62,7 +62,7 @@ class MetaAligner(Task):
         base_args = {
             }
         # Initialize task
-        Task.__init__(self, cladeid, "alg", "meta-alg", 
+        Task.__init__(self, cladeid, "alg", "Meta-Alg", 
                       base_args, self.conf["meta_aligner"])
 
         # Load task data

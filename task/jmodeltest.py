@@ -21,7 +21,7 @@ class JModeltest(Task):
         else:
             task_type = "mchooser"
             
-        Task.__init__(self, cladeid, task_type, "jmodeltest", base_args, args)
+        Task.__init__(self, cladeid, task_type, "Jmodeltest", base_args, args)
         # set app arguments and options
         self.alg_fasta_file = alg_fasta_file
         self.alg_phylip_file = alg_phylip_file

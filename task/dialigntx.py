@@ -22,7 +22,7 @@ class Dialigntx(Task):
                 '': None,
             })
         # Initialize task
-        Task.__init__(self, cladeid, "alg", "dialigntx", 
+        Task.__init__(self, cladeid, "alg", "DialignTX", 
                       base_args, conf["dialigntx"])
 
         # Load task data

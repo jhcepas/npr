@@ -3,12 +3,14 @@ DNA_sct = float()
 DNA_sst = integer()
 DNA_sit = float()
 
-clean_alg = boolean()
-
-alignment_large = integer()
-alignment_huge =  integer()
-
-test_aa_models = boolean()
-test_nt_models = boolean()
 render_tree_images = boolean()
 
+medium = integer()
+large = integer()
+huge =  integer()
+
+test_aa_models = boolean_list(4, 4)
+test_nt_models = boolean_list(4, 4)
+clean_alg = boolean_list(4, 4)
+aligner = list(4, 4)
+tree_builder = list(4, 4)

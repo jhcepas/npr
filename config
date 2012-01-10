@@ -1,23 +1,23 @@
 [main]
-basedir = ./prueba
+basedir  = ./prueba
 pipeline = template/standard1.py
 
+render_tree_images = true
 DNA_sst = 20 # DNA switching size threshold
 DNA_sct = 0.0 # DNA switching conservation threshold
 DNA_sit = 0.95 # DNA switching identity threshold
 
+medium = 5
+large  = 6
+huge   = 7
 
-aligner = meta_aligner
-aligner_large = clustalo
-aligner_huge = uhire
+# tree sizes      small          medium        large           huge 
+clean_alg      =  true,           true,          true,          false
+test_aa_models =  true,           true,          false,         false 
+test_nt_models =  true,           true,          false,         false 
+aligner        =  meta_aligner,   muscle,        clustalo,      uhire  
+tree_builder   =  raxml,          phyml,         fasttree,      fasttree
 
-alignment_large = 8
-alignment_huge = 5000
-
-clean_alg = true
-test_aa_models = true
-test_nt_models = true
-render_tree_images = true
 
 [app]
 muscle     = "/home/jhuerta/_Projects/npr/external_apps/muscle"
@@ -31,6 +31,7 @@ raxml      = "/home/jhuerta/_Projects/npr/external_apps/raxmlHPC-PTHREADS-SSE3"
 jmodeltest = "JMODELTEST_HOME=~/_Projects/npr/external_apps/jmodeltest2; cd $JMODELTEST_HOME; java -jar $JMODELTEST_HOME/jModelTest.jar"
 dialigntx  = "/home/jhuerta/_Projects/npr/external_apps/dialign-tx /home/jhuerta/_Projects/npr/external_apps/DIALIGN-TX_1.0.2/conf/"
 usearch    = "/home/jhuerta/_Projects/npr/external_apps/usearch"
+fasttree   = "/home/jhuerta/_Projects/npr/external_apps/FastTree"
 
 # ----------------------------
 # application config section
@@ -60,11 +61,8 @@ _use_reverse = True
 [mcoffee]
 -n_core = 1
 
-
-# Makes large alignment by divide and conquer strategy
 [uhire]
 _aligner = Muscle
-
 [bionj_modelchooser]
 _models = "JTT", "WAG" 
 -f = m            # char freq (m)odel or (e)stimated
@@ -73,6 +71,9 @@ _models = "JTT", "WAG"
 --nclasses =  4   # Number of classes
 --no_memory_check = ""
 --quiet = ""
+
+[fasttree]
+
 
 [phyml]
 --pinv = e        # Proportion of invariant sites.  Fixed value in the
@@ -90,13 +91,13 @@ _models = "JTT", "WAG"
                   #  Chi2-based parametric branch supports.
 
 [raxml]
+# phyml can be used to compute aLRT values once the tree is done
 _phyml_bin = /home/jhuerta/_Projects/npr/external_apps/phyml
-
 _method = GAMMA # GAMMA or CAT
 #_pinv = I # If True, estimates the proportion of invariable sites. 
 #_ebf = F # Empirical base frequencies
 -f = d 
-_aa_model = JTT # Used only if no model selection is performed
+_aa_model = JTT # Model used if no model selection is performed
 -T = 2
 -p = 31416 # Random seed to generate starting tree. Make results reproducible 
 
@@ -111,7 +112,7 @@ _aa_model = JTT # Used only if no model selection is performed
 #-a = ""
 
 [tree_merger]
-_min_size = 4
+_min_size = 3
 _min_outgroups = 1
 _outgroup_policy = "mean_dist" # mean_dist, max_dist, min_dist, median_dist
 

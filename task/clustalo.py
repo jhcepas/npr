@@ -24,7 +24,7 @@ class Clustalo(Task):
             '--outfmt': "fa",
             }
         # Initialize task
-        Task.__init__(self, cladeid, "alg", "clustal_omega", 
+        Task.__init__(self, cladeid, "alg", "Clustal-Omega", 
                       base_args, conf["clustalo"])
 
         # Load task data

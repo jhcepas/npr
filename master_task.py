@@ -9,12 +9,6 @@ from master_job import Job
 isjob = lambda j: isinstance(j, Job)
 istask = lambda j: isinstance(j, Task)
 
-### __init__
-### init()
-###    load_jobs
-###    load_task_info
-###    set_jobs_wd
-
 class Task(object):
     global_config = {"basedir": "./test"}
 
@@ -23,7 +17,7 @@ class Task(object):
             tid = self.taskid[:6]
         else:
             tid = "?"
-        return "Task (%s-%s, %s)" %(self.ttype, self.tname, tid)
+        return "Task (%s: %s, %s)" %(self.ttype, self.tname, tid)
 
     def summary(self):
         print "Type:", self.ttype

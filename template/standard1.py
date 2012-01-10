@@ -13,10 +13,11 @@ name2class = {
     "muscle":Muscle, 
     "uhire":Uhire, 
     "dialigntx":Dialigntx, 
+    "fasttree":FastTree, 
     "clustalo": Clustalo, 
     "raxml": Raxml,
     "phyml": Phyml,
-}
+    }
 
 def pipeline(task, main_tree, conf):
     # new tasks is a list of Task instances that are returned to the
@@ -25,6 +26,28 @@ def pipeline(task, main_tree, conf):
     nt_seed_file = conf["main"]["nt_seed"]
 
     new_tasks = []
+    try: 
+        nseqs = int(task.nseqs)
+    except:
+        nseqs = 0
+
+    if nseqs >= conf["main"]["huge"]:
+        index = 3
+    elif nseqs >= conf["main"]["large"]:
+        index = 2
+    elif nseqs >= conf["main"]["medium"]:
+        index = 1
+    else:
+        index = 0
+
+    _clean_alg = conf["main"]["clean_alg"][index]
+    _test_aa_model = conf["main"]["test_aa_models"][index]
+    _test_nt_model = conf["main"]["test_aa_models"][index]
+    _aligner = name2class[conf["main"]["aligner"][index]]
+    _tree_builder = name2class[conf["main"]["tree_builder"][index]]
+
+    #print "-------->", nseqs, index, _clean_alg, _test_nt_model, _test_aa_model, _aligner, _tree_builder
+       
     if not task:
         if aa_seed_file:
             new_tasks.append(Msf(None, aa_seed_file, "aa"))
@@ -34,18 +57,12 @@ def pipeline(task, main_tree, conf):
             raise Exception("I need at least one seed file")
 
     elif task.ttype == "msf":
-        if task.nseqs >= conf["main"]["alignment_huge"]:
-            _aligner = name2class[conf["main"]["aligner_huge"]]
-        elif task.nseqs >= conf["main"]["alignment_large"]:
-            _aligner = name2class[conf["main"]["aligner_large"]]
-        else:
-            _aligner = name2class[conf["main"]["aligner"]]
+        alg_task = _aligner(task.cladeid, task.multiseq_file,
+                           task.seqtype, conf)
+        alg_task.nseqs = task.nseqs
+        new_tasks.append(alg_task)
 
-        new_tasks.append(_aligner(task.cladeid, task.multiseq_file, 
-                                  task.seqtype, conf))
-
-    elif task.ttype == "alg" and conf["main"]["clean_alg"]:
-
+    elif task.ttype == "alg" and _clean_alg:
         # Calculate alignment stats
         cons_mean, cons_std = get_conservation(task.alg_fasta_file, 
                                                conf["app"]["trimal"])
@@ -90,7 +107,6 @@ def pipeline(task, main_tree, conf):
         if seqtype == "aa" and nt_seed_file and \
                 task.nseqs <= sst and max_identity > sit and \
                 cons_mean >= sct:
-
                 log.info("switching to codon alignment")
                 # I could force the columns I want to keep
                 # kept_columns = getattr(task, "kept_columns", None)
@@ -105,37 +121,24 @@ def pipeline(task, main_tree, conf):
             alg_phylip_file = getattr(task, "clean_alg_phylip_file", 
                                       task.alg_phylip_file)
         # Register model testing task
-        if seqtype == "aa" and conf["main"]["test_aa_models"]:
-            new_tasks.append(BionjModelChooser(cladeid,
-                                               alg_fasta_file, 
-                                               alg_phylip_file, 
-                                               conf))
+        if seqtype == "aa" and _test_aa_model:
+            next_task = BionjModelChooser(cladeid,
+                                          alg_fasta_file, 
+                                          alg_phylip_file, 
+                                          conf)
             
-        elif seqtype == "nt" and conf["main"]["test_nt_models"]:
-            new_tasks.append(JModeltest(cladeid, 
-                                        alg_fasta_file, 
-                                        alg_phylip_file,
-                                        conf))
-        elif seqtype == "aa":
-            new_tasks.append(Raxml(cladeid,
+        elif seqtype == "nt" and _test_nt_model:
+            next_task = JModeltest(cladeid, 
+                                   alg_fasta_file, 
                                    alg_phylip_file,
-                                   model, "aa",
-                                   conf))
-            
-            #new_tasks.append(Phyml(cladeid, alg_phylip_file, 
-            #                           model, "aa", 
-            #                           conf))
+                                        conf)
+        else:
+            next_task = _tree_builder(task.cladeid, alg_phylip_file, None, 
+                                      seqtype, conf)
 
-        elif seqtype == "nt":
-            if model:
-                new_tasks.append(Phyml(cladeid, alg_phylip_file, 
-                                       model, "nt", 
-                                       conf))
-            else:
-                new_tasks.append(Raxml(cladeid,
-                                   alg_phylip_file,
-                                   "GTR", "nt",
-                                   conf))
+        next_task.nseqs = task.nseqs
+        new_tasks.append(next_task)
+
     elif task.ttype == "mchooser":
         seqtype = task.seqtype
         alg_fasta_file = task.alg_fasta_file
@@ -146,26 +149,10 @@ def pipeline(task, main_tree, conf):
         else:
             model = None
 
-        if task.seqtype == "aa":
-            new_tasks.append(Raxml(cladeid,
-                                   alg_phylip_file,
-                                   model, "aa",
-                                   conf))
-            
-            #new_tasks.append(Phyml(cladeid, alg_phylip_file, 
-            #                           model, "aa", 
-            #                           conf))
-
-        else:
-            if model:
-                new_tasks.append(Phyml(cladeid, alg_phylip_file, 
-                                       model, "nt", 
-                                       conf))
-            else:
-                new_tasks.append(Raxml(cladeid,
-                                   alg_phylip_file,
-                                   "GTR", "nt",
-                                   conf))
+        tree_task = _tree_builder(task.cladeid, alg_phylip_file, model, 
+                                  seqtype, conf)
+        tree_task.nseqs = task.nseqs
+        new_tasks.append(tree_task)
 
     elif task.ttype == "tree":
         t = PhyloTree(task.tree_file)
@@ -271,3 +258,4 @@ def switch_to_codon(alg_fasta_file, alg_phylip_file, nt_seed_file,
     nt_alg.write(outfile=alg_phylip_filename, format="iphylip_relaxed")
         
     return alg_fasta_filename, alg_phylip_filename
+
