@@ -2,41 +2,37 @@ import os
 import logging
 log = logging.getLogger("main")
 
-from .master_task import Task
+from .master_task import AlgTask
 from .master_job import Job
-from .utils import SeqGroup
+from .utils import SeqGroup, OrderedDict
 
 __all__ = ["Muscle"]
 
-class Muscle(Task):
+class Muscle(AlgTask):
     def __init__(self, cladeid, multiseq_file, seqtype, conf):
+        # fixed Muscle options
+        base_args = OrderedDict({
+                '-in': None,
+                '-out': None,
+                })
+        # Initialize task
+        AlgTask.__init__(self, cladeid, "alg", "Muscle", 
+                      base_args, conf["muscle"])
+
         self.conf = conf
         self.seqtype = seqtype
         self.multiseq_file = multiseq_file
-        self.nseqs = 0
-        # fixed options for running this task
-        base_args = {
-            '-in': None,
-            '-out': None,
-            }
-        # Initialize task
-        Task.__init__(self, cladeid, "alg", "Muscle", 
-                      base_args, conf["muscle"])
+        self.alg_fasta_file = os.path.join(self.taskdir, "final_alg.fasta")
+        self.alg_phylip_file = os.path.join(self.taskdir, "final_alg.iphylip")
 
-        # Load task data
+        # Load jobs
         self.init()
-
-        # Set Task specific attributes
-        main_job = self.jobs[0]
-        self.alg_fasta_file = os.path.join(main_job.jobdir, "alg.fasta")
-        self.alg_phylip_file = os.path.join(main_job.jobdir, "alg.iphylip")
 
     def finish(self):
         # Once executed, alignment is converted into relaxed
-        # interleaved phylip format. Both files, fasta and phylip,
-        # remain accessible.
-        alg = SeqGroup(self.alg_fasta_file)
-        self.nseqs = len(alg.id2seq)
+        # interleaved phylip format.
+        alg = SeqGroup(os.path.join(self.jobs[0].jobdir, "alg.fasta"))
+        alg.write(outfile=self.alg_fasta_file, format="fasta")
         alg.write(outfile=self.alg_phylip_file, format="iphylip_relaxed")
 
     def load_jobs(self):
@@ -46,9 +42,3 @@ class Muscle(Task):
         args["-out"] = "alg.fasta"
         job = Job(self.conf["app"]["muscle"], args)
         self.jobs.append(job)
-
-    def check(self):
-        if os.path.exists(self.alg_fasta_file) and \
-                os.path.exists(self.alg_phylip_file):
-            return True
-        return False

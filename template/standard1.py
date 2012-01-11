@@ -76,10 +76,10 @@ def pipeline(task, main_tree, conf):
         task.mean_conservation = cons_mean
         task.std_conservation = cons_std
 
-        new_tasks.append(\
-            Trimal(task.cladeid, task.alg_fasta_file, task.alg_phylip_file,
-                   task.seqtype, 
-                   conf))
+        clean_task = Trimal(task.cladeid, task.alg_fasta_file, task.alg_phylip_file,
+                            task.seqtype, conf)
+        clean_task.nseqs = task.nseqs
+        new_tasks.append(clean_task)
                                
     elif (task.ttype == "alg" or task.ttype == "acleaner"):
         seqtype = task.seqtype

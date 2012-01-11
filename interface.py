@@ -78,6 +78,7 @@ class Screen(StringIO):
             self.write_curses(text)
         else:
             self.write_normal(text)
+
     def write_normal(self, text):
         text = re.sub(self.TAG, "", text)
         self.stdout.write(text)

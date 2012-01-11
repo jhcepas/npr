@@ -1,34 +1,35 @@
 import os
+import shutil
 import sys
 import re
 
 import logging
 log = logging.getLogger("main")
 
-from .master_task import Task
+from .master_task import TreeTask
 from .master_job import Job
-from .utils import basename, PhyloTree
+from .utils import basename, PhyloTree, OrderedDict
 
 __all__ = ["Phyml"]
 
-class Phyml(Task):
+class Phyml(TreeTask):
     def __init__(self, cladeid, alg_file, model, seqtype, conf):
+        base_args = OrderedDict({
+                "--no_memory_check": "", 
+                "--quiet": "" })
+
+        TreeTask.__init__(self, cladeid, "tree", "Phyml", 
+                      base_args, conf["phyml"])
+
         self.conf = conf
         self.alg_phylip_file = alg_file
         self.alg_basename = basename(self.alg_phylip_file)
+        if seqtype == "aa":
+            self.model = model or conf["phyml"]["_aa_model"]
+        elif seqtype == "nt":
+            self.model = model or conf["phyml"]["_nt_model"]
         self.seqtype = seqtype
-        self.model = model 
         self.lk = None
-
-        base_args = {
-            "--model": model, 
-            "--datatype": seqtype,
-            "--input": self.alg_basename,
-            "--no_memory_check": "", 
-            "--quiet": "" }
-
-        Task.__init__(self, cladeid, "tree", "Phyml", 
-                      base_args, conf["phyml"])
 
         # Prepare jobs and task
         self.init()
@@ -45,6 +46,9 @@ class Phyml(Task):
 
     def load_jobs(self):
         args = self.args.copy()
+        args["--model"] = self.model
+        args["--datatype"] = self.seqtype
+        args["--input"] = self.alg_basename
         job = Job(self.conf["app"]["phyml"], args)
         self.jobs.append(job)
 
@@ -64,13 +68,3 @@ class Phyml(Task):
                                       "phyml_tree."+self.cladeid)
         tree = PhyloTree(tree_file)        
         tree.write(outfile=self.tree_file)
-
-    def check(self):
-        try: 
-            t = PhyloTree(self.tree_file)
-        except Exception, e: 
-            log.error(e)
-            return False
-        else:
-            return True
-        

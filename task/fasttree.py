@@ -1,0 +1,55 @@
+import os
+import sys
+import re
+
+import logging
+log = logging.getLogger("main")
+
+from .master_task import TreeTask
+from .master_job import Job
+from .utils import basename, PhyloTree, OrderedDict
+
+__all__ = ["FastTree"]
+
+class FastTree(TreeTask):
+    def __init__(self, cladeid, alg_file, model, seqtype, conf):
+        self.conf = conf
+        self.alg_phylip_file = alg_file
+        self.alg_basename = basename(self.alg_phylip_file)
+        self.seqtype = seqtype
+        self.tree_file = ""
+
+        if model:
+            log.warning("FastTree does not allow for model selection. However,"
+                        "you could set several options regarding models in the "
+                        "fasttree section of the config file.")
+        self.model = None
+        self.lk = None
+
+        base_args = OrderedDict()
+        base_args["-nopr"] = ""
+        if self.seqtype == "nt":
+            base_args["-nt"] = ""
+        elif self.seqtype == "aa":
+            pass
+        else:
+            raise ValueError("Unknown seqtype %s" %self.seqtype)
+
+        TreeTask.__init__(self, cladeid, "tree", "FastTree", 
+                      base_args, conf["fasttree"])
+
+        # input alg must be the last argument 
+        self.args[self.alg_phylip_file] = ""
+
+        # Prepare jobs and task
+        self.init()
+
+    def load_jobs(self):
+        args = self.args.copy()
+        job = Job(self.conf["app"]["fasttree"], args)
+        self.jobs.append(job)
+
+    def finish(self):
+        job = self.jobs[-1]
+        self.tree_file = os.path.join(job.jobdir, "final_tree.nw")
+        os.symlink(job.stdout_file, self.tree_file)

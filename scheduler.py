@@ -45,6 +45,7 @@ def schedule(config, processer, schedule_time, execution, retry):
                         os.system(cmd)
                     else:
                         print cmd
+
             elif task.status == "R":
                 log.info("Task is marked as Running")
 
@@ -70,6 +71,7 @@ def schedule(config, processer, schedule_time, execution, retry):
                     log.info("Remarking task as undone to retry")
                     task.retry()
                 else:
+                    print open(task.stderr_file).read()
                     raise Exception("ERROR FOUND in", task.taskdir)
 
             # If last task processed a new tree node, dump snapshots
@@ -122,9 +124,10 @@ def annotate_tree(t, clade2tasks):
                                tree_type=task.tname, 
                                tree_cmd=params)
             elif task.ttype == "mchooser":
-                n.add_features(modeltester_models=task.model, 
+                n.add_features(modeltester_models=task.models, 
                                modeltester_type=task.tname, 
                                modeltester_params=params, 
+                               modeltester_bestmodel=task.best_model, 
                                )
             elif task.ttype == "tree_merger":
                 n.add_features(treemerger_type=task.tname, 

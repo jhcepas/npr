@@ -150,7 +150,7 @@ class Task(object):
 
     def launch_jobs(self):
         for j in self.jobs:
-            # Skip done jobs and those that depend on unfinished
+            # Skip done jobs and those that depend on unfinished jobs
             if j in self._donejobs or \
                     (j.dependencies - self._donejobs): 
                 continue
@@ -179,4 +179,32 @@ class Task(object):
         return True
 
 
+class AlgTask(Task):
+    def __repr__(self):
+        return "AlgTask (%s seqs, %s, %s)" %\
+            (getattr(self, "nseqs", 0),
+             self.tname, 
+             getattr(self, "taskid", "?")[:6])
+
+    def check(self):
+        if os.path.exists(self.alg_fasta_file) and \
+                os.path.exists(self.alg_phylip_file) and \
+                os.path.getsize(self.alg_fasta_file) and \
+                os.path.getsize(self.alg_phylip_file):
+            return True
+        return False
+
+
+class TreeTask(Task):
+    def __repr__(self):
+        return "TreeTask (%s seqs, %s, %s)" %\
+            (getattr(self, "nseqs", 0),
+             self.tname, 
+             (getattr(self, "taskid", None) or "?")[:6])
+
+    def check(self):
+        if os.path.exists(self.tree_file) and \
+                os.path.getsize(self.tree_file):
+            return True
+        return False
 

@@ -16,7 +16,6 @@ class Trimal(Task):
         self.alg_fasta_file = alg_fasta_file
         self.alg_phylip_file = alg_phylip_file
         self.kept_columns = []
-        self.nseqs = 0
         base_args = {
             '-in': None,
             '-out': None,
@@ -40,7 +39,6 @@ class Trimal(Task):
         # interleaved phylip format. Both files, fasta and phylip,
         # remain accessible.
         alg = SeqGroup(self.clean_alg_fasta_file)
-        self.nseqs = len(alg.id2seq)
         for line in open(self.jobs[0].stdout_file):
             line = line.strip()
             if line.startswith("#ColumnsMap"):

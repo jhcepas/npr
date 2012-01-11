@@ -14,7 +14,6 @@ class JModeltest(Task):
         base_args = {
             '-d': alg_fasta_file, 
             }
-
         args = self.conf["jmodeltest"]
         if args.get("-t", "ML") == "ML":
             task_type = "tree"
@@ -22,11 +21,13 @@ class JModeltest(Task):
             task_type = "mchooser"
             
         Task.__init__(self, cladeid, task_type, "Jmodeltest", base_args, args)
+
         # set app arguments and options
         self.alg_fasta_file = alg_fasta_file
         self.alg_phylip_file = alg_phylip_file
         self.seqtype = "nt"
         self.best_model = None
+        self.models = "see jmodeltest params"
         self.tree_file = None
         # Load task data
         self.init()

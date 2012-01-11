@@ -7,11 +7,12 @@ DNA_sst = 20   # DNA switching size threshold
 DNA_sct = 0.0  # DNA switching conservation threshold
 DNA_sit = 0.95 # DNA switching identity threshold
 
-medium = 5
-large  = 6
-huge   = 7
+medium = 200
+large  = 500
+huge   = 5000
 
 # tree sizes      small          medium        large           huge 
+#size           =  0,              5,             6,             7
 clean_alg      =  true,           true,          true,          false
 test_aa_models =  true,           true,          false,         false 
 test_nt_models =  true,           true,          false,         false 
@@ -62,6 +63,7 @@ _use_reverse = True
 
 [uhire]
 _muscle_maxiters = 2 # maxiters allowes for the clump alignments
+_maxclump = 5000    # max size of clusters
 
 [bionj_modelchooser]
 _models = "JTT", "WAG" 
@@ -93,6 +95,7 @@ _models = "JTT", "WAG"
 [raxml]
 # phyml can be used to compute aLRT values once the tree is done
 _phyml_bin = /home/jhuerta/_Projects/npr/external_apps/phyml
+_alrt_calculation = phyml # none, phyml or raxml
 _method = GAMMA # GAMMA or CAT
 #_pinv = I # If True, estimates the proportion of invariable sites. 
 #_ebf = F # Empirical base frequencies

@@ -16,8 +16,8 @@ sys.path.insert(0, "/home/jhuerta/_Devel/ete/gui/")
 from ete_dev import PhyloTree, SeqGroup, TreeStyle, NodeStyle, faces
 from ete_dev.parser.fasta import read_fasta
 
-AA = set("ABCDEFGHIJKLMNPOQRSUTVWXYZ")
-NT = set("ACGTURYKMSWBDHVN")
+AA = set("ABCDEFGHIJKLMNPOQRSUTVWXYZ") | set("abcdefghijklmnpoqrsutvwxyz") 
+NT = set("ACGTURYKMSWBDHVN") | set("acgturykmswbdhvn")
 
 GENCODE = {
     'ATA':'I', 'ATC':'I', 'ATT':'I', 'ATG':'M',
@@ -79,11 +79,10 @@ def render_tree(tree, fname):
     ts.show_leaf_name = True
     ts.show_branch_length = True
     ts.show_branch_support = True
-    ts.mode = "c"
+    ts.mode = "r"
     iterface = faces.TextFace("iter")
     ts.legend.add_face(iterface, 0)
 
     tree.dist = 0
     tree.sort_descendants()
     tree.render(fname, tree_style = ts, w = 700)
-
