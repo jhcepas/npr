@@ -1,25 +1,40 @@
+#
+# Standard NPR configuration file
+#
+# .... ... 
+#
 [main]
 basedir  = ./prueba
 pipeline = template/standard1.py
 
-render_tree_images = true
 DNA_sst = 20   # DNA switching size threshold
 DNA_sct = 0.0  # DNA switching conservation threshold
 DNA_sit = 0.95 # DNA switching identity threshold
 
-medium = 200
-large  = 500
-huge   = 5000
+# Read the following config lines as a table, in which each column
+# represents a different phylogenetic workflow. Different configs are
+# used for different sizes of dataset. 'npr_max_seqs' defines the
+# maximum number of sequences that can be handled by each config
+# block. Note that npr_max_seqs in the last column should be higher
+# than the max number of sequences you plan to analyze. 
 
-# tree sizes      small          medium        large           huge 
-#size           =  0,              5,             6,             7
-clean_alg      =  true,           true,          true,          false
-test_aa_models =  true,           true,          false,         false 
-test_nt_models =  true,           true,          false,         false 
-aligner        =  meta_aligner,   muscle,        clustalo,      uhire  
-tree_builder   =  raxml,          phyml,         fasttree,      fasttree
+npr_max_seqs          =  3,              4,             5,            1000000
+npr_aa_aligner        =  meta_aligner,   muscle,        clustalo,      uhire  
+npr_aa_alg_cleaner    =  trimal,         trimal,        trimal,        none
+npr_aa_model_tester   =  prottest,       prottest,      none,          none  
+npr_aa_tree_builder   =  raxml,          phyml,         fasttree,      fasttree
+
+npr_nt_aligner        =  meta_aligner,   muscle,        uhire,         uhire  
+npr_nt_alg_cleaner    =  trimal,         trimal,        trimal,        none
+npr_nt_model_tester   =  jmodeltest,     jmodeltest,    none,          none 
+npr_nt_tree_builder   =  raxml,          phyml,         fasttree,      fasttree
+
+
+# Should I render a tree growing animation?
+render_tree_images = true
 
 [app]
+# Paths to the different applications
 muscle     = "/home/jhuerta/_Projects/npr/external_apps/muscle"
 mafft      = "MAFFT_BINARIES=~/_Projects/npr/external_apps/mafft-6.861-without-extensions/binaries/  /home/jhuerta/_Projects/npr/external_apps/mafft"
 clustalo   = "/home/jhuerta/_Projects/npr/external_apps/clustalo"
@@ -46,6 +61,7 @@ fasttree   = "/home/jhuerta/_Projects/npr/external_apps/FastTree"
 --auto = ""
 
 [clustalo]
+_alternative_aligner = uhire
 -v = ""
 --threads = 1 
 
@@ -78,15 +94,16 @@ _models = "JTT", "WAG"
 -wag = ""
 
 [phyml]
+_aa_model = JTT # AA model used if no model selection is performed
+_nt_model = GTR # Nt model used if no model selection is performed
+--no_memory_check = ""
+--quiet = ""
 --pinv = e        # Proportion of invariant sites.  Fixed value in the
                   # [0,1] range or "e" for estimated
 --alpha = e       # Gamma distribution shape parameter. fixed value or
                   # "e" for "estimated"
---no_memory_check = ""
---quiet = ""
 --nclasses =  4   # Number of rate categories
--o = tlr          # optimization
---model = LG      # Default model if no model-selection step is executed
+-o = tlr          # Tree optimization
 -f = m            # e: estiamte character frequencies.  m: character
                   # frequencies from model
 --bootstrap = -2  #  approximate likelihood ratio test returning

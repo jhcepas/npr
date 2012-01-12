@@ -18,6 +18,7 @@ def schedule(config, processer, schedule_time, execution, retry):
     clade2tasks = defaultdict(list)
     # Then enters into the pipeline. 
     while pending_tasks:
+        print "."
         # A will modify pending_task within the loop, so I create a
         # copy of it
         for task in list(pending_tasks):
@@ -71,7 +72,6 @@ def schedule(config, processer, schedule_time, execution, retry):
                     log.info("Remarking task as undone to retry")
                     task.retry()
                 else:
-                    print open(task.stderr_file).read()
                     raise Exception("ERROR FOUND in", task.taskdir)
 
             # If last task processed a new tree node, dump snapshots
@@ -133,5 +133,3 @@ def annotate_tree(t, clade2tasks):
                 n.add_features(treemerger_type=task.tname, 
                                treemerger_hidden_outgroup=task.outgroup_topology, 
                                )
-
-

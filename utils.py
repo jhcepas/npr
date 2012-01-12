@@ -86,3 +86,4 @@ def render_tree(tree, fname):
     tree.dist = 0
     tree.sort_descendants()
     tree.render(fname, tree_style = ts, w = 700)
+

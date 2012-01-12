@@ -5,12 +5,15 @@ DNA_sit = float()
 
 render_tree_images = boolean()
 
-medium = integer()
-large = integer()
-huge =  integer()
+npr_max_seqs = positive_integer_list()
+npr_nt_alg_cleaner = list()
+npr_aa_alg_cleaner = list()
 
-test_aa_models = boolean_list(4, 4)
-test_nt_models = boolean_list(4, 4)
-clean_alg = boolean_list(4, 4)
-aligner = list(4, 4)
-tree_builder = list(4, 4)
+npr_aa_aligner = list()
+npr_nt_aligner = list()
+
+npr_aa_tree_builder = list()
+npr_nt_tree_builder = list()
+
+npr_aa_model_tester = list()
+npr_nt_model_tester = list()

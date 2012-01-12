@@ -15,6 +15,7 @@ __all__ = ["Phyml"]
 class Phyml(TreeTask):
     def __init__(self, cladeid, alg_file, model, seqtype, conf):
         base_args = OrderedDict({
+                "--model": "", 
                 "--no_memory_check": "", 
                 "--quiet": "" })
 

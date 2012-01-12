@@ -3,7 +3,7 @@ import re
 from StringIO import StringIO
 from signal import signal, SIGWINCH
 from collections import deque
-
+from errors import ConfigError, DataError
 from logger import get_main_log
 
 try:
@@ -182,10 +182,17 @@ def app_wrapper(func, args):
     if not args.enable_interface:
         NCURSES = False
 
-    if NCURSES:
-        curses.wrapper(main, func, args)
-    else:
-        main(None, func, args)
+    try:
+        if NCURSES:
+            curses.wrapper(main, func, args)
+        else:
+            main(None, func, args)
+    except ConfigError, e: 
+        print >>sys.stderr, "\nConfiguration Error:", e
+    except DataError, e: 
+        print >>sys.stderr, "\nData Error:", e
+    except:
+        raise
 
 def main(main_screen, func, args):
     """ Init logging and Screen. Then call main function """

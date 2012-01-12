@@ -10,7 +10,7 @@ from .utils import SeqGroup
 __all__ = ["Trimal"]
 
 class Trimal(Task):
-    def __init__(self, cladeid, alg_fasta_file, alg_phylip_file, seqtype, conf):
+    def __init__(self, cladeid, seqtype, alg_fasta_file, alg_phylip_file, conf):
         self.conf = conf
         self.seqtype = seqtype
         self.alg_fasta_file = alg_fasta_file
