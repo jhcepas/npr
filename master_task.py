@@ -3,7 +3,7 @@ import logging
 from logger import logindent
 log = logging.getLogger("main")
 
-from utils import get_md5, merge_dicts, PhyloTree, SeqGroup, random_string
+from utils import get_md5, merge_dicts, PhyloTree, SeqGroup, checksum
 from master_job import Job
 
 isjob = lambda j: isinstance(j, Job)
@@ -53,9 +53,7 @@ class Task(object):
         self.jobs = []
 
         # Working directory for the task
-        self.taskdir = os.path.join(self.global_config["basedir"], self.cladeid,
-                                     self.tname+"_"+random_string(8))
-
+        self.taskdir = None
 
         # Unique id based on the parameters set for each task
         self.taskid = None
@@ -66,6 +64,7 @@ class Task(object):
         # Path to the file containing task status: (D)one, (R)unning
         # or (W)aiting or (Un)Finished
         self.status_file = None
+        self.key_file = None
         self.status = "W"
         self._donejobs = set()
         self.dependencies = set()
@@ -92,6 +91,13 @@ class Task(object):
         self.status = st
         return st
 
+    def get_taskdir(self, *files):
+        input_key = checksum(*files)
+
+        taskdir = os.path.join(self.global_config["basedir"], self.cladeid,
+                               self.tname+"_"+input_key)
+        return taskdir
+
     def init(self):
         # Prepare required jobs
         self.load_jobs()
@@ -101,10 +107,11 @@ class Task(object):
 
         # Set the working dir for all jobs
         self.set_jobs_wd(self.taskdir)
-        
+
     def get_jobs_status(self):
         ''' Check the status of all children jobs. '''
         all_states = set()
+
         if self.jobs:
             for j in self.jobs:
                 if j not in self._donejobs:
@@ -112,6 +119,7 @@ class Task(object):
                     all_states.add(st)
                     if st == "D": 
                         self._donejobs.add(j)
+                        
         if not all_states:
             all_states.add("D")
         return all_states
@@ -120,21 +128,25 @@ class Task(object):
         ''' Initialize task information. It generates a unique taskID
         based on the sibling jobs and sets task working directory. ''' 
 
-        # Creates a task id based on its jobs
+        # Creates a task id based on its jobs and arguments. The same
+        # tasks, including the same parameters would raise the same
+        # id, so it is easy to check if a task is already done in the
+        # working path. Note that this prevents using.taskdir before
+        # calling task.init()
         if not self.taskid:
-            unique_id = get_md5(','.join(sorted([getattr(j, "jobid", "taskid") for j in self.jobs])))
+            unique_id = get_md5(','.join(sorted(
+                        [getattr(j, "jobid", "taskid") for j in self.jobs])))
             self.taskid = unique_id
-        #
-        # I now set the dir as a random string
-        # self.taskdir = os.path.join(self.global_config["basedir"], self.cladeid,
-        #                             self.tname+"_"+self.taskid)
+
+        self.taskdir = os.path.join(self.global_config["basedir"], self.cladeid,
+                               self.tname+"_"+self.taskid)
+
         if not os.path.exists(self.taskdir):
             os.makedirs(self.taskdir)
 
         self.status_file = os.path.join(self.taskdir, "__status__")
         self.jobs_file = os.path.join(self.taskdir, "__jobs__")
-        self.id_file = os.path.join(self.taskdir, "__id__")
-        open(self.id_file, "w").write(self.taskid)
+        self.key_file = os.path.join(self.taskdir, "__input__")
 
     def set_jobs_wd(self, path):
         ''' Sets working directory of all sibling jobs '''
@@ -193,6 +205,36 @@ class AlgTask(Task):
                 os.path.getsize(self.alg_phylip_file):
             return True
         return False
+
+
+class AlgCleanerTask(Task):
+    def __repr__(self):
+        return "AlgCleanerTask (%s seqs, %s, %s)" %\
+            (getattr(self, "nseqs", 0),
+             self.tname, 
+             getattr(self, "taskid", "?")[:6])
+
+    def check(self):
+        if os.path.exists(self.clean_alg_fasta_file) and \
+                os.path.exists(self.clean_alg_phylip_file) and \
+                os.path.getsize(self.clean_alg_fasta_file) and \
+                os.path.getsize(self.clean_alg_phylip_file):
+            return True
+        return False
+
+class ModelTesterTask(Task):
+    def __repr__(self):
+        return "ModelTesterTask (%s seqs, %s, %s)" %\
+            (getattr(self, "nseqs", 0),
+             self.tname, 
+             getattr(self, "taskid", "?")[:6])
+
+    def check(self):
+        if (self.tree_file and not 
+            (os.path.exists(self.tree_file) and
+             PhyloTree(self.tree_file))) or not self.best_model:
+            return False
+        return True
 
 
 class TreeTask(Task):

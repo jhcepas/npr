@@ -17,16 +17,18 @@ class Uhire(AlgTask):
         self.conf = conf
         self.seqtype = seqtype
         self.multiseq_file = multiseq_file
+
+        self.init()
+
         self.alg_fasta_file = os.path.join(self.taskdir, "final_alg.fasta")
         self.alg_phylip_file = os.path.join(self.taskdir, "final_alg.iphylip")
-
-        # Load jobs
-        self.init()
 
     def finish(self):
         # Once executed, alignment is converted into relaxed
         # interleaved phylip format. 
-        alg = SeqGroup(self.alg_fasta_file)
+        final_job = self.jobs[2]
+        alg = SeqGroup(os.path.join(final_job.jobdir, "alg.fasta"))
+        alg.write(outfile=self.alg_fasta_file, format="fasta")
         alg.write(outfile=self.alg_phylip_file, format="iphylip_relaxed")
 
     def load_jobs(self):
@@ -57,8 +59,9 @@ class Uhire(AlgTask):
 
         # Merge the cluster alignemnts into a single one
         umerge_args = {
+            "--maxlen": self.conf["uhire"]["_max_seq_length"],
             "--mergeclumps": "../clumpalgs/",
-            "--output": self.alg_fasta_file,
+            "--output": "alg.fasta",
             }
         umerge_job = Job(self.conf["app"]["usearch"], umerge_args, "usearch-umerge")
         umerge_job.dependencies.add(alg_job)

@@ -2,13 +2,13 @@ import os
 import logging
 log = logging.getLogger("main")
 
-from .master_task import Task
+from .master_task import ModelTesterTask
 from .master_job import Job
 from .utils import basename, PhyloTree
 
 __all__ = ["JModeltest"]
 
-class JModeltest(Task):
+class JModeltest(ModelTesterTask):
     def __init__(self, cladeid, alg_fasta_file, alg_phylip_file, conf):
         self.conf = conf
         base_args = {
@@ -20,7 +20,7 @@ class JModeltest(Task):
         else:
             task_type = "mchooser"
             
-        Task.__init__(self, cladeid, task_type, "Jmodeltest", base_args, args)
+        ModelTesterTask.__init__(self, cladeid, task_type, "Jmodeltest", base_args, args)
 
         # set app arguments and options
         self.alg_fasta_file = alg_fasta_file
@@ -29,7 +29,7 @@ class JModeltest(Task):
         self.best_model = None
         self.models = "see jmodeltest params"
         self.tree_file = None
-        # Load task data
+
         self.init()
 
     def load_jobs(self):
@@ -62,12 +62,3 @@ class JModeltest(Task):
         self.best_model = best_model
         self.model = best_model
         log.info("Best model: %s" %self.best_model)
-
-    def check(self):
-        if not self.best_model or (self.tree_file and not \
-                                      (os.path.exists(self.tree_file) and\
-                                           PhyloTree(self.tree_file))):
-
-            return False
-        return True
-

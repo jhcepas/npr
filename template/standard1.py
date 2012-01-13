@@ -131,9 +131,7 @@ def process_task(task, main_tree, conf):
         _model_tester = n2class[conf["main"]["npr_aa_model_tester"][index]]
         _tree_builder = n2class[conf["main"]["npr_aa_tree_builder"][index]]
 
-    print (nseqs, index, _alg_cleaner, _model_tester,
-           _aligner, _tree_builder)
-
+    #print (nseqs, index, _alg_cleaner, _model_tester, _aligner, _tree_builder)
     
     new_tasks = []
     if ttype == "msf":
@@ -202,8 +200,7 @@ def process_task(task, main_tree, conf):
         new_tasks.append(tree_task)
 
     elif ttype == "tree":
-        t = PhyloTree(task.tree_file)
-        treemerge_task = TreeMerger(cladeid, seqtype, t, main_tree, conf)
+        treemerge_task = TreeMerger(cladeid, seqtype, task.tree_file, main_tree, conf)
         treemerge_task.nseqs = nseqs
         new_tasks.append(treemerge_task)
 

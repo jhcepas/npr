@@ -22,11 +22,11 @@ class Muscle(AlgTask):
         self.conf = conf
         self.seqtype = seqtype
         self.multiseq_file = multiseq_file
+
+        self.init()
         self.alg_fasta_file = os.path.join(self.taskdir, "final_alg.fasta")
         self.alg_phylip_file = os.path.join(self.taskdir, "final_alg.iphylip")
 
-        # Load jobs
-        self.init()
 
     def finish(self):
         # Once executed, alignment is converted into relaxed

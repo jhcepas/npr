@@ -41,7 +41,6 @@ class FastTree(TreeTask):
         # input alg must be the last argument 
         self.args[self.alg_phylip_file] = ""
 
-        # Prepare jobs and task
         self.init()
 
     def load_jobs(self):

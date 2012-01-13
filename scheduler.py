@@ -16,12 +16,12 @@ def schedule(config, processer, schedule_time, execution, retry):
     pending_tasks, main_tree = processer(None, None, 
                                          config)
     clade2tasks = defaultdict(list)
+    sort_by_clade = lambda x,y: cmp(x.cladeid, y.cladeid)
     # Then enters into the pipeline. 
     while pending_tasks:
-        print "."
         # A will modify pending_task within the loop, so I create a
         # copy of it
-        for task in list(pending_tasks):
+        for task in sorted(pending_tasks, sort_by_clade):
             set_logindent(0)
             log.info(task)
             logindent(2)

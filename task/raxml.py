@@ -35,7 +35,6 @@ class Raxml(TreeTask):
         #inv = conf["raxml"].get("pinv", "").upper()
         #freq = conf["raxml"].get("ebf", "").upper()
 
-        # Load task info
         self.init()
 
         self.ml_tree_file = os.path.join(self.jobs[0].jobdir,

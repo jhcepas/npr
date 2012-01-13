@@ -14,9 +14,10 @@ class TreeMerger(Task):
         Task.__init__(self, cladeid, "treemerger", "Standard-TreeMerger")
         self.conf = conf
         self.args = conf["tree_merger"]
-        self.task_tree = task_tree
+        self.task_tree = PhyloTree(task_tree)
         self.main_tree = main_tree
         self.seqtype = seqtype
+
         self.init()
 
     def finish(self):

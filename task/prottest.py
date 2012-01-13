@@ -3,17 +3,18 @@ import re
 import logging
 log = logging.getLogger("main")
 
-from .master_task import Task
+from .master_task import ModelTesterTask
 from .master_job import Job
 from .utils import basename, PhyloTree
 
 __all__ = ["Prottest"]
 
-class Prottest(Task):
+class Prottest(ModelTesterTask):
     def __init__(self, cladeid, alg_fasta_file, alg_phylip_file, conf):
         self.alg_phylip_file = alg_phylip_file
         self.alg_fasta_file = alg_fasta_file
         self.alg_basename = basename(self.alg_phylip_file)
+        self.tree_file = None
         self.conf = conf
         base_args = {
             "--datatype": "aa",
@@ -25,14 +26,13 @@ class Prottest(Task):
             "--quiet": ""
             }
 
-        Task.__init__(self, cladeid, "mchooser", "Prottest", 
+        ModelTesterTask.__init__(self, cladeid, "mchooser", "Prottest", 
                       base_args, conf["bionj_modelchooser"])
 
         self.best_model = None
         self.seqtype = "aa"
         self.models = self.conf["prottest"]["_models"]
 
-        # Prepare jobs and task
         self.init()
 
         # Phyml cannot write the output in a different directory that
@@ -52,6 +52,7 @@ class Prottest(Task):
             job = Job(self.conf["app"]["phyml"], args)
             self.jobs.append(job)
         log.info(self.models)
+
     def finish(self):
         lks = []
         for j in self.jobs:
@@ -71,7 +72,3 @@ class Prottest(Task):
         # choose the model with higher likelihood
         self.best_model = lks[-1][1]
 
-    def check(self):
-        if self.best_model != None:
-            return True
-        return False

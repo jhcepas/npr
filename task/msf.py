@@ -33,12 +33,7 @@ class Msf(Task):
 
         # taskid does not depend on jobs, so I set it manually
         self.taskid = msf_id
-
-        # Sets task information, such as taskdir. taskid will kept as
-        # it was set manually
         self.init()
-
-        # Sets the path of output file
         self.multiseq_file = os.path.join(self.taskdir, "msf.fasta")
 
     def finish(self):

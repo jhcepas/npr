@@ -87,3 +87,15 @@ def render_tree(tree, fname):
     tree.sort_descendants()
     tree.render(fname, tree_style = ts, w = 700)
 
+def checksum(*fnames):
+    block_size=2**20
+    hash = hashlib.md5()
+    for fname in fnames:
+        f = open(fname, "rb")
+        while True:
+            data = f.read(block_size)
+            if not data:
+                break
+            hash.update(data)
+        f.close()
+    return hash.hexdigest()

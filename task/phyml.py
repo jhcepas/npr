@@ -32,7 +32,6 @@ class Phyml(TreeTask):
         self.seqtype = seqtype
         self.lk = None
 
-        # Prepare jobs and task
         self.init()
         
         # Phyml cannot write the output in a different directory that

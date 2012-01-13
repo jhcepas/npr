@@ -4,10 +4,10 @@
 # .... ... 
 #
 [main]
-basedir  = ./prueba
+#basedir  = ./prueba
 pipeline = template/standard1.py
 
-DNA_sst = 20   # DNA switching size threshold
+DNA_sst = 20   # DNA switching size (numebr of seqs) threshold
 DNA_sct = 0.0  # DNA switching conservation threshold
 DNA_sit = 0.95 # DNA switching identity threshold
 
@@ -17,8 +17,7 @@ DNA_sit = 0.95 # DNA switching identity threshold
 # maximum number of sequences that can be handled by each config
 # block. Note that npr_max_seqs in the last column should be higher
 # than the max number of sequences you plan to analyze. 
-
-npr_max_seqs          =  3,              4,             5,            1000000
+npr_max_seqs          =  100,            500,           3000,          1000000
 npr_aa_aligner        =  meta_aligner,   muscle,        clustalo,      uhire  
 npr_aa_alg_cleaner    =  trimal,         trimal,        trimal,        none
 npr_aa_model_tester   =  prottest,       prottest,      none,          none  
@@ -78,9 +77,9 @@ _use_reverse = True
 -n_core = 1
 
 [uhire]
-_muscle_maxiters = 2 # maxiters allowes for the clump alignments
-_maxclump = 5000    # max size of clusters
-
+_muscle_maxiters = 2    # maxiters allowes for the clump alignments
+_maxclump = 500         # max size of clusters
+_max_seq_length = 100000 # max size of clusters
 [prottest]
 _models = "JTT", "WAG" 
 -f = m            # char freq (m)odel or (e)stimated

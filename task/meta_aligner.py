@@ -32,11 +32,10 @@ class MCoffee(AlgTask):
 
         self.conf = conf
         self.seqtype = seqtype
+
+        self.init()
         self.alg_fasta_file = os.path.join(self.taskdir, "final_alg.fasta")
         self.alg_phylip_file = os.path.join(self.taskdir, "final_alg.iphylip")
-
-        # Load task data
-        self.init()
 
     def finish(self):
         # Once executed, alignment is converted into relaxed
@@ -60,11 +59,11 @@ class MetaAligner(AlgTask):
         self.conf = conf
         self.seqtype = seqtype
         self.multiseq_file = multiseq_file
+
+        self.init()
         self.alg_fasta_file = os.path.join(self.taskdir, "final_alg.fasta")
         self.alg_phylip_file = os.path.join(self.taskdir, "final_alg.iphylip")
 
-        # Load task data
-        self.init()
 
     def load_jobs(self):
         multiseq_file_r = self.multiseq_file+".reversed"
@@ -97,12 +96,13 @@ class MetaAligner(AlgTask):
             all_alg_files.append(task2.alg_fasta_file+".reverse")
 
         # Combine signal from all algs using Mcoffee
-        self.final_task = MCoffee(self.cladeid, self.seqtype, all_alg_files,
+        final_task = MCoffee(self.cladeid, self.seqtype, all_alg_files,
                              self.conf)
-        self.final_task.dependencies.update(self.jobs)
-        self.jobs.append(self.final_task)
+        final_task.dependencies.update(self.jobs)
+        self.jobs.append(final_task)
         
     def finish(self):
-        shutil.copy(self.final_task.alg_fasta_file, self.alg_fasta_file)
-        shutil.copy(self.final_task.alg_fasta_file, self.alg_phylip_file)
+        final_task = self.jobs[-1]
+        shutil.copy(final_task.alg_fasta_file, self.alg_fasta_file)
+        shutil.copy(final_task.alg_fasta_file, self.alg_phylip_file)
 
