@@ -43,15 +43,6 @@ class Task(object):
         # messages
         self.tname = task_name
 
-        # =============================================================
-        # The following attributes are expected to be completed by the
-        # subclasses
-        # =============================================================
-
-        # List of associated jobs necessary to complete the task. Job
-        # and Task classes are accepted as elements in the list.
-        self.jobs = []
-
         # Working directory for the task
         self.taskdir = None
 
@@ -64,12 +55,19 @@ class Task(object):
         # Path to the file containing task status: (D)one, (R)unning
         # or (W)aiting or (Un)Finished
         self.status_file = None
-        self.key_file = None
+        self.inkey_file = None
         self.status = "W"
         self._donejobs = set()
         self.dependencies = set()
         # Initialize job arguments 
         self.args = merge_dicts(extra_args, base_args, parent=self)
+
+        # List of associated jobs necessary to complete the task. Job
+        # and Task classes are accepted as elements in the list.
+        self.jobs = []
+
+
+
 
     def get_status(self):
         job_status = self.get_jobs_status()
@@ -91,12 +89,9 @@ class Task(object):
         self.status = st
         return st
 
-    def get_taskdir(self, *files):
+    def dump_inkey_file(self, *files):
         input_key = checksum(*files)
-
-        taskdir = os.path.join(self.global_config["basedir"], self.cladeid,
-                               self.tname+"_"+input_key)
-        return taskdir
+        open(self.inkey_file, "w").write(input_key)
 
     def init(self):
         # Prepare required jobs
@@ -146,7 +141,7 @@ class Task(object):
 
         self.status_file = os.path.join(self.taskdir, "__status__")
         self.jobs_file = os.path.join(self.taskdir, "__jobs__")
-        self.key_file = os.path.join(self.taskdir, "__input__")
+        self.inkey_file = os.path.join(self.taskdir, "__inkey__")
 
     def set_jobs_wd(self, path):
         ''' Sets working directory of all sibling jobs '''
@@ -206,6 +201,10 @@ class AlgTask(Task):
             return True
         return False
 
+    def finish(self):
+        self.dump_inkey_file(self.alg_fasta_file, 
+                             self.alg_phylip_file)
+
 
 class AlgCleanerTask(Task):
     def __repr__(self):
@@ -222,6 +221,11 @@ class AlgCleanerTask(Task):
             return True
         return False
 
+    def finish(self):
+        self.dump_inkey_file(self.alg_fasta_file, 
+                             self.alg_phylip_file)
+
+
 class ModelTesterTask(Task):
     def __repr__(self):
         return "ModelTesterTask (%s seqs, %s, %s)" %\
@@ -236,6 +240,10 @@ class ModelTesterTask(Task):
             return False
         return True
 
+    def finish(self):
+        self.dump_inkey_file(self.alg_fasta_file, 
+                             self.alg_phylip_file)
+
 
 class TreeTask(Task):
     def __repr__(self):
@@ -249,4 +257,8 @@ class TreeTask(Task):
                 os.path.getsize(self.tree_file):
             return True
         return False
+
+    def finish(self):
+        self.dump_inkey_file(self.alg_phylip_file)
+
 

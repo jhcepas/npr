@@ -71,4 +71,5 @@ class Prottest(ModelTesterTask):
         lks.reverse()
         # choose the model with higher likelihood
         self.best_model = lks[-1][1]
-
+        ModelTesterTask.finish(self)
+        

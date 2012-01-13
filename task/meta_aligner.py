@@ -5,7 +5,7 @@ log = logging.getLogger("main")
 
 from .master_task import AlgTask
 from .master_job import Job
-from .utils import SeqGroup, OrderedDict
+from .utils import SeqGroup, OrderedDict, checksum
 import __init__ as task
 
 __all__ = ["MetaAligner"]
@@ -29,7 +29,7 @@ class MCoffee(AlgTask):
         # Initialize task
         AlgTask.__init__(self, cladeid, "alg", "Mcoffee", 
                       base_args, conf["meta_aligner"])
-
+        self.all_alg_files = all_alg_files
         self.conf = conf
         self.seqtype = seqtype
 
@@ -37,18 +37,20 @@ class MCoffee(AlgTask):
         self.alg_fasta_file = os.path.join(self.taskdir, "final_alg.fasta")
         self.alg_phylip_file = os.path.join(self.taskdir, "final_alg.iphylip")
 
+    def load_jobs(self):
+        args = self.args.copy()
+        args["-outfile"] = "alg.fasta"
+        job = Job(self.conf["app"]["tcoffee"], args)
+        self.jobs.append(job)
+
     def finish(self):
         # Once executed, alignment is converted into relaxed
         # interleaved phylip format.
         alg = SeqGroup(os.path.join(self.jobs[0].jobdir, "alg.fasta"))
         alg.write(outfile=self.alg_fasta_file, format="fasta")
         alg.write(outfile=self.alg_phylip_file, format="iphylip_relaxed")
-
-    def load_jobs(self):
-        args = self.args.copy()
-        args["-outfile"] = "alg.fasta"
-        job = Job(self.conf["app"]["tcoffee"], args)
-        self.jobs.append(job)
+        self.dump_inkey_file(*self.all_alg_files)
+        
 
 class MetaAligner(AlgTask):
     def __init__(self, cladeid, multiseq_file, seqtype, conf):
@@ -105,4 +107,4 @@ class MetaAligner(AlgTask):
         final_task = self.jobs[-1]
         shutil.copy(final_task.alg_fasta_file, self.alg_fasta_file)
         shutil.copy(final_task.alg_fasta_file, self.alg_phylip_file)
-
+        AlgTask.finish(self)

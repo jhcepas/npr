@@ -27,14 +27,6 @@ class Muscle(AlgTask):
         self.alg_fasta_file = os.path.join(self.taskdir, "final_alg.fasta")
         self.alg_phylip_file = os.path.join(self.taskdir, "final_alg.iphylip")
 
-
-    def finish(self):
-        # Once executed, alignment is converted into relaxed
-        # interleaved phylip format.
-        alg = SeqGroup(os.path.join(self.jobs[0].jobdir, "alg.fasta"))
-        alg.write(outfile=self.alg_fasta_file, format="fasta")
-        alg.write(outfile=self.alg_phylip_file, format="iphylip_relaxed")
-
     def load_jobs(self):
         # Only one Muscle job is necessary to run this task
         args = self.args.copy()
@@ -42,3 +34,12 @@ class Muscle(AlgTask):
         args["-out"] = "alg.fasta"
         job = Job(self.conf["app"]["muscle"], args)
         self.jobs.append(job)
+
+    def finish(self):
+        # Once executed, alignment is converted into relaxed
+        # interleaved phylip format.
+        alg = SeqGroup(os.path.join(self.jobs[0].jobdir, "alg.fasta"))
+        alg.write(outfile=self.alg_fasta_file, format="fasta")
+        alg.write(outfile=self.alg_phylip_file, format="iphylip_relaxed")
+        AlgTask.finish(self)
+

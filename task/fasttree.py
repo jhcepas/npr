@@ -52,3 +52,4 @@ class FastTree(TreeTask):
         job = self.jobs[-1]
         self.tree_file = os.path.join(job.jobdir, "final_tree.nw")
         os.symlink(job.stdout_file, self.tree_file)
+        TreeTask.finish(self)

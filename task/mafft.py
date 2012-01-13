@@ -22,14 +22,7 @@ class Mafft(AlgTask):
 
         self.alg_fasta_file = os.path.join(self.taskdir, "final_alg.fasta")
         self.alg_phylip_file = os.path.join(self.taskdir, "final_alg.iphylip")
-
-    def finish(self):
-        # Once executed, alignment is converted into relaxed
-        # interleaved phylip format. 
-        alg = SeqGroup(self.jobs[0].stdout_file)
-        alg.write(outfile=self.alg_fasta_file, format="fasta")
-        alg.write(outfile=self.alg_phylip_file, format="iphylip_relaxed")
-
+ 
     def load_jobs(self):
         args = self.args.copy()
         # Mafft redirects resulting alg to std.output. The order of
@@ -38,3 +31,11 @@ class Mafft(AlgTask):
         args[""] = self.multiseq_file
         job = Job(self.conf["app"]["mafft"], args)
         self.jobs.append(job)
+
+    def finish(self):
+        # Once executed, alignment is converted into relaxed
+        # interleaved phylip format. 
+        alg = SeqGroup(self.jobs[0].stdout_file)
+        alg.write(outfile=self.alg_fasta_file, format="fasta")
+        alg.write(outfile=self.alg_phylip_file, format="iphylip_relaxed")
+        AlgTask.finish(self)

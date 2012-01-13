@@ -33,6 +33,13 @@ class Trimal(AlgCleanerTask):
         self.clean_alg_fasta_file = os.path.join(main_job.jobdir, "clean.alg.fasta")
         self.clean_alg_phylip_file = os.path.join(main_job.jobdir, "clean.alg.iphylip")
 
+    def load_jobs(self):
+        args = self.args.copy()
+        args["-in"] = self.alg_fasta_file
+        args["-out"] = "clean.alg.fasta"
+        job = Job(self.conf["app"]["trimal"], args)
+        self.jobs.append(job)
+
     def finish(self):
         # Once executed, alignment is converted into relaxed
         # interleaved phylip format. Both files, fasta and phylip,
@@ -43,10 +50,4 @@ class Trimal(AlgCleanerTask):
             if line.startswith("#ColumnsMap"):
                 self.kept_columns = map(int, line.split("\t")[1].split(","))
         alg.write(outfile=self.clean_alg_phylip_file, format="iphylip_relaxed")
-
-    def load_jobs(self):
-        args = self.args.copy()
-        args["-in"] = self.alg_fasta_file
-        args["-out"] = "clean.alg.fasta"
-        job = Job(self.conf["app"]["trimal"], args)
-        self.jobs.append(job)
+        AlgCleanerTask.finish(self)

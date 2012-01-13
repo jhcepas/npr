@@ -39,6 +39,7 @@ class Msf(Task):
     def finish(self):
         # Dump msf file to the correct path
         self.msf.write(outfile=self.multiseq_file)
+        self.dump_inkey_file(self.seed_file)
 
     def check(self):
         if os.path.exists(self.multiseq_file):

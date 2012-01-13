@@ -23,14 +23,6 @@ class Uhire(AlgTask):
         self.alg_fasta_file = os.path.join(self.taskdir, "final_alg.fasta")
         self.alg_phylip_file = os.path.join(self.taskdir, "final_alg.iphylip")
 
-    def finish(self):
-        # Once executed, alignment is converted into relaxed
-        # interleaved phylip format. 
-        final_job = self.jobs[2]
-        alg = SeqGroup(os.path.join(final_job.jobdir, "alg.fasta"))
-        alg.write(outfile=self.alg_fasta_file, format="fasta")
-        alg.write(outfile=self.alg_phylip_file, format="iphylip_relaxed")
-
     def load_jobs(self):
         # split the original set of sequences in clusters.
         uhire_args = {
@@ -68,3 +60,12 @@ class Uhire(AlgTask):
         
         # Add all jobs to the task queue queue
         self.jobs.extend([uhire_job, alg_job, umerge_job])
+
+    def finish(self):
+        # Once executed, alignment is converted into relaxed
+        # interleaved phylip format. 
+        final_job = self.jobs[2]
+        alg = SeqGroup(os.path.join(final_job.jobdir, "alg.fasta"))
+        alg.write(outfile=self.alg_fasta_file, format="fasta")
+        alg.write(outfile=self.alg_phylip_file, format="iphylip_relaxed")
+        AlgTask.finish(self)

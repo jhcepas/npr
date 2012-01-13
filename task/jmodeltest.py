@@ -62,3 +62,4 @@ class JModeltest(ModelTesterTask):
         self.best_model = best_model
         self.model = best_model
         log.info("Best model: %s" %self.best_model)
+        ModelTesterTask.finish(self)

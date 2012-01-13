@@ -14,14 +14,14 @@ class TreeMerger(Task):
         Task.__init__(self, cladeid, "treemerger", "Standard-TreeMerger")
         self.conf = conf
         self.args = conf["tree_merger"]
-        self.task_tree = PhyloTree(task_tree)
+        self.task_tree_file = task_tree
         self.main_tree = main_tree
         self.seqtype = seqtype
 
         self.init()
 
     def finish(self):
-        ttree = self.task_tree
+        ttree = PhyloTree(self.task_tree_file)
         mtree = self.main_tree
 
         log.debug("Task Tree: %s", ttree)
@@ -161,4 +161,5 @@ class TreeMerger(Task):
         self.set_b = [b.cladeid, seqs_b, outs_b]
         self.main_tree = mtree
         log.debug("Final Merged Main_Tree: %s", self.main_tree)
+        self.dump_inkey_file(self.task_tree_file)
 

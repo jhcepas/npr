@@ -68,3 +68,4 @@ class Phyml(TreeTask):
                                       "phyml_tree."+self.cladeid)
         tree = PhyloTree(tree_file)        
         tree.write(outfile=self.tree_file)
+        TreeTask.finish(self)

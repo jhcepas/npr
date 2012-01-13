@@ -17,7 +17,8 @@ DNA_sit = 0.95 # DNA switching identity threshold
 # maximum number of sequences that can be handled by each config
 # block. Note that npr_max_seqs in the last column should be higher
 # than the max number of sequences you plan to analyze. 
-npr_max_seqs          =  100,            500,           3000,          1000000
+#npr_max_seqs          =  100,            500,           3000,          1000000
+npr_max_seqs          =     4,              5,           6,          1000000
 npr_aa_aligner        =  meta_aligner,   muscle,        clustalo,      uhire  
 npr_aa_alg_cleaner    =  trimal,         trimal,        trimal,        none
 npr_aa_model_tester   =  prottest,       prottest,      none,          none  

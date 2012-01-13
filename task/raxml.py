@@ -108,3 +108,5 @@ class Raxml(TreeTask):
             self.tree_file = self.alrt_tree_file
         else:
             self.tree_file = self.ml_tree_file
+
+        TreeTask.finish(self)
