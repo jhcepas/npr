@@ -81,7 +81,7 @@ _use_reverse = True
 _muscle_maxiters = 2 # maxiters allowes for the clump alignments
 _maxclump = 5000    # max size of clusters
 
-[bionj_modelchooser]
+[prottest]
 _models = "JTT", "WAG" 
 -f = m            # char freq (m)odel or (e)stimated
 --pinv = e        # Proportion of invariant sites

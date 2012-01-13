@@ -7,9 +7,9 @@ from .master_task import Task
 from .master_job import Job
 from .utils import basename, PhyloTree
 
-__all__ = ["BionjModelChooser"]
+__all__ = ["Prottest"]
 
-class BionjModelChooser(Task):
+class Prottest(Task):
     def __init__(self, cladeid, alg_fasta_file, alg_phylip_file, conf):
         self.alg_phylip_file = alg_phylip_file
         self.alg_fasta_file = alg_fasta_file
@@ -25,12 +25,12 @@ class BionjModelChooser(Task):
             "--quiet": ""
             }
 
-        Task.__init__(self, cladeid, "mchooser", "Bionj-ModelChooser", 
+        Task.__init__(self, cladeid, "mchooser", "Prottest", 
                       base_args, conf["bionj_modelchooser"])
 
         self.best_model = None
         self.seqtype = "aa"
-        self.models = self.conf["bionj_modelchooser"]["_models"]
+        self.models = self.conf["prottest"]["_models"]
 
         # Prepare jobs and task
         self.init()

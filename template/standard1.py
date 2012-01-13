@@ -20,7 +20,7 @@ n2class = {
     "raxml": Raxml,
     "phyml": Phyml,
     "jmodeltest": JModeltest,
-    "prottest": BionjModelChooser,
+    "prottest": Prottest,
     "trimal": Trimal
     }
 
