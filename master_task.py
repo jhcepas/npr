@@ -3,23 +3,27 @@ import logging
 from logger import logindent
 log = logging.getLogger("main")
 
-from utils import get_md5, merge_dicts, PhyloTree, SeqGroup, checksum
+from utils import get_md5, merge_arg_dicts, PhyloTree, SeqGroup, checksum
 from master_job import Job
 
 isjob = lambda j: isinstance(j, Job)
 istask = lambda j: isinstance(j, Task)
 
+def class_repr(cls, cls_name):
+    """ Human readable representation of NPR tasks.""" 
+    return "%s (%s seqs, %s, %s)" %\
+        (cls_name, getattr(cls, "nseqs", None) or 0,
+         cls.tname, 
+         (getattr(cls, "taskid", None) or "?")[:6])
+
+
 class Task(object):
     global_config = {"basedir": "./test"}
 
     def __repr__(self):
-        if self.taskid:
-            tid = self.taskid[:6]
-        else:
-            tid = "?"
-        return "Task (%s: %s, %s)" %(self.ttype, self.tname, tid)
+        return class_repr(self, "Task")
 
-    def summary(self):
+    def print_summary(self):
         print "Type:", self.ttype
         print "Name:", self.tname
         print "Id:", self.taskid
@@ -49,9 +53,6 @@ class Task(object):
         # Unique id based on the parameters set for each task
         self.taskid = None
 
-        # Path to the file with job commands
-        self.jobs_file = None
-
         # Path to the file containing task status: (D)one, (R)unning
         # or (W)aiting or (Un)Finished
         self.status_file = None
@@ -59,33 +60,42 @@ class Task(object):
         self.status = "W"
         self._donejobs = set()
         self.dependencies = set()
+
         # Initialize job arguments 
-        self.args = merge_dicts(extra_args, base_args, parent=self)
+        self.args = merge_arg_dicts(extra_args, base_args, parent=self)
 
         # List of associated jobs necessary to complete the task. Job
         # and Task classes are accepted as elements in the list.
         self.jobs = []
 
-
-
-
     def get_status(self):
+        saved_status = self.get_saved_status()
         job_status = self.get_jobs_status()
-        # Order matters
-        if "E" in job_status: 
-            st = "E"
-        elif "W" in job_status: 
-            st =  "W"
-        elif "R" in job_status: 
-            st = "R"
-        elif set("D") == job_status: 
+        # D* means Done and finished
+        if job_status == set("D") and saved_status != "D":
+            print saved_status, self.status_file
+            log.info("Running task post-processing %s", self)
             self.finish()
-            if self.check():
-                st = "D"
+            st = "D"
+        elif job_status == set("D") and saved_status == "D":
+            st = "D"
+        else:
+            # Order matters
+            if "E" in job_status: 
+                st = "E"
+            elif "W" in job_status: 
+                st =  "W"
+            elif "R" in job_status: 
+                st = "R"
             else:
                 st = "E"
-        else:
-            st = "?"
+
+        if st == "D":
+            if not self.check():
+                log.error("Task check not passed")
+                st = "E"
+
+        self.save_status(st)
         self.status = st
         return st
 
@@ -103,17 +113,22 @@ class Task(object):
         # Set the working dir for all jobs
         self.set_jobs_wd(self.taskdir)
 
+    def get_saved_status(self):
+        try:
+            return open(self.status_file, "ru").read(1)
+        except IOError: 
+            return "?" 
+
     def get_jobs_status(self):
         ''' Check the status of all children jobs. '''
         all_states = set()
 
-        if self.jobs:
-            for j in self.jobs:
-                if j not in self._donejobs:
-                    st = j.get_status()
-                    all_states.add(st)
-                    if st == "D": 
-                        self._donejobs.add(j)
+        for j in self.jobs:
+           if j not in self._donejobs:
+               st = j.get_status()
+               all_states.add(st)
+               if st == "D": 
+                   self._donejobs.add(j)
                         
         if not all_states:
             all_states.add("D")
@@ -140,8 +155,10 @@ class Task(object):
             os.makedirs(self.taskdir)
 
         self.status_file = os.path.join(self.taskdir, "__status__")
-        self.jobs_file = os.path.join(self.taskdir, "__jobs__")
         self.inkey_file = os.path.join(self.taskdir, "__inkey__")
+
+    def save_status(self, status):
+        open(self.status_file, "w").write(status)
 
     def set_jobs_wd(self, path):
         ''' Sets working directory of all sibling jobs '''
@@ -188,10 +205,7 @@ class Task(object):
 
 class AlgTask(Task):
     def __repr__(self):
-        return "AlgTask (%s seqs, %s, %s)" %\
-            (getattr(self, "nseqs", 0),
-             self.tname, 
-             getattr(self, "taskid", "?")[:6])
+        return class_repr(self, "AlgTask")
 
     def check(self):
         if os.path.exists(self.alg_fasta_file) and \
@@ -205,13 +219,9 @@ class AlgTask(Task):
         self.dump_inkey_file(self.alg_fasta_file, 
                              self.alg_phylip_file)
 
-
 class AlgCleanerTask(Task):
     def __repr__(self):
-        return "AlgCleanerTask (%s seqs, %s, %s)" %\
-            (getattr(self, "nseqs", 0),
-             self.tname, 
-             getattr(self, "taskid", "?")[:6])
+        return class_repr(self, "AlgCleanerTask")
 
     def check(self):
         if os.path.exists(self.clean_alg_fasta_file) and \
@@ -228,29 +238,29 @@ class AlgCleanerTask(Task):
 
 class ModelTesterTask(Task):
     def __repr__(self):
-        return "ModelTesterTask (%s seqs, %s, %s)" %\
-            (getattr(self, "nseqs", 0),
-             self.tname, 
-             getattr(self, "taskid", "?")[:6])
+        return class_repr(self, "ModelTesterTask")
+
+    def get_best_model(self):
+        return open(self.best_model_file, "ru").read()
 
     def check(self):
-        if (self.tree_file and not 
-            (os.path.exists(self.tree_file) and
-             PhyloTree(self.tree_file))) or not self.best_model:
+        if not os.path.exists(self.best_model_file) or\
+                not os.path.getsize(self.best_model_file):
             return False
+        elif self.tree_file:
+            print "check 1", self.tree_file
+            if not os.path.exists(self.tree_file) or\
+                    not os.path.getsize(self.tree_file):
+                return False
         return True
 
     def finish(self):
         self.dump_inkey_file(self.alg_fasta_file, 
                              self.alg_phylip_file)
 
-
 class TreeTask(Task):
     def __repr__(self):
-        return "TreeTask (%s seqs, %s, %s)" %\
-            (getattr(self, "nseqs", 0),
-             self.tname, 
-             (getattr(self, "taskid", None) or "?")[:6])
+        return class_repr(self, "TreeTask")
 
     def check(self):
         if os.path.exists(self.tree_file) and \

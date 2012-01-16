@@ -1,6 +1,7 @@
 import os
 import sys
 import re
+import shutil
 
 import logging
 log = logging.getLogger("main")
@@ -42,6 +43,7 @@ class FastTree(TreeTask):
         self.args[self.alg_phylip_file] = ""
 
         self.init()
+        self.tree_file = os.path.join(self.taskdir, "final_tree.nw")
 
     def load_jobs(self):
         args = self.args.copy()
@@ -50,6 +52,5 @@ class FastTree(TreeTask):
 
     def finish(self):
         job = self.jobs[-1]
-        self.tree_file = os.path.join(job.jobdir, "final_tree.nw")
-        os.symlink(job.stdout_file, self.tree_file)
+        shutil.copy(job.stdout_file, self.tree_file)
         TreeTask.finish(self)

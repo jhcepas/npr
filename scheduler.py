@@ -31,11 +31,13 @@ def schedule(config, processer, schedule_time, execution, retry):
             log.info("TaskJobs: %d" %len(task.jobs))
             task.status = task.get_status()
 
+            log.info("Task status : %s" %task.status)
             logindent(2)
             for j in task.jobs:
                 if j.status != "D":
                     log.info("%s: %s", j.status, j)
             logindent(-2)
+
 
             if task.status == "W":
                 log.info("missing %d jobs." %len(set(task.jobs)-task._donejobs))
@@ -51,20 +53,16 @@ def schedule(config, processer, schedule_time, execution, retry):
                 log.info("Task is marked as Running")
 
             elif task.status == "D":
-                if task.check():
-                    logindent(3)
-                    new_tasks, main_tree = processer(task, main_tree, 
-                                                     config)
-                    logindent(-3)
-                    pending_tasks.extend(new_tasks)
-                    pending_tasks.remove(task)
-                    task.status = "D"
-                    clade2tasks[task.cladeid].append(task)
-                    if main_tree:
-                        annotate_tree(main_tree, clade2tasks)
-                else: 
-                    log.error("Task looks done but result files are not found")
-                    task.status = "E"
+                logindent(3)
+                new_tasks, main_tree = processer(task, main_tree, 
+                                                 config)
+                logindent(-3)
+                pending_tasks.extend(new_tasks)
+                pending_tasks.remove(task)
+                task.status = "D"
+                clade2tasks[task.cladeid].append(task)
+                if main_tree:
+                    annotate_tree(main_tree, clade2tasks)
 
             elif task.status == "E":
                 log.error("Task is marked as ERROR")
@@ -73,6 +71,10 @@ def schedule(config, processer, schedule_time, execution, retry):
                     task.retry()
                 else:
                     raise Exception("ERROR FOUND in", task.taskdir)
+
+            else :
+                log.error("Unknown task state [%s]", task.status)
+                continue
 
             # If last task processed a new tree node, dump snapshots
             if task.ttype == "treemerger":
@@ -107,15 +109,17 @@ def annotate_tree(t, clade2tasks):
                 n.add_features(nseqs=task.nseqs, 
                                msf_file=task.seed_file)
             elif task.ttype == "acleaner":
-                n.add_features(clean_alg_conservation=task.mean_conservation, 
-                               clean_alg_conservation_std=task.std_conservation, 
-                               clean_alg_max_identity=task.max_identity, 
+                n.add_features(clean_alg_mean_identn=task.mean_ident, 
+                               clean_alg_std_ident=task.std_ident, 
+                               clean_alg_max_ident=task.max_ident, 
+                               clean_alg_min_ident=task.min_ident, 
                                clean_alg_type=task.tname, 
                                clean_alg_cmd=params)
             elif task.ttype == "alg":
-                n.add_features(alg_conservation=task.mean_conservation, 
-                               alg_conservation_std=task.std_conservation, 
-                               alg_max_identity=task.max_identity, 
+                n.add_features(alg_mean_identn=task.mean_ident, 
+                               alg_std_ident=task.std_ident, 
+                               alg_max_ident=task.max_ident, 
+                               alg_min_ident=task.min_ident, 
                                alg_type=task.tname, 
                                alg_cmd=params)
             elif task.ttype == "tree":
@@ -127,9 +131,10 @@ def annotate_tree(t, clade2tasks):
                 n.add_features(modeltester_models=task.models, 
                                modeltester_type=task.tname, 
                                modeltester_params=params, 
-                               modeltester_bestmodel=task.best_model, 
+                               modeltester_bestmodel=task.get_best_model(), 
                                )
             elif task.ttype == "tree_merger":
                 n.add_features(treemerger_type=task.tname, 
                                treemerger_hidden_outgroup=task.outgroup_topology, 
                                )
+

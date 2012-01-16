@@ -1,10 +1,11 @@
 import numpy
 import logging
+import os
 log = logging.getLogger("main")
 
 from .master_task import Task
 from .master_job import Job
-from .utils import get_cladeid, load_node_size, PhyloTree
+from .utils import get_cladeid, load_node_size, PhyloTree, SeqGroup
 
 __all__ = ["TreeMerger"]
 
@@ -17,8 +18,11 @@ class TreeMerger(Task):
         self.task_tree_file = task_tree
         self.main_tree = main_tree
         self.seqtype = seqtype
-
+        self.set_a = None
+        self.set_b = None
         self.init()
+        self.left_part_file = os.path.join(self.taskdir, "left.msf")
+        self.right_part_file = os.path.join(self.taskdir, "right.msf")
 
     def finish(self):
         ttree = PhyloTree(self.task_tree_file)
@@ -157,9 +161,40 @@ class TreeMerger(Task):
             target.detach()
             up.add_child(ttree)
 
-        self.set_a = [a.cladeid, seqs_a, outs_a]
-        self.set_b = [b.cladeid, seqs_b, outs_b]
+        self.set_a = [a.cladeid, seqs_a, outs_a, self.left_part_file]
+        self.set_b = [b.cladeid, seqs_b, outs_b, self.right_part_file]
         self.main_tree = mtree
         log.debug("Final Merged Main_Tree: %s", self.main_tree)
+
+        # Dump partitions into disk
+        for part in [self.set_a, self.set_b]:
+            part_cladeid, seqs, outgroups, fname = part
+
+            # Creates msf file for the new partitions. If
+            # possible, it always uses aa, even when previous tree
+            # was done with a codon alignment.
+            if self.conf["main"]["aa_seed"]:
+                alg = SeqGroup(self.conf["main"]["aa_seed"])
+                seqtype = "aa"
+            else:
+                alg = SeqGroup(self.conf["main"]["nt_seed"])
+                seqtype = "nt"
+
+            msf_seqs = seqs + outgroups[:3]
+            fasta = '\n'.join([">%s\n%s" %
+                               (n, alg.get_seq(n))
+                               for n in msf_seqs])
+            open(fname, "w").write(fasta)
+
         self.dump_inkey_file(self.task_tree_file)
+
+    def check(self):
+        if os.path.exists(self.left_part_file) and \
+                os.path.exists(self.right_part_file) and \
+                os.path.getsize(self.left_part_file) and \
+                os.path.getsize(self.right_part_file):
+            return True
+        return False
+            
+            
 

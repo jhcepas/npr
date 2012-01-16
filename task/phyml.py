@@ -33,6 +33,7 @@ class Phyml(TreeTask):
         self.lk = None
 
         self.init()
+        self.tree_file = os.path.join(self.taskdir, "final_tree.nw")
         
         # Phyml cannot write the output in a different directory that
         # the original alg file. So I use relative path to alg file
@@ -64,8 +65,6 @@ class Phyml(TreeTask):
                       open(stats_file).read())
         lk = float(m.groups()[0])
         self.lk =  lk
-        self.tree_file = os.path.join(j.jobdir,
-                                      "phyml_tree."+self.cladeid)
         tree = PhyloTree(tree_file)        
         tree.write(outfile=self.tree_file)
         TreeTask.finish(self)

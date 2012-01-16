@@ -49,7 +49,7 @@ del_gaps = lambda seq: seq.replace("-","").replace(".", "")
 random_string = lambda N: ''.join(random.choice(string.ascii_uppercase + string.digits) for x in range(N))
 
 
-def merge_dicts(source, target, parent=""):
+def merge_arg_dicts(source, target, parent=""):
     for k,v in source.iteritems(): 
         if not k.startswith("_"): 
             if k not in target:

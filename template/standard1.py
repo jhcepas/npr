@@ -1,12 +1,15 @@
-from os import path
 import numpy 
 import re
 import commands
 import logging
-log = logging.getLogger("main")
+import numpy
+from collections import defaultdict
+
 from .utils import del_gaps, GENCODE, PhyloTree, SeqGroup, TreeStyle
 from .task import *
 from .errors import DataError
+
+log = logging.getLogger("main")
 
 n2class = {
     "none": None, 
@@ -24,8 +27,7 @@ n2class = {
     "trimal": Trimal
     }
 
-
-def get_conservation(alg_file, trimal_bin):
+def get_trimal_conservation(alg_file, trimal_bin):
     output = commands.getoutput("%s -ssc -in %s" %\
                                     (trimal_bin, alg_file))
     conservation = []
@@ -36,7 +38,7 @@ def get_conservation(alg_file, trimal_bin):
     std =  numpy.std(conservation)
     return mean, std
 
-def get_max_identity(alg_file, trimal_bin):
+def get_trimal_identity(alg_file, trimal_bin):
     #print "%s -sident -in %s" %\
     #    (trimal_bin, alg_file)
     output = commands.getoutput("%s -sident -in %s" %\
@@ -48,6 +50,24 @@ def get_max_identity(alg_file, trimal_bin):
         if m: 
             max_identity = float(m.groups()[0])
     return max_identity
+
+def get_identity(fname): 
+    s = SeqGroup(fname)
+    nseqs = float(len(s.id2seq))
+    comb = ((nseqs*nseqs)/2.0)-nseqs
+    seqlen = len(s.id2seq.itervalues().next())
+    ident = list()
+    for i in xrange(seqlen):
+        states = defaultdict(int)
+        for seq in s.id2seq.itervalues():
+            if seq[i] != "-":
+                states[seq[i]] += 1
+        values = states.values()
+        if values:
+            ident.append(float(max(values))/sum(values))
+    return (numpy.min(ident), numpy.max(ident), 
+            numpy.mean(ident), numpy.std(ident))
+
 
          
 def switch_to_codon(alg_fasta_file, alg_phylip_file, nt_seed_file, 
@@ -92,7 +112,6 @@ def switch_to_codon(alg_fasta_file, alg_phylip_file, nt_seed_file,
     nt_alg.write(outfile=alg_phylip_filename, format="iphylip_relaxed")
         
     return alg_fasta_filename, alg_phylip_filename
-
 
 def process_task(task, main_tree, conf):
     aa_seed_file = conf["main"]["aa_seed"]
@@ -147,17 +166,22 @@ def process_task(task, main_tree, conf):
                                   task.alg_phylip_file)
 
         # Calculate alignment stats           
-        cons_mean, cons_std = get_conservation(task.alg_fasta_file, 
-                                               conf["app"]["trimal"])
+        # cons_mean, cons_std = get_trimal_conservation(task.alg_fasta_file, 
+        #                                        conf["app"]["trimal"])
+        #  
+        # max_identity = get_trimal_identity(task.alg_fasta_file, 
+        #                                 conf["app"]["trimal"])
+        # log.info("Conservation: %0.2f +-%0.2f", cons_mean, cons_std)
+        # log.info("Max. Identity: %0.2f", max_identity)
 
-        max_identity = get_max_identity(task.alg_fasta_file, 
-                                        conf["app"]["trimal"])
 
-        log.info("Conservation: %0.2f +-%0.2f", cons_mean, cons_std)
-        log.info("Max. Identity: %0.2f", max_identity)
-        task.max_identity = max_identity
-        task.mean_conservation = cons_mean
-        task.std_conservation = cons_std
+        mx, mn, mean, std = get_identity(task.alg_fasta_file)
+        log.info("Identity: max=%0.2f min=%0.2f mean=%0.2f +- %0.2f",
+                 mx, mn, mean, std)
+        task.max_ident = mx
+        task.min_ident = mx
+        task.mean_ident = mean
+        task.std_ident = std
 
         if ttype == "alg" and _alg_cleaner:
             next_task = _alg_cleaner(cladeid, seqtype, alg_fasta_file, 
@@ -165,8 +189,8 @@ def process_task(task, main_tree, conf):
         else:
             # Converts aa alignment into nt if necessary
             if seqtype == "aa" and nt_seed_file and \
-                    task.nseqs <= sst and max_identity > sit and \
-                    cons_mean >= sct:
+                    task.nseqs <= sst and task.mean_ident > sit:
+
                     log.info("switching to codon alignment")
                     # Change seqtype config 
                     seqtype = "nt"
@@ -192,7 +216,7 @@ def process_task(task, main_tree, conf):
     elif ttype == "mchooser":
         alg_fasta_file = task.alg_fasta_file
         alg_phylip_file = task.alg_phylip_file
-        model = task.best_model
+        model = task.get_best_model()
 
         tree_task = _tree_builder(task.cladeid, alg_phylip_file, model, 
                                   seqtype, conf)
@@ -205,33 +229,17 @@ def process_task(task, main_tree, conf):
         new_tasks.append(treemerge_task)
 
     elif ttype == "treemerger":
+        if not task.set_a: 
+            task.finish()
         main_tree = task.main_tree
-                      
         for part in [task.set_a, task.set_b]:
-            part_cladeid, seqs, outgroups = part
+            part_cladeid, seqs, outgroups, fname = part
             # Partition size limit
             if len(seqs) >= int(conf["tree_merger"]["_min_size"]) and \
                     len(outgroups) >= int(conf["tree_merger"]["_min_outgroups"]):
 
-                # Creates msf file for the new partitions. If
-                # possible, it always uses aa, even when previous tree
-                # was done with a codon alignment.
-                if conf["main"]["aa_seed"]:
-                    alg = SeqGroup(conf["main"]["aa_seed"])
-                    seqtype = "aa"
-                else:
-                    alg = SeqGroup(conf["main"]["nt_seed"])
-                    seqtype = "nt"
-
-                msf_seqs = seqs + outgroups[:3]
-                new_msf_file = path.join(task.taskdir, 
-                                            "children_%s.msf" %part_cladeid)
-                fasta = '\n'.join([">%s\n%s" %
-                                   (n,del_gaps(alg.get_seq(n)))
-                                   for n in msf_seqs])
-                open(new_msf_file, "w").write(fasta)
                 new_tasks.append(\
-                    Msf(part_cladeid, new_msf_file, seqtype))
+                    Msf(part_cladeid, fname, seqtype))
            
     return new_tasks, main_tree
 
@@ -245,3 +253,4 @@ def pipeline(task, main_tree, conf):
         new_tasks, main_tree = process_task(task, main_tree, conf)
 
     return new_tasks, main_tree
+

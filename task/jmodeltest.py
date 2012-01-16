@@ -26,11 +26,15 @@ class JModeltest(ModelTesterTask):
         self.alg_fasta_file = alg_fasta_file
         self.alg_phylip_file = alg_phylip_file
         self.seqtype = "nt"
-        self.best_model = None
         self.models = "see jmodeltest params"
-        self.tree_file = None
 
         self.init()
+        self.best_model_file = os.path.join(self.taskdir, "best_model.txt")
+        if task_type == "tree":
+            self.tree_file = os.path.join(self.taskdir, "final_tree.nw")
+        else:
+            self.tree_file = None
+
 
     def load_jobs(self):
         tree_job = Job(self.conf["app"]["jmodeltest"], self.args)
@@ -53,13 +57,15 @@ class JModeltest(ModelTesterTask):
             elif line.startswith("ML tree (NNI) for the best AIC model ="): 
                 nw = line.replace("ML tree (NNI) for the best AIC model =", "")
                 t = PhyloTree(nw)
-        if t: 
-            tree_job = self.jobs[-1]
-            self.tree_file = os.path.join(tree_job.jobdir,
-                                          "jModelTest_tree."+self.cladeid)
-            t.write(outfile=self.tree_file)
 
-        self.best_model = best_model
-        self.model = best_model
-        log.info("Best model: %s" %self.best_model)
+        open(self.best_model_file, "w").write(best_model)
+        log.info("Best model: %s" %best_model)
+        if self.ttype == "tree": 
+            tree_job = self.jobs[-1]
+            tree_file =  os.path.join(tree_job.jobdir,
+                                      "jModelTest_tree."+self.cladeid)
+            t.write(outfile=self.tree_file)
+            self.model = best_model
+        
+
         ModelTesterTask.finish(self)

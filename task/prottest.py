@@ -14,7 +14,6 @@ class Prottest(ModelTesterTask):
         self.alg_phylip_file = alg_phylip_file
         self.alg_fasta_file = alg_fasta_file
         self.alg_basename = basename(self.alg_phylip_file)
-        self.tree_file = None
         self.conf = conf
         base_args = {
             "--datatype": "aa",
@@ -27,13 +26,14 @@ class Prottest(ModelTesterTask):
             }
 
         ModelTesterTask.__init__(self, cladeid, "mchooser", "Prottest", 
-                      base_args, conf["bionj_modelchooser"])
+                      base_args, conf["prottest"])
 
         self.best_model = None
         self.seqtype = "aa"
         self.models = self.conf["prottest"]["_models"]
-
         self.init()
+        self.best_model_file = os.path.join(self.taskdir, "best_model.txt")
+        self.tree_file = None #os.path.join(self.taskdir, "final_tree.nw")
 
         # Phyml cannot write the output in a different directory that
         # the original alg file. So I use relative path to alg file
@@ -66,10 +66,14 @@ class Prottest(ModelTesterTask):
             lk = float(m.groups()[0])
             tree.add_feature("lk", lk)
             tree.add_feature("model", j.args["--model"])
-            lks.append([float(tree.lk), tree.model])
+            lks.append([float(tree.lk), tree.model, tree])
         lks.sort()
         lks.reverse()
         # choose the model with higher likelihood
-        self.best_model = lks[-1][1]
+        best_model = lks[-1][1]
+        best_tree = lks[-1][2]
+        open(self.best_model_file, "w").write(best_model)
+        if self.tree_file:
+            tree.write(self.tree_file)
         ModelTesterTask.finish(self)
         

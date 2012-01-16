@@ -2,6 +2,7 @@ import os
 import sys
 import logging
 import re
+import shutil
 
 log = logging.getLogger("main")
 
@@ -36,15 +37,16 @@ class Raxml(TreeTask):
         #freq = conf["raxml"].get("ebf", "").upper()
 
         self.init()
+        self.tree_file = os.path.join(self.taskdir, "final_tree.nw")
 
         self.ml_tree_file = os.path.join(self.jobs[0].jobdir,
-                                      "RAxML_bestTree." + self.cladeid)
+                                    "RAxML_bestTree." + self.cladeid)
+        
         if self.compute_alrt == "raxml":
             self.jobs[1].args["-t"] = self.ml_tree_file
             self.alrt_tree_file = os.path.join(self.jobs[1].jobdir,
                                                "RAxML_fastTreeSH_Support." +\
                                                    self.cladeid)
-
         elif self.compute_alrt == "phyml":
             fake_alg_file = os.path.join(self.jobs[1].jobdir, basename(self.alg_phylip_file))
             if os.path.exists(fake_alg_file):
@@ -53,6 +55,9 @@ class Raxml(TreeTask):
             self.jobs[1].args["-u"] = self.ml_tree_file
             self.alrt_tree_file = os.path.join(self.jobs[1].jobdir,
                                                basename(self.alg_phylip_file) +"_phyml_tree.txt")
+        else:
+            self.alrt_tree_file = None
+
 
     def load_jobs(self):
         args = self.args.copy()
@@ -101,12 +106,10 @@ class Raxml(TreeTask):
         if self.compute_alrt:
             tree = open(self.alrt_tree_file).read().replace("\n", "")
             nw = re.subn(":(\d+\.\d+)\[(\d+)\]", parse_alrt, tree, re.MULTILINE)
-            
-            open(self.alrt_tree_file+".parsed", "w").write(nw[0])
-
-        if self.compute_alrt:
-            self.tree_file = self.alrt_tree_file
+            open(self.tree_file, "w").write(nw[0])
         else:
-            self.tree_file = self.ml_tree_file
+            shutil.copy(self.ml_tree_file, self.tree_file)
 
+        print self.tree_file
         TreeTask.finish(self)
+        
