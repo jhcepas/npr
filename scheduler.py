@@ -38,14 +38,18 @@ def schedule(config, processer, schedule_time, execution, retry):
                     log.info("%s: %s", j.status, j)
             logindent(-2)
 
-
             if task.status == "W":
                 log.info("missing %d jobs." %len(set(task.jobs)-task._donejobs))
                 task.status = "R"
                 for j, cmd in task.launch_jobs():
                     if execution:
                         log.info("Running %s" %j)
-                        os.system(cmd)
+                        try:
+                            os.system(cmd)
+                        except:
+                            task.save_status("E")
+                            task.status = "E"
+                            raise 
                     else:
                         print cmd
 
@@ -57,11 +61,11 @@ def schedule(config, processer, schedule_time, execution, retry):
                 new_tasks, main_tree = processer(task, main_tree, 
                                                  config)
                 logindent(-3)
-                pending_tasks.extend(new_tasks)
                 pending_tasks.remove(task)
-                task.status = "D"
+                pending_tasks.extend(new_tasks)
                 clade2tasks[task.cladeid].append(task)
                 if main_tree:
+                    log.info("Annotating tree")
                     annotate_tree(main_tree, clade2tasks)
 
             elif task.status == "E":
@@ -83,7 +87,7 @@ def schedule(config, processer, schedule_time, execution, retry):
                 main_tree.write(outfile=nw_file, features=[])
                 if config["main"]["render_tree_images"]:
                     img_file = os.path.join(config["main"]["basedir"], 
-                                            "gallery", task.cladeid+".png")
+                                            "gallery", task.cladeid+".svg")
                     render_tree(main_tree, img_file)
             
         sleep(WAITING_TIME)

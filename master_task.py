@@ -71,9 +71,8 @@ class Task(object):
     def get_status(self):
         saved_status = self.get_saved_status()
         job_status = self.get_jobs_status()
-        # D* means Done and finished
+
         if job_status == set("D") and saved_status != "D":
-            print saved_status, self.status_file
             log.info("Running task post-processing %s", self)
             self.finish()
             st = "D"

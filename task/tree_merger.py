@@ -28,15 +28,15 @@ class TreeMerger(Task):
         ttree = PhyloTree(self.task_tree_file)
         mtree = self.main_tree
 
-        log.debug("Task Tree: %s", ttree)
-        log.debug("Main Tree: %s", mtree)
+        #log.debug("Task Tree: %s", ttree)
+        #log.debug("Main Tree: %s", mtree)
 
         # Process current main tree and the new generated tree
         # (task_tree) to find out the outgroups used in task_tree. The
         # trick lies on the fact that cladeid is always calculated
         # ignoring the IDs of outgroups seqs.
         if mtree:
-            target_node = mtree.search_nodes(cladeid=self.cladeid)[0]
+            target_node = fast_search_node(self.cladeid, mtree)
             core_seqs = set(target_node.get_leaf_names())
             outgroup_seqs = set(ttree.get_leaf_names()) - core_seqs
         else:
@@ -85,10 +85,11 @@ class TreeMerger(Task):
             supports.sort()
             supports.reverse()
             ttree.set_outgroup(supports[0][2])
+            log.info("Done")
 
         self.outgroup_topology = ttree.children[0].__str__()
 
-        log.debug("Pruned Task_Tree: %s", ttree)
+        #log.debug("Pruned Task_Tree: %s", ttree)
 
         # Extract the two new partitions (potentially representing two
         # new iterations in the pipeline). Note that outgroup node was
@@ -104,13 +105,20 @@ class TreeMerger(Task):
         # (a and b), I calculate the branch length distances from them
         # (a and b) to all leaf nodes in its corresponding sister
         # node.
+        log.info("Calculating node distance")
         to_b_dists = []
         to_a_dists = []
+        n2rootdist = root_distance_matrix(ttree)
         for b_leaf in b.iter_leaves():
-            dist = b_leaf.get_distance(a)
+            dist = n2rootdist[b_leaf] + a.dist
+            #dist1 = b_leaf.get_distance(a)
+            #print dist, dist1
             to_a_dists.append([dist, b_leaf.name])
+            
         for a_leaf in a.iter_leaves():
-            dist = a_leaf.get_distance(b)
+            dist = n2rootdist[a_leaf] + b.dist
+            #dist1 = a_leaf.get_distance(b)
+            #print dist, dist1
             to_b_dists.append([dist, a_leaf.name])
 
         # Then we can sort outgroups prioritizing sequences whose
@@ -146,6 +154,7 @@ class TreeMerger(Task):
         log.debug("Best outgroup for B: %s" %rank_outs_b[:5])
 
         # Annotate current tree
+        log.info("Annotating new tree")
         for n in ttree.traverse():
             n.add_features(cladeid=get_cladeid(n.get_leaf_names()))
 
@@ -154,7 +163,7 @@ class TreeMerger(Task):
             mtree = ttree
         else:
             log.info("Merging trees")
-            target = mtree.search_nodes(cladeid=self.cladeid)[0]
+            target = fast_search_node(self.cladeid, mtree)
             # Switch nodes in the main_tree so current tree topology
             # is incorporated.
             up = target.up
@@ -164,9 +173,10 @@ class TreeMerger(Task):
         self.set_a = [a.cladeid, seqs_a, outs_a, self.left_part_file]
         self.set_b = [b.cladeid, seqs_b, outs_b, self.right_part_file]
         self.main_tree = mtree
-        log.debug("Final Merged Main_Tree: %s", self.main_tree)
+        #log.debug("Final Merged Main_Tree: %s", self.main_tree)
 
         # Dump partitions into disk
+        log.info("Dumping new partitions")
         for part in [self.set_a, self.set_b]:
             part_cladeid, seqs, outgroups, fname = part
 
@@ -187,7 +197,8 @@ class TreeMerger(Task):
             open(fname, "w").write(fasta)
 
         self.dump_inkey_file(self.task_tree_file)
-
+        log.info("Done.")
+        
     def check(self):
         if os.path.exists(self.left_part_file) and \
                 os.path.exists(self.right_part_file) and \
@@ -196,5 +207,18 @@ class TreeMerger(Task):
             return True
         return False
             
-            
+def fast_search_node(cladeid, tree):
+    for n in tree.traverse():
+        if n.cladeid == cladeid:
+            return n
+
+def root_distance_matrix(root):
+    root.dist = 0.0
+    n2rdist = {root:0.0}
+    for n in root.iter_descendants("preorder"):
+        n2rdist[n] = n2rdist[n.up] + n.dist
+    return n2rdist
+
+
+
 

@@ -52,9 +52,8 @@ def get_trimal_identity(alg_file, trimal_bin):
     return max_identity
 
 def get_identity(fname): 
+    log.info("Calculating alg stats...")
     s = SeqGroup(fname)
-    nseqs = float(len(s.id2seq))
-    comb = ((nseqs*nseqs)/2.0)-nseqs
     seqlen = len(s.id2seq.itervalues().next())
     ident = list()
     for i in xrange(seqlen):
@@ -67,7 +66,6 @@ def get_identity(fname):
             ident.append(float(max(values))/sum(values))
     return (numpy.min(ident), numpy.max(ident), 
             numpy.mean(ident), numpy.std(ident))
-
 
          
 def switch_to_codon(alg_fasta_file, alg_phylip_file, nt_seed_file, 
