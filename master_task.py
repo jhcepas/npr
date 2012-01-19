@@ -5,6 +5,7 @@ log = logging.getLogger("main")
 
 from utils import get_md5, merge_arg_dicts, PhyloTree, SeqGroup, checksum
 from master_job import Job
+from errors import RetryException
 
 isjob = lambda j: isinstance(j, Job)
 istask = lambda j: isinstance(j, Task)
@@ -16,10 +17,14 @@ def class_repr(cls, cls_name):
          cls.tname, 
          (getattr(cls, "taskid", None) or "?")[:6])
 
-
 class Task(object):
     global_config = {"basedir": "./test"}
 
+    def _get_max_cores(self):
+        return max([j.cores for j in self.jobs]) or 1
+            
+    cores = property(_get_max_cores,None)
+    
     def __repr__(self):
         return class_repr(self, "Task")
 
@@ -61,6 +66,9 @@ class Task(object):
         self._donejobs = set()
         self.dependencies = set()
 
+        # keeps a counter of how many cores are being used by running jobs
+        self.cores_used = 0
+        
         # Initialize job arguments 
         self.args = merge_arg_dicts(extra_args, base_args, parent=self)
 
@@ -74,20 +82,24 @@ class Task(object):
 
         if job_status == set("D") and saved_status != "D":
             log.info("Running task post-processing %s", self)
-            self.finish()
-            st = "D"
+            try:
+                self.finish()
+            except RetryException:
+                return "W"
+            else:
+                st = "D"
         elif job_status == set("D") and saved_status == "D":
             st = "D"
         else:
             # Order matters
-            if "E" in job_status: 
+            if "E" in job_status:
                 st = "E"
-            elif "W" in job_status: 
-                st =  "W"
             elif "R" in job_status: 
-                st = "R"
+                st =  "R"
+            elif "W" in job_status: 
+                st = "W"
             else:
-                st = "E"
+                st = "?"
 
         if st == "D":
             if not self.check():
@@ -120,15 +132,17 @@ class Task(object):
 
     def get_jobs_status(self):
         ''' Check the status of all children jobs. '''
+        self.cores_used = 0
         all_states = set()
-
         for j in self.jobs:
-           if j not in self._donejobs:
-               st = j.get_status()
-               all_states.add(st)
-               if st == "D": 
-                   self._donejobs.add(j)
-                        
+            if j not in self._donejobs:
+                st = j.get_status()
+                all_states.add(st)
+                if st == "D":
+                    self._donejobs.add(j)
+                elif st == "R":
+                    self.cores_used += j.cores
+                    
         if not all_states:
             all_states.add("D")
         return all_states
@@ -171,21 +185,18 @@ class Task(object):
             if job.get_status() == "E":
                 job.clean()
 
-    def launch_jobs(self):
+    def iter_waiting_jobs(self):
         for j in self.jobs:
-            # Skip done jobs and those that depend on unfinished jobs
-            if j in self._donejobs or \
-                    (j.dependencies - self._donejobs): 
-                continue
-            # Process the rest
-            if isjob(j):
-                j.dump_script()
-                cmd = "sh %s >%s 2>%s\n" %\
-                    (j.cmd_file, j.stdout_file, j.stderr_file)
-                yield j, cmd
-            elif istask(j):
-                for subj, cmd in j.launch_jobs():
+            # Process only  jobs whose dependencies are satisfied
+            if j.status == "W" and not (j.dependencies - self._donejobs): 
+                if isjob(j):
+                    j.dump_script()
+                    cmd = "sh %s >%s 2>%s" %\
+                        (j.cmd_file, j.stdout_file, j.stderr_file)
                     yield j, cmd
+                elif istask(j):
+                    for subj, cmd in j.iter_waiting_jobs():
+                        yield subj, cmd
 
     def load_jobs(self):
         ''' Customizable function. It must create all job objects and add

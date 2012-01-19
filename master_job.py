@@ -35,7 +35,11 @@ class Job(object):
         self.status = "W"
         # How to run the app
         self.bin = bin
+        # command line arguments 
         self.args = args
+        # Default number of cores used by the job. If more than 1,
+        # this attribute should be changed
+        self.cores = 1 
         self.jobname = jobname
         # generates an unique job identifier based on the params of
         # the app.
@@ -71,23 +75,26 @@ class Job(object):
         launch_cmd = ' '.join([self.bin] + ["%s %s" %(k,v) for k,v in self.args.iteritems() if v is not None])
         lines = [
             "#!/bin/sh",
-            "(echo R > %s && date > %s) &&" %(self.status_file, self.time_file),
-            "(cd %s && %s && (echo D > %s; %s) || (echo E > %s; %s));" %\
+            " (echo R > %s && date > %s) &&" %(self.status_file, self.time_file),
+            " (cd %s && %s && (echo D > %s; %s) || (echo E > %s; %s));" %\
                 (self.jobdir, launch_cmd,  self.status_file, self.ifdone_cmd, 
                  self.status_file, self.iffail_cmd), 
-            "date >> %s; " %(self.time_file),
+            " date >> %s; " %(self.time_file),
             ]
         script = '\n'.join(lines)
         if not os.path.exists(self.jobdir):
             os.makedirs(self.jobdir)
         open(self.cmd_file, "w").write(script)
-        #log.debug(script)
+
  
     def get_status(self):
-        if os.path.exists(self.status_file):
+        try:
             st = open(self.status_file).read(1)
+        except IOError:
+            pass
+        else:
             self.status = st
         return self.status
-   
+
     def clean(self):
         shutil.rmtree(self.jobdir)

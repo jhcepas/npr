@@ -6,6 +6,7 @@ log = logging.getLogger("main")
 from .master_task import AlgCleanerTask
 from .master_job import Job
 from .utils import SeqGroup
+from .errors import RetryException
 
 __all__ = ["Trimal"]
 
@@ -45,9 +46,18 @@ class Trimal(AlgCleanerTask):
         # interleaved phylip format. Both files, fasta and phylip,
         # remain accessible.
         alg = SeqGroup(self.clean_alg_fasta_file)
-        for line in open(self.jobs[0].stdout_file):
-            line = line.strip()
-            if line.startswith("#ColumnsMap"):
-                self.kept_columns = map(int, line.split("\t")[1].split(","))
-        alg.write(outfile=self.clean_alg_phylip_file, format="iphylip_relaxed")
-        AlgCleanerTask.finish(self)
+        if len(alg) != self.nseqs:
+            log.warning("Trimming was to aggressive and some"
+                        " sequences were removed. Params will"
+                        " be changed to keep at least 50% of the alg")
+            self.jobs[0].args["-cons"]="50"
+            self.jobs[0].status="W"
+            self.status = "W"
+            raise RetryException("")
+        else:
+            for line in open(self.jobs[0].stdout_file):
+                line = line.strip()
+                if line.startswith("#ColumnsMap"):
+                    self.kept_columns = map(int, line.split("\t")[1].split(","))
+            alg.write(outfile=self.clean_alg_phylip_file, format="iphylip_relaxed")
+            AlgCleanerTask.finish(self)

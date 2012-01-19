@@ -14,14 +14,32 @@ __all__ = ["Raxml"]
 
 class Raxml(TreeTask):
     def __init__(self, cladeid, alg_file, model, seqtype, conf):
+        # PTHREADS version needs at least -T2, which is actually
+        # similar to the normal version
+        threads = int(conf["raxml"].get(
+                "_max_cores", conf["main"]["_max_cores"]))
+
+        if threads > conf["main"]["_max_cores"]:
+            threads = conf["main"]["_max_cores"]
+            log.warning("RAxML execution will be limited to [%d] threads." %
+                        threads)
+        if threads > 1:
+            raxml_bin = conf["app"]["raxml-pthreads"]
+            base_args = OrderedDict({"-T": threads})
+        else:
+            raxml_bin = conf["app"]["raxml"]
+            base_args = OrderedDict()
 
         TreeTask.__init__(self, cladeid, "tree", "RaxML", 
-                      OrderedDict(), conf["raxml"])
+                          base_args, conf["raxml"])
 
+        self.raxml_bin = raxml_bin
+        self.threads = threads
         self.conf = conf
         self.seqtype = seqtype
         self.alg_phylip_file = alg_file
         self.compute_alrt = conf["raxml"].get("_alrt_calculation", None)
+
         # Process raxml options
         model = model or conf["raxml"]["_aa_model"]
         method = conf["raxml"].get("method", "GAMMA").upper()
@@ -58,26 +76,28 @@ class Raxml(TreeTask):
         else:
             self.alrt_tree_file = None
 
-
     def load_jobs(self):
+        if self.threads > 1:
+            bin = self.conf["app"]["raxml-pthreads"]
+        else:
+            bin = self.conf["app"]["raxml"]
+            
+        
         args = self.args.copy()
         args["-s"] = self.alg_phylip_file
         args["-m"] = self.model_string
         args["-n"] = self.cladeid
-        tree_job = Job(self.conf["app"]["raxml"], args)
+        tree_job = Job(self.raxml_bin, args)
+        tree_job.cores = self.threads
         self.jobs.append(tree_job)
 
         if self.compute_alrt == "raxml":
-            alrt_args = {
-                "-f": "J",
-                "-t": None,
-                "-T": args.get("-T", "1"),
-                "-m": args["-m"],
-                "-n": args["-n"],
-                "-s": args["-s"],
-                }
-            alrt_job = Job(self.conf["app"]["raxml"], alrt_args)       
+            alrt_args = tree_job.args.copy()
+            alrt_args["-f"] =  "J"
+            alrt_args["-t"] = None # It will be after init()
+            alrt_job = Job(self.raxml_bin, alrt_args)       
             alrt_job.dependencies.add(tree_job)
+            alrt_job.cores = self.threads
             self.jobs.append(alrt_job)
 
         elif self.compute_alrt == "phyml":

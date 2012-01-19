@@ -1,4 +1,5 @@
 import os
+from subprocess import call, Popen
 from time import sleep
 from collections import defaultdict
 import logging
@@ -6,22 +7,31 @@ from logger import set_logindent, logindent
 log = logging.getLogger("main")
 
 from utils import get_cladeid, render_tree
+from errors import ConfigError, DataError
 
 def schedule(config, processer, schedule_time, execution, retry):
     """ Main pipeline scheduler """ 
 
-    WAITING_TIME = schedule_time
     config["_alg_conversion"] = {}
     # Pass seed files to processer to generate the initial task
     pending_tasks, main_tree = processer(None, None, 
                                          config)
     clade2tasks = defaultdict(list)
-    sort_by_clade = lambda x,y: cmp(x.cladeid, y.cladeid)
-    # Then enters into the pipeline. 
+    sort_by_cladeid = lambda x,y: cmp(x.cladeid, y.cladeid)
+    # Then enters into the pipeline.
+    cores_total = config["main"]["_max_cores"]
+
     while pending_tasks:
-        # A will modify pending_task within the loop, so I create a
-        # copy of it
-        for task in sorted(pending_tasks, sort_by_clade):
+        cores_used = 0
+        wait_time = 0 # Try to go fast unless running tasks
+        set_logindent(0)
+        log.info("Checking the status of %d tasks" %len(pending_tasks))
+        # Check task status and compute total cores being used
+        for task in pending_tasks:
+            task.status = task.get_status()
+            cores_used += task.cores_used
+        
+        for task in sorted(pending_tasks, sort_by_cladeid):
             set_logindent(0)
             log.info(task)
             logindent(2)
@@ -29,44 +39,52 @@ def schedule(config, processer, schedule_time, execution, retry):
             tdir = tdir.lstrip("/")
             log.info("TaskDir: %s" %tdir)
             log.info("TaskJobs: %d" %len(task.jobs))
-            task.status = task.get_status()
-
             log.info("Task status : %s" %task.status)
-            logindent(2)
-            for j in task.jobs:
-                if j.status != "D":
-                    log.info("%s: %s", j.status, j)
-            logindent(-2)
 
-            if task.status == "W":
+            if task.status == "W" or task.status == "R":
+                # shows info about unfinished jobs
+                logindent(2)
+                for j in task.jobs:
+                    if j.status != "D":
+                        log.info("%s: %s", j.status, j)
+                logindent(-2)
+                
                 log.info("missing %d jobs." %len(set(task.jobs)-task._donejobs))
-                task.status = "R"
-                for j, cmd in task.launch_jobs():
+                # Tries to send new jobs from this task
+                pids = []
+                for j, cmd in task.iter_waiting_jobs():
+                    if not check_cores(j, cores_used, cores_total, execution):
+                        continue
                     if execution:
-                        log.info("Running %s" %j)
+                        log.info("Launching %s" %j)
                         try:
-                            os.system(cmd)
+                            P = Popen(cmd, shell=True)
                         except:
                             task.save_status("E")
                             task.status = "E"
-                            raise 
+                            raise
+                        else:
+                            pids.append(P.pid)
+                            task.status = "R"
+                            j.status = "R"
+                            cores_used += j.cores
+                            #print P
                     else:
+                        task.status = "R"
+                        j.status = "R"
+                        # Do something cool like sending to cluster.
                         print cmd
-
-            elif task.status == "R":
-                log.info("Task is marked as Running")
-
+                        
+                if not pids:
+                    wait_time = schedule_time
+                    
             elif task.status == "D":
                 logindent(3)
-                new_tasks, main_tree = processer(task, main_tree, 
-                                                 config)
+                new_tasks, main_tree = processer(task, main_tree, config)
                 logindent(-3)
                 pending_tasks.remove(task)
                 pending_tasks.extend(new_tasks)
                 clade2tasks[task.cladeid].append(task)
-                if main_tree:
-                    log.info("Annotating tree")
-                    annotate_tree(main_tree, clade2tasks)
 
             elif task.status == "E":
                 log.error("Task is marked as ERROR")
@@ -76,21 +94,27 @@ def schedule(config, processer, schedule_time, execution, retry):
                 else:
                     raise Exception("ERROR FOUND in", task.taskdir)
 
-            else :
+            else:
+                wait_time = schedule_time
                 log.error("Unknown task state [%s]", task.status)
                 continue
 
+            log.info("Cores used %s" %cores_used)
             # If last task processed a new tree node, dump snapshots
             if task.ttype == "treemerger":
-                nw_file = os.path.join(config["main"]["basedir"],
-                                       "tree_snapshots", task.cladeid+".nw")
-                main_tree.write(outfile=nw_file, features=[])
+                #log.info("Annotating tree")
+                #annotate_tree(main_tree, clade2tasks)
+                #nw_file = os.path.join(config["main"]["basedir"],
+                #                       "tree_snapshots", task.cladeid+".nw")
+                #main_tree.write(outfile=nw_file, features=[])
+                
                 if config["main"]["render_tree_images"]:
+                    log.info("Rendering tree image")
                     img_file = os.path.join(config["main"]["basedir"], 
                                             "gallery", task.cladeid+".svg")
                     render_tree(main_tree, img_file)
             
-        sleep(WAITING_TIME)
+        sleep(wait_time)
         print 
 
     final_tree_file = os.path.join(config["main"]["basedir"], \
@@ -99,12 +123,15 @@ def schedule(config, processer, schedule_time, execution, retry):
     main_tree.show()
 
 def annotate_tree(t, clade2tasks):
+    n2names = get_node2content(t)
     for n in t.traverse():
-        
-        cladeid = get_cladeid(n.get_leaf_names())
-        n.add_feature("cladeid", cladeid)
+        n.add_features(cladeid=get_cladeid(n2names[n]))
+    
+    clade2node = dict([ (n.cladeid, n) for n in t.traverse()])
+    for cladeid, alltasks in clade2tasks.iteritems():
+        n = clade2node[cladeid]
+        for task in alltasks:
 
-        for task in clade2tasks.get(n.cladeid, []):
             params = ["%s %s" %(k,v) for k,v in  task.args.iteritems() 
                       if not k.startswith("_")]
             params = " ".join(params)
@@ -142,3 +169,28 @@ def annotate_tree(t, clade2tasks):
                                treemerger_hidden_outgroup=task.outgroup_topology, 
                                )
 
+def check_cores(j, cores_used, cores_total, execution):
+    if j.cores > cores_total:
+        raise ConfigError("Job [%s] is trying to be executed using [%d] cores."
+                          " However, the program is limited to [%d] core(s)."
+                          " Use the --multicore option to enable more cores." %
+                          (j, j.cores, cores_total))
+    elif execution and j.cores > cores_total-cores_used:
+        log.info("Job [%s] will be postponed until [%d] core(s) are available." 
+                 % (j, j.cores))
+        return False
+    else:
+        return True
+    
+def get_node2content(node, store={}):
+    for ch in node.children:
+        get_node2content(ch, store=store)
+
+    if node.children:
+        val = []
+        for ch in node.children:
+            val.extend(store[ch])
+        store[node] = val
+    else:
+        store[node] = [node.name]
+    return store

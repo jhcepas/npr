@@ -50,6 +50,8 @@ class TreeMerger(Task):
             log.info("Rooting new tree using %d custom seqs" %
                      len(outgroup_seqs))
 
+            log.debug(outgroup_seqs)
+
             if len(outgroup_seqs) > 1:
                 # Root to a non-outgroup leave to leave all outgroups
                 # in one side.
@@ -155,9 +157,13 @@ class TreeMerger(Task):
 
         # Annotate current tree
         log.info("Annotating new tree")
-        for n in ttree.traverse():
-            n.add_features(cladeid=get_cladeid(n.get_leaf_names()))
 
+        n2names = get_node2content(ttree)
+        for n in ttree.traverse():
+            #n.add_features(cladeid=get_cladeid(n.get_leaf_names()))
+            n.add_features(cladeid=get_cladeid(n2names[n]))
+            #print get_cladeid(n.get_leaf_names()), n.cladeid
+                              
         # Updates main tree with the results extracted from task_tree
         if mtree is None:
             mtree = ttree
@@ -220,5 +226,15 @@ def root_distance_matrix(root):
     return n2rdist
 
 
+def get_node2content(node, store={}):
+    for ch in node.children:
+        get_node2content(ch, store=store)
 
-
+    if node.children:
+        val = []
+        for ch in node.children:
+            val.extend(store[ch])
+        store[node] = val
+    else:
+        store[node] = [node.name]
+    return store
