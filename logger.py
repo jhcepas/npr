@@ -19,22 +19,22 @@ def logindent(x):
     global __LOGINDENT__
     __LOGINDENT__ += x
 
-def get_main_log(handler):
+def get_main_log(handler, level=20):
     # Prepares main log
     log = logging.getLogger("main")
-    log.setLevel(26)
-    log_format = IndentedFormatter("%(levelname) 7s@@1: - %(indent)s %(message)s")
+    log.setLevel(level)
+    lformat = IndentedFormatter("%(levelname) 4s@@1: - %(indent)s %(message)s")
     logging.addLevelName(10, "@@3,2:DEBUG")
     logging.addLevelName(20, "@@1,3:INFO")
-    logging.addLevelName(22, "@@1,2:INFO")
+    logging.addLevelName(22, "@@1,3:INFO")
     logging.addLevelName(24, "@@1,3:INFO")
     logging.addLevelName(26, "@@1,3:INFO")
     logging.addLevelName(28, "@@1,3:INFO")
-    logging.addLevelName(30, "@@2,4:WARNING")
-    logging.addLevelName(40, "@@2,5:ERROR")
-    logging.addLevelName(50, "@@2,6:CRITICAL")
+    logging.addLevelName(30, "@@2,4:WRNG")
+    logging.addLevelName(40, "@@2,5:ERR ")
+    logging.addLevelName(50, "@@2,6:DISASTER")
     log_handler = logging.StreamHandler(handler)
-    log_handler.setFormatter(log_format)
+    log_handler.setFormatter(lformat)
     log.addHandler(log_handler)
     return log
   

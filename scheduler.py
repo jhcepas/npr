@@ -1,13 +1,15 @@
 import os
 from subprocess import call, Popen
-from time import sleep
+from time import sleep, ctime
 from collections import defaultdict
 import logging
 from logger import set_logindent, logindent
 log = logging.getLogger("main")
 
-from utils import get_cladeid, render_tree, launch_detached, HOSTNAME
+from utils import get_cladeid, render_tree, HOSTNAME
 from errors import ConfigError, DataError, TaskError
+
+import sge
 
 def schedule(config, processer, schedule_time, execution, retry):
     # Send seed files to processer to generate the initial task
@@ -22,44 +24,52 @@ def schedule(config, processer, schedule_time, execution, retry):
         cores_used = 0
         wait_time = 0.1 # Try to go fast unless running tasks
         set_logindent(0)
+        log.log(28, ctime())
         log.log(28, "Checking the status of %d tasks" %len(pending_tasks))
+        log.log(28, "------------------------------------")
+
         # Check task status and compute total cores being used
         for task in pending_tasks:
             task.status = task.get_status()
             cores_used += task.cores_used
         
         for task in sorted(pending_tasks, sort_by_cladeid):
-            set_logindent(0)
+            
+            print
+            set_logindent(1)
             log.log(28, "(%s) %s" %(task.status, task))
-            set_logindent(3)
-            st_info = ', '.join(["%s=%d" %(k,v) for k,v in task.job_status.iteritems()])
+            logindent(2)
+            st_info = ', '.join(["%d(%s)" %(v,k) for k,v in task.job_status.iteritems()])
             log.log(28, "%d jobs: %s" %(len(task.jobs), st_info))
             tdir = task.taskdir.replace(config["main"]["basedir"], "")
             tdir = tdir.lstrip("/")
-
-            log.debug("TaskDir: %s" %tdir)
+            log.log(20, "TaskDir: %s" %tdir)
             
             if task.status == "L":
+                logindent(-2)
                 log.warning("Some jobs within the task [%s] are marked as (L)ost,"
                             " meaning that although they look as running,"
                             " its execution cannot be tracked. NPR will"
                             " continue execution with other pending tasks."
                             %task)
-            
+                logindent(2)
+                
             if task.status in set("WRL"):
+                exec_type = getattr(task, "exec_type", execution)
                 # shows info about unfinished jobs
-                logindent(1)
+                logindent(2)
                 for j in task.jobs:
                     if j.status != "D":
-                        log.log(26, "%s: %s", j.status, j)
-                logindent(-1)
+                        log.log(24, "%s: %s", j.status, j)
+                logindent(-2)
 
                 # Tries to send new jobs from this task
-                pids = []
+                sge_cmds = []
                 for j, cmd in task.iter_waiting_jobs():
                     if not check_cores(j, cores_used, cores_total, execution):
                         continue
-                    if execution:
+                    
+                    if exec_type == "insitu":
                         log.log(28, "Launching %s" %j)
                         try:
                             launch_detached(cmd, j.pid_file)
@@ -68,19 +78,23 @@ def schedule(config, processer, schedule_time, execution, retry):
                             task.status = "E"
                             raise
                         else:
-                            pids.append(1)
+                        
                             task.status = "R"
                             j.status = "R"
                             cores_used += j.cores
-                            #print P
+                    elif exec_type == "sge":
+                        # sending to cluster.
+                        task.status = "R"
+                        j.status = "R"
+                        sge_cmds.append(cmd, cores)
                     else:
                         task.status = "R"
                         j.status = "R"
-                        # Do something cool like sending to cluster.
                         print cmd
-                        
-                if not pids:
+
+                if task.status == "R":
                     wait_time = schedule_time
+                
                     
             elif task.status == "D":
                 logindent(3)
@@ -102,8 +116,9 @@ def schedule(config, processer, schedule_time, execution, retry):
                 wait_time = schedule_time
                 log.error("Unknown task state [%s].", task.status)
                 continue
-            set_logindent(-2)
+            logindent(-2)
             log.log(26, "Cores in use: %s" %cores_used)
+
             # If last task processed a new tree node, dump snapshots
             if task.ttype == "treemerger":
                 #log.info("Annotating tree")
@@ -181,8 +196,8 @@ def check_cores(j, cores_used, cores_total, execution):
                           " However, the program is limited to [%d] core(s)."
                           " Use the --multicore option to enable more cores." %
                           (j, j.cores, cores_total))
-    elif execution and j.cores > cores_total-cores_used:
-        log.log(24, "Job [%s] will be postponed until [%d] core(s) are available." 
+    elif execution =="insitu" and j.cores > cores_total-cores_used:
+        log.log(22, "Job [%s] is waiting for [%d] core(s)" 
                  % (j, j.cores))
         return False
     else:
@@ -200,3 +215,38 @@ def get_node2content(node, store={}):
     else:
         store[node] = [node.name]
     return store
+
+def launch_detached(cmd, pid_file):
+    pid1 = os.fork()
+    if pid1 == 0:
+        pid2 = os.fork()
+   
+        if pid2 == 0:	
+            os.setsid()
+            pid3 = os.fork()
+            if pid3 == 0:
+                os.chdir("/")
+                os.umask(0)
+                P = Popen(cmd, shell=True)
+                PIDFILE = open(pid_file,"w")
+                PIDFILE.write("%s\t%s" %(HOSTNAME, P.pid))
+                PIDFILE.flush()
+                PIDFILE.close()
+                P.wait()
+                os._exit(0)
+            else:
+                # exit() or _exit()?  See below.
+                os._exit(0)
+        else:
+            # exit() or _exit()?
+            # _exit is like exit(), but it doesn't call any functions registered
+            # with atexit (and on_exit) or any registered signal handlers.  It also
+            # closes any open file descriptors.  Using exit() may cause all stdio
+            # streams to be flushed twice and any temporary files may be unexpectedly
+            # removed.  It's therefore recommended that child branches of a fork()
+            # and the parent branch(es) of a daemon use _exit().
+            os._exit(0)
+    else:
+        return
+
+    

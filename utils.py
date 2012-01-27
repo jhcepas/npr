@@ -112,35 +112,3 @@ def pid_up(pid):
     else:
         return True
 
-def launch_detached(cmd, pid_file):
-   pid1 = os.fork()
-   if pid1 == 0:
-      pid2 = os.fork()
-   
-      if pid2 == 0:	
-         os.setsid()
-         pid3 = os.fork()
-         if pid3 == 0:
-            os.chdir("/")
-            os.umask(0)
-            P = Popen(cmd, shell=True)
-            PIDFILE = open(pid_file,"w")
-            PIDFILE.write("%s\t%s" %(HOSTNAME, P.pid))
-            PIDFILE.flush()
-            PIDFILE.close()
-            P.wait()
-            os._exit(0)
-         else:
-            # exit() or _exit()?  See below.
-            os._exit(0)
-      else:
-         # exit() or _exit()?
-         # _exit is like exit(), but it doesn't call any functions registered
-         # with atexit (and on_exit) or any registered signal handlers.  It also
-         # closes any open file descriptors.  Using exit() may cause all stdio
-         # streams to be flushed twice and any temporary files may be unexpectedly
-         # removed.  It's therefore recommended that child branches of a fork()
-         # and the parent branch(es) of a daemon use _exit().
-         os._exit(0)
-   else:
-      return

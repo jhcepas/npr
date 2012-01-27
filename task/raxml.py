@@ -130,6 +130,5 @@ class Raxml(TreeTask):
         else:
             shutil.copy(self.ml_tree_file, self.tree_file)
 
-        print self.tree_file
         TreeTask.finish(self)
         

@@ -116,12 +116,12 @@ _nt_model = GTR # Nt model used if no model selection is performed
 # max number of cores specified with the command line --maxcores
 # option.
 #_max_cores = 1
+#_execution = sge # you can choose between "sge" or "insitu"
 _alrt_calculation = phyml # none, phyml or raxml
 _method = GAMMA # GAMMA or CAT
 _aa_model = JTT # Model used if no model selection is performed
 #_pinv = I # If True, estimates the proportion of invariable sites. 
 #_ebf = F # Empirical base frequencies
-
 -f = d 
 -p = 31416 # Random seed to generate starting tree. Make results reproducible 
 
@@ -140,3 +140,8 @@ _min_size = 3
 _min_outgroups = 1
 _outgroup_policy = "mean_dist" # mean_dist, max_dist, min_dist, median_dist
 
+[sge]
+-o= 
+-e= 
+-q = cgen
+-p = 

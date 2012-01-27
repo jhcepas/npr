@@ -5,6 +5,7 @@ from signal import signal, SIGWINCH
 from collections import deque
 from errors import *
 from logger import get_main_log
+from textwrap import TextWrapper
 
 try:
     import curses
@@ -13,6 +14,8 @@ except ImportError:
 else:
     NCURSES = True
 
+
+    
 class Screen(StringIO):
     # tags used to control color of strings and select buffer
     TAG = re.compile("@@(\d+)?,?(\d+):", re.MULTILINE)
@@ -20,6 +23,9 @@ class Screen(StringIO):
         StringIO.__init__(self)
         self.windows = windows
         self.pos = {}
+        self.wrapper = TextWrapper(width=80, initial_indent="",
+                                   subsequent_indent="         ",
+                                   replace_whitespace=False)
         if NCURSES:
             for w in windows:
                 self.pos[w] = [0, 0]
@@ -81,8 +87,10 @@ class Screen(StringIO):
 
     def write_normal(self, text):
         text = re.sub(self.TAG, "", text)
+        #_text = '\n'.join(self.wrapper.wrap(text))
+        #self.stdout.write(_text+"\n")
         self.stdout.write(text)
-
+        
     def write_curses(self, text):
         formatstr = deque()
         for m in re.finditer(self.TAG, text):
@@ -179,7 +187,7 @@ def init_curses(main_scr):
 def app_wrapper(func, args):
     global NCURSES
 
-    if not args.enable_interface:
+    if not args.enable_ui:
         NCURSES = False
 
     try:
@@ -216,7 +224,7 @@ def main(main_screen, func, args):
     sys.stdout = screen
 
     # Start logger, pointing to the selected screen
-    log = get_main_log(screen)
+    log = get_main_log(screen, [28,26,24,22,20,10][args.verbosity])
 
     # Call main function as lower thread
     if NCURSES:
