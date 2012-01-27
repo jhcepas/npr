@@ -6,14 +6,11 @@ import logging
 from logger import set_logindent, logindent
 log = logging.getLogger("main")
 
-from utils import get_cladeid, render_tree
-from errors import ConfigError, DataError
+from utils import get_cladeid, render_tree, launch_detached, HOSTNAME
+from errors import ConfigError, DataError, TaskError
 
 def schedule(config, processer, schedule_time, execution, retry):
-    """ Main pipeline scheduler """ 
-
-    config["_alg_conversion"] = {}
-    # Pass seed files to processer to generate the initial task
+    # Send seed files to processer to generate the initial task
     pending_tasks, main_tree = processer(None, None, 
                                          config)
     clade2tasks = defaultdict(list)
@@ -23,9 +20,9 @@ def schedule(config, processer, schedule_time, execution, retry):
 
     while pending_tasks:
         cores_used = 0
-        wait_time = 0 # Try to go fast unless running tasks
+        wait_time = 0.1 # Try to go fast unless running tasks
         set_logindent(0)
-        log.info("Checking the status of %d tasks" %len(pending_tasks))
+        log.log(28, "Checking the status of %d tasks" %len(pending_tasks))
         # Check task status and compute total cores being used
         for task in pending_tasks:
             task.status = task.get_status()
@@ -33,38 +30,45 @@ def schedule(config, processer, schedule_time, execution, retry):
         
         for task in sorted(pending_tasks, sort_by_cladeid):
             set_logindent(0)
-            log.info(task)
-            logindent(2)
+            log.log(28, "(%s) %s" %(task.status, task))
+            set_logindent(3)
+            st_info = ', '.join(["%s=%d" %(k,v) for k,v in task.job_status.iteritems()])
+            log.log(28, "%d jobs: %s" %(len(task.jobs), st_info))
             tdir = task.taskdir.replace(config["main"]["basedir"], "")
             tdir = tdir.lstrip("/")
-            log.info("TaskDir: %s" %tdir)
-            log.info("TaskJobs: %d" %len(task.jobs))
-            log.info("Task status : %s" %task.status)
 
-            if task.status == "W" or task.status == "R":
+            log.debug("TaskDir: %s" %tdir)
+            
+            if task.status == "L":
+                log.warning("Some jobs within the task [%s] are marked as (L)ost,"
+                            " meaning that although they look as running,"
+                            " its execution cannot be tracked. NPR will"
+                            " continue execution with other pending tasks."
+                            %task)
+            
+            if task.status in set("WRL"):
                 # shows info about unfinished jobs
-                logindent(2)
+                logindent(1)
                 for j in task.jobs:
                     if j.status != "D":
-                        log.info("%s: %s", j.status, j)
-                logindent(-2)
-                
-                log.info("missing %d jobs." %len(set(task.jobs)-task._donejobs))
+                        log.log(26, "%s: %s", j.status, j)
+                logindent(-1)
+
                 # Tries to send new jobs from this task
                 pids = []
                 for j, cmd in task.iter_waiting_jobs():
                     if not check_cores(j, cores_used, cores_total, execution):
                         continue
                     if execution:
-                        log.info("Launching %s" %j)
+                        log.log(28, "Launching %s" %j)
                         try:
-                            P = Popen(cmd, shell=True)
-                        except:
+                            launch_detached(cmd, j.pid_file)
+                        except Exception:
                             task.save_status("E")
                             task.status = "E"
                             raise
                         else:
-                            pids.append(P.pid)
+                            pids.append(1)
                             task.status = "R"
                             j.status = "R"
                             cores_used += j.cores
@@ -87,19 +91,19 @@ def schedule(config, processer, schedule_time, execution, retry):
                 clade2tasks[task.cladeid].append(task)
 
             elif task.status == "E":
-                log.error("Task is marked as ERROR")
+                log.error("Task contains errors")
                 if retry:
-                    log.info("Remarking task as undone to retry")
+                    log.log(28, "Remarking task as undone to retry")
                     task.retry()
                 else:
-                    raise Exception("ERROR FOUND in", task.taskdir)
+                    raise TaskError(task)
 
             else:
                 wait_time = schedule_time
-                log.error("Unknown task state [%s]", task.status)
+                log.error("Unknown task state [%s].", task.status)
                 continue
-
-            log.info("Cores used %s" %cores_used)
+            set_logindent(-2)
+            log.log(26, "Cores in use: %s" %cores_used)
             # If last task processed a new tree node, dump snapshots
             if task.ttype == "treemerger":
                 #log.info("Annotating tree")
@@ -109,17 +113,19 @@ def schedule(config, processer, schedule_time, execution, retry):
                 #main_tree.write(outfile=nw_file, features=[])
                 
                 if config["main"]["render_tree_images"]:
-                    log.info("Rendering tree image")
+                    log.log(28, "Rendering tree image")
                     img_file = os.path.join(config["main"]["basedir"], 
                                             "gallery", task.cladeid+".svg")
                     render_tree(main_tree, img_file)
-            
+
+        #log.debug(wait_time)
         sleep(wait_time)
         print 
 
     final_tree_file = os.path.join(config["main"]["basedir"], \
                                        "final_tree.nw")
     main_tree.write(outfile=final_tree_file)
+    log.debug(str(main_tree))
     main_tree.show()
 
 def annotate_tree(t, clade2tasks):
@@ -176,7 +182,7 @@ def check_cores(j, cores_used, cores_total, execution):
                           " Use the --multicore option to enable more cores." %
                           (j, j.cores, cores_total))
     elif execution and j.cores > cores_total-cores_used:
-        log.info("Job [%s] will be postponed until [%d] core(s) are available." 
+        log.log(24, "Job [%s] will be postponed until [%d] core(s) are available." 
                  % (j, j.cores))
         return False
     else:

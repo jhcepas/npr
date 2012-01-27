@@ -17,7 +17,7 @@ def seq_reverser_job(multiseq_file, outfile, trimal_bin):
                       "-reverse": "",
                       "-fasta": "",
                       }
-    job = Job(trimal_bin, reversion_args)
+    job = Job(trimal_bin, reversion_args, "TrimalAlgReverser")
     return job
 
 class MCoffee(AlgTask):

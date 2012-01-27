@@ -47,7 +47,7 @@ class TreeMerger(Task):
         # the first iteration, so it will try automatic rooting based
         # on dictionary or midpoint.
         if outgroup_seqs:
-            log.info("Rooting new tree using %d custom seqs" %
+            log.log(26, "Rooting new tree using %d custom seqs" %
                      len(outgroup_seqs))
 
             log.debug(outgroup_seqs)
@@ -67,7 +67,7 @@ class TreeMerger(Task):
             ttree.detach()
 
         else:
-            log.info("Rooting new tree using midpoint outgroup")
+            log.log(26, "Rooting new tree using midpoint outgroup")
             ttree.set_outgroup(ttree.get_midpoint_outgroup())
             # Pre load node size for better performance
             load_node_size(ttree)
@@ -87,7 +87,6 @@ class TreeMerger(Task):
             supports.sort()
             supports.reverse()
             ttree.set_outgroup(supports[0][2])
-            log.info("Done")
 
         self.outgroup_topology = ttree.children[0].__str__()
 
@@ -107,7 +106,7 @@ class TreeMerger(Task):
         # (a and b), I calculate the branch length distances from them
         # (a and b) to all leaf nodes in its corresponding sister
         # node.
-        log.info("Calculating node distance")
+        log.log(26, "Calculating node distances")
         to_b_dists = []
         to_a_dists = []
         n2rootdist = root_distance_matrix(ttree)
@@ -150,13 +149,13 @@ class TreeMerger(Task):
         outs_a = [e[1] for e in rank_outs_a]
         outs_b = [e[1] for e in rank_outs_b]
 
-        log.debug("Best distance to node A: %s" %best_dist_to_a)
-        log.debug("Best outgroup for A: %s" %rank_outs_a[:5])
-        log.debug("Best distance to node B: %s" %best_dist_to_b)
-        log.debug("Best outgroup for B: %s" %rank_outs_b[:5])
+        log.log(22, "Best distance to node A: %s" %best_dist_to_a)
+        log.log(22, "Best outgroup for A: %s" %rank_outs_a[:5])
+        log.log(22, "Best distance to node B: %s" %best_dist_to_b)
+        log.log(22, "Best outgroup for B: %s" %rank_outs_b[:5])
 
         # Annotate current tree
-        log.info("Annotating new tree")
+        log.log(26, "Annotating new tree")
 
         n2names = get_node2content(ttree)
         for n in ttree.traverse():
@@ -168,7 +167,7 @@ class TreeMerger(Task):
         if mtree is None:
             mtree = ttree
         else:
-            log.info("Merging trees")
+            log.log(26, "Merging trees")
             target = fast_search_node(self.cladeid, mtree)
             # Switch nodes in the main_tree so current tree topology
             # is incorporated.
@@ -182,7 +181,7 @@ class TreeMerger(Task):
         #log.debug("Final Merged Main_Tree: %s", self.main_tree)
 
         # Dump partitions into disk
-        log.info("Dumping new partitions")
+        log.log(26, "Dumping new partitions")
         for part in [self.set_a, self.set_b]:
             part_cladeid, seqs, outgroups, fname = part
 
@@ -203,7 +202,7 @@ class TreeMerger(Task):
             open(fname, "w").write(fasta)
 
         self.dump_inkey_file(self.task_tree_file)
-        log.info("Done.")
+
         
     def check(self):
         if os.path.exists(self.left_part_file) and \

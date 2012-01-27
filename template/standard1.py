@@ -52,7 +52,7 @@ def get_trimal_identity(alg_file, trimal_bin):
     return max_identity
 
 def get_identity(fname): 
-    log.info("Calculating alg stats...")
+    log.log(28, "Calculating alg stats...")
     s = SeqGroup(fname)
     seqlen = len(s.id2seq.itervalues().next())
     ident = list()
@@ -174,7 +174,7 @@ def process_task(task, main_tree, conf):
 
 
         mx, mn, mean, std = get_identity(task.alg_fasta_file)
-        log.info("Identity: max=%0.2f min=%0.2f mean=%0.2f +- %0.2f",
+        log.log(26, "Identity: max=%0.2f min=%0.2f mean=%0.2f +- %0.2f",
                  mx, mn, mean, std)
         task.max_ident = mx
         task.min_ident = mx
@@ -189,7 +189,7 @@ def process_task(task, main_tree, conf):
             if seqtype == "aa" and nt_seed_file and \
                     task.nseqs <= sst and task.mean_ident > sit:
 
-                    log.info("switching to codon alignment")
+                    log.log(26, "switching to codon alignment")
                     # Change seqtype config 
                     seqtype = "nt"
                     _model_tester = n2class[conf["main"]["npr_nt_model_tester"][index]]

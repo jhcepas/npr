@@ -1,7 +1,9 @@
 import os
 import shutil
-from utils import get_md5, basename, random_string
+from utils import get_md5, basename, random_string, strip, pid_up, \
+    HOSTNAME
 import re
+import sge
 import logging
 log = logging.getLogger("main")
 
@@ -19,6 +21,7 @@ class Job(object):
       self.time_file = join(self.jobdir, "__time__")
       self.stdout_file = join(self.jobdir, "__stdout__")
       self.stderr_file = join(self.jobdir, "__stderr__")
+      self.pid_file = join(self.jobdir, "__pid__")
 
     In addition, job launching command is stored in: 
 
@@ -68,6 +71,21 @@ class Job(object):
         self.cmd_file = os.path.join(self.jobdir, "__cmd__")
         self.stdout_file = os.path.join(self.jobdir, "__stdout__")
         self.stderr_file = os.path.join(self.jobdir, "__stderr__")
+        self.pid_file = os.path.join(self.jobdir, "__pid__")
+
+    def write_pid(self, host, pid):
+        open(self.pid_file,"w").write("%s\t%s" %(host, pid))
+
+    def read_pid(self):
+        try:
+           host, pid = map(strip,
+                           open(self.pid_file,"rU").readline().split("\t"))
+        except IOError:
+            host, pid = None, None
+        else:
+            pid = int(pid)
+            
+        return host, pid
         
     def dump_script(self):
         ''' Generates the shell script launching the job. ''' 
@@ -91,9 +109,16 @@ class Job(object):
         try:
             st = open(self.status_file).read(1)
         except IOError:
-            pass
-        else:
-            self.status = st
+            st = "W"
+            
+        if st == "R":
+            host, pid = self.read_pid()
+            if host == HOSTNAME and not pid_up(pid):
+                st = "L"
+            elif host == "#SGE#" and sge.get_job_status(pid) == "done":
+                st = "L"
+
+        self.status = st
         return self.status
 
     def clean(self):

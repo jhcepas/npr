@@ -59,7 +59,7 @@ class JModeltest(ModelTesterTask):
                 t = PhyloTree(nw)
 
         open(self.best_model_file, "w").write(best_model)
-        log.info("Best model: %s" %best_model)
+        log.log(26, "Best model: %s" %best_model)
         if self.ttype == "tree": 
             tree_job = self.jobs[-1]
             tree_file =  os.path.join(tree_job.jobdir,

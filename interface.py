@@ -3,7 +3,7 @@ import re
 from StringIO import StringIO
 from signal import signal, SIGWINCH
 from collections import deque
-from errors import ConfigError, DataError
+from errors import *
 from logger import get_main_log
 
 try:
@@ -191,6 +191,17 @@ def app_wrapper(func, args):
         print >>sys.stderr, "\nConfiguration Error:", e
     except DataError, e: 
         print >>sys.stderr, "\nData Error:", e
+    except TaskError, e:
+        print >>sys.stderr, ("\nErrors were found in the follwing task: %s"
+                             "\nCheck the log files within the taskdir:"
+                             "\n%s"
+                             %(e.value, e.value.taskdir))
+        sys.exit(1)
+    except KeyboardInterrupt:
+        print >>sys.stderr, ("\nProgram was interrupted."
+                             " IMPORTANT!: Launched jobs will keep"
+                             " running:")
+        sys.exit(1)
     except:
         raise
 
@@ -223,7 +234,7 @@ def main(main_screen, func, args):
             mwin.addstr(0, 0, "%s (%s) (%s)" %(key, screen.pos, screen.windows) + " "*50)
             mwin.refresh()
             if key == 113: 
-                break
+                raise KeyboardInterrupt
             if key == 9: 
                 cbuff += 1
                 if cbuff>3: 

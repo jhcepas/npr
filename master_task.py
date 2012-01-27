@@ -3,7 +3,9 @@ import logging
 from logger import logindent
 log = logging.getLogger("main")
 
-from utils import get_md5, merge_arg_dicts, PhyloTree, SeqGroup, checksum
+from utils import (get_md5, merge_arg_dicts, PhyloTree, SeqGroup,
+                   checksum)
+from collections import defaultdict
 from master_job import Job
 from errors import RetryException
 
@@ -63,6 +65,7 @@ class Task(object):
         self.status_file = None
         self.inkey_file = None
         self.status = "W"
+        self.all_status = None
         self._donejobs = set()
         self.dependencies = set()
 
@@ -78,10 +81,11 @@ class Task(object):
 
     def get_status(self):
         saved_status = self.get_saved_status()
-        job_status = self.get_jobs_status()
+        self.job_status = self.get_jobs_status()
+        job_status = set(self.job_status.keys())
 
         if job_status == set("D") and saved_status != "D":
-            log.info("Running task post-processing %s", self)
+            log.log(20, "Running task post-processing %s", self)
             try:
                 self.finish()
             except RetryException:
@@ -94,6 +98,8 @@ class Task(object):
             # Order matters
             if "E" in job_status:
                 st = "E"
+            elif "L" in job_status:
+                st = "L"
             elif "R" in job_status: 
                 st =  "R"
             elif "W" in job_status: 
@@ -133,18 +139,18 @@ class Task(object):
     def get_jobs_status(self):
         ''' Check the status of all children jobs. '''
         self.cores_used = 0
-        all_states = set()
+        all_states = defaultdict(int)
         for j in self.jobs:
             if j not in self._donejobs:
                 st = j.get_status()
-                all_states.add(st)
+                all_states[st] += 1
                 if st == "D":
                     self._donejobs.add(j)
                 elif st == "R":
                     self.cores_used += j.cores
                     
         if not all_states:
-            all_states.add("D")
+            all_states["D"] +=1 
         return all_states
 
     def load_task_info(self):
@@ -258,7 +264,6 @@ class ModelTesterTask(Task):
                 not os.path.getsize(self.best_model_file):
             return False
         elif self.tree_file:
-            print "check 1", self.tree_file
             if not os.path.exists(self.tree_file) or\
                     not os.path.getsize(self.tree_file):
                 return False

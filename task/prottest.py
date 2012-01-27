@@ -51,7 +51,7 @@ class Prottest(ModelTesterTask):
             args["--model"] = m
             job = Job(self.conf["app"]["phyml"], args)
             self.jobs.append(job)
-        log.info(self.models)
+        log.log(26, self.models)
 
     def finish(self):
         lks = []
