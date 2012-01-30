@@ -1,16 +1,50 @@
-#!/usr/bin/env python
-#
-# Comparative Genomics group at CRG.
-# Based on a previous work from bioinfo.cipf
-#
+import sys
+import os
+import time
+import re
+from collections import defaultdict
 
-import sys, os, getopt, re
 import tempfile
 from string import strip, split
-import commands
-import random
-import hashlib
 
+def launch_jobs(jobs, conf):
+    # Group jobs with identical config
+    sge_path = conf["main"]["sge_dir"]
+    
+    conf2jobs = defaultdict(list)
+    for j, cmd in jobs:
+        job_config = conf["sge"].copy()
+        job_config["-pe smp"] = j.cores
+        for k,v in j.sge.iteritems():
+            job_config[k] = v
+        conf_key = tuple(sorted(job_config.items()))
+        conf2jobs[conf_key].append(cmd)
+
+    for job_config, commands in conf2jobs.iteritems():
+        job_file = "%s_%d_jobs" %(time.ctime().replace(" ", "_").replace(":","-"),
+                                  len(commands))
+        cmds_file = os.path.join(sge_path, job_file+".cmds")
+        qsub_file = os.path.join(sge_path, job_file+".qsub")
+
+        script =  '''#!/bin/sh\n'''
+        for k,v in job_config:
+            script += '#$ %s %s\n' %(k,v)
+        script += '''#$ -o %s\n''' % sge_path
+        script += '''#$ -e %s\n''' % sge_path
+        script += '''#$ -N %s\n''' % "NPR%djobs" %len(commands)
+        script += '''#$ -t 1-%d\n''' % len(commands)
+        script += '''SEEDFILE=%s\n''' % cmds_file
+        script += '''sh -c "`cat $SEEDFILE | head -n $SGE_TASK_ID | tail -n 1`" \n'''
+
+        open(cmds_file, "w").write('\n'.join([cmd for cmd in commands]))
+        open(qsub_file, "w").write(script)
+        print qsub_file
+        
+    for j, cmd in jobs:
+        j.save_status("R")
+            
+        
+        
 all_nodes = [ 'gen01', 'gen02', 'gen03', 'gen04', 'gen05', 'gen06',
              'gen07', 'gen08', 'gen09', 'gen10', 'gen11', 'gen12',
              'gen13', 'gen14', 'gen15', 'gen16', 'gen17', 'gen18',

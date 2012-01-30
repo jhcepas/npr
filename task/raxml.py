@@ -81,7 +81,6 @@ class Raxml(TreeTask):
             bin = self.conf["app"]["raxml-pthreads"]
         else:
             bin = self.conf["app"]["raxml"]
-            
         
         args = self.args.copy()
         args["-s"] = self.alg_phylip_file

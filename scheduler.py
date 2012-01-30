@@ -32,9 +32,9 @@ def schedule(config, processer, schedule_time, execution, retry):
         for task in pending_tasks:
             task.status = task.get_status()
             cores_used += task.cores_used
-        
-        for task in sorted(pending_tasks, sort_by_cladeid):
             
+        sge_jobs = []
+        for task in sorted(pending_tasks, sort_by_cladeid):
             print
             set_logindent(1)
             log.log(28, "(%s) %s" %(task.status, task))
@@ -49,7 +49,7 @@ def schedule(config, processer, schedule_time, execution, retry):
                 logindent(-2)
                 log.warning("Some jobs within the task [%s] are marked as (L)ost,"
                             " meaning that although they look as running,"
-                            " its execution cannot be tracked. NPR will"
+                            " its execution could not be tracked. NPR will"
                             " continue execution with other pending tasks."
                             %task)
                 logindent(2)
@@ -64,7 +64,6 @@ def schedule(config, processer, schedule_time, execution, retry):
                 logindent(-2)
 
                 # Tries to send new jobs from this task
-                sge_cmds = []
                 for j, cmd in task.iter_waiting_jobs():
                     if not check_cores(j, cores_used, cores_total, execution):
                         continue
@@ -78,23 +77,20 @@ def schedule(config, processer, schedule_time, execution, retry):
                             task.status = "E"
                             raise
                         else:
-                        
-                            task.status = "R"
                             j.status = "R"
+                            task.status = "R"
                             cores_used += j.cores
                     elif exec_type == "sge":
                         # sending to cluster.
                         task.status = "R"
                         j.status = "R"
-                        sge_cmds.append(cmd, cores)
+                        j.sge = config["sge"]
+                        sge_jobs.append((j,cmd))
                     else:
-                        task.status = "R"
-                        j.status = "R"
                         print cmd
-
                 if task.status == "R":
                     wait_time = schedule_time
-                
+               
                     
             elif task.status == "D":
                 logindent(3)
@@ -133,7 +129,7 @@ def schedule(config, processer, schedule_time, execution, retry):
                                             "gallery", task.cladeid+".svg")
                     render_tree(main_tree, img_file)
 
-        #log.debug(wait_time)
+        sge.launch_jobs(sge_jobs, config)
         sleep(wait_time)
         print 
 
@@ -248,5 +244,3 @@ def launch_detached(cmd, pid_file):
             os._exit(0)
     else:
         return
-
-    

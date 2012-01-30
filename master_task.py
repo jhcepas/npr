@@ -47,7 +47,7 @@ class Task(object):
         # list of sequence IDs grouped by the node.
         self.cladeid = cladeid
 
-        # task type: "alg|tree|acleaner|mchooser|bootstrap"
+        # task type: "alg|tree|acleaner|mchooser|etc."
         self.ttype = task_type
 
         # Used only to name directories and identify task in log

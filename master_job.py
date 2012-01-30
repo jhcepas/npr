@@ -42,7 +42,8 @@ class Job(object):
         self.args = args
         # Default number of cores used by the job. If more than 1,
         # this attribute should be changed
-        self.cores = 1 
+        self.cores = 1
+        self.exec_type = "insitu"
         self.jobname = jobname
         # generates an unique job identifier based on the params of
         # the app.
@@ -81,7 +82,7 @@ class Job(object):
            host, pid = map(strip,
                            open(self.pid_file,"rU").readline().split("\t"))
         except IOError:
-            host, pid = None, None
+            host, pid = "", ""
         else:
             pid = int(pid)
             
@@ -103,7 +104,6 @@ class Job(object):
         if not os.path.exists(self.jobdir):
             os.makedirs(self.jobdir)
         open(self.cmd_file, "w").write(script)
-
  
     def get_status(self):
         try:
@@ -115,11 +115,14 @@ class Job(object):
             host, pid = self.read_pid()
             if host == HOSTNAME and not pid_up(pid):
                 st = "L"
-            elif host == "#SGE#" and sge.get_job_status(pid) == "done":
+            elif host.startswith("@sge") and sge.get_job_status(pid) == "done":
                 st = "L"
 
         self.status = st
         return self.status
 
+    def save_status(self, status):
+        open(self.status_file, "w").write(status)
+        
     def clean(self):
         shutil.rmtree(self.jobdir)
