@@ -86,7 +86,7 @@ class Raxml(TreeTask):
         args["-s"] = self.alg_phylip_file
         args["-m"] = self.model_string
         args["-n"] = self.cladeid
-        tree_job = Job(self.raxml_bin, args)
+        tree_job = Job(self.raxml_bin, args, parent_ids=[self.cladeid])
         tree_job.cores = self.threads
         self.jobs.append(tree_job)
 
@@ -94,7 +94,7 @@ class Raxml(TreeTask):
             alrt_args = tree_job.args.copy()
             alrt_args["-f"] =  "J"
             alrt_args["-t"] = None # It will be after init()
-            alrt_job = Job(self.raxml_bin, alrt_args)       
+            alrt_job = Job(self.raxml_bin, alrt_args, parent_ids=[tree_job.jobid])       
             alrt_job.dependencies.add(tree_job)
             alrt_job.cores = self.threads
             self.jobs.append(alrt_job)
@@ -111,7 +111,7 @@ class Raxml(TreeTask):
                 "--no_memory_check": "",
                 }
 
-            alrt_job = Job(self.conf["app"]["phyml"], alrt_args)       
+            alrt_job = Job(self.conf["app"]["phyml"], alrt_args, parent_ids=[tree_job.jobid])
             alrt_job.dependencies.add(tree_job)
             self.jobs.append(alrt_job)
 

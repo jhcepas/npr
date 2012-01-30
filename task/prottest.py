@@ -49,7 +49,7 @@ class Prottest(ModelTesterTask):
         for m in self.models:
             args = self.args.copy()
             args["--model"] = m
-            job = Job(self.conf["app"]["phyml"], args)
+            job = Job(self.conf["app"]["phyml"], args, parent_ids=[self.cladeid])
             self.jobs.append(job)
         log.log(26, self.models)
 
@@ -60,6 +60,7 @@ class Prottest(ModelTesterTask):
                                      self.alg_basename+"_phyml_tree.txt")
             stats_file = os.path.join(j.jobdir,
                                       self.alg_basename+"_phyml_stats.txt")
+            print tree_file
             tree = PhyloTree(tree_file)
             m = re.search('Log-likelihood:\s+(-?\d+\.\d+)',
                           open(stats_file).read())

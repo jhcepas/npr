@@ -106,7 +106,7 @@ def checksum(*fnames):
 def pid_up(pid):        
     """ Check For the existence of a unix pid. """
     try:
-        os.kill(pid, 0)
+        os.kill(int(pid), 0)
     except OSError:
         return False
     else:

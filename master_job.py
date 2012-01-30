@@ -1,9 +1,9 @@
 import os
 import shutil
-from utils import get_md5, basename, random_string, strip, pid_up, \
-    HOSTNAME
+from utils import get_md5, basename, random_string, strip, pid_up, HOSTNAME
 import re
 import sge
+import db
 import logging
 log = logging.getLogger("main")
 
@@ -31,7 +31,7 @@ class Job(object):
     def __repr__(self):
         return "Job (%s, %s)" %(self.jobname, self.jobid[:6])
 
-    def __init__(self, bin, args, jobname=None):
+    def __init__(self, bin, args, jobname=None, parent_ids=None):
         # Used at execution time
         self.jobdir = None
         self.status_file = None
@@ -49,6 +49,9 @@ class Job(object):
         # the app.
         self.jobid = get_md5(','.join(sorted([get_md5(str(pair)) for pair in 
                                               self.args.iteritems()])))
+        if parent_ids:
+            self.jobid = get_md5(','.join(sorted(parent_ids+[self.jobid])))
+
         if not self.jobname:
             self.jobname = re.sub("[^0-9a-zA-Z]", "-", basename(self.bin))
 
@@ -105,20 +108,48 @@ class Job(object):
             os.makedirs(self.jobdir)
         open(self.cmd_file, "w").write(script)
  
-    def get_status(self):
-        try:
-            st = open(self.status_file).read(1)
-        except IOError:
-            st = "W"
-            
-        if st == "R":
-            host, pid = self.read_pid()
-            if host == HOSTNAME and not pid_up(pid):
-                st = "L"
-            elif host.startswith("@sge") and sge.get_job_status(pid) == "done":
-                st = "L"
+    def get_status(self, sge_jobs=None):
+        # Finished status:
+        #  E.rror
+        #  D.one
+        # In execution status:
+        #  W.ating
+        #  Q.ueued
+        #  R.unning
+        #  L.ost
+        if self.status not in set("DE"):
+            jinfo = db.get_job_info(self.jobid)
+            self.host = jinfo.get("host", None) or ""
+            self.pid = jinfo.get("pid", None) or ""
 
-        self.status = st
+            saved_status = jinfo.get("status", None)
+            try:
+                st = open(self.status_file).read(1)
+            except IOError:
+                st = saved_status
+            
+            if st is None:
+                db.add_job(self.jobid, status="W")
+                st = saved_status = "W"
+
+            # If this is in execution, tries to track the job
+            if st in set("QRL"):
+                if self.host.startswith("@sge"):
+                    sge_st = sge_jobs.get(self.pid, {}).get("state", None)
+                    log.debug("%s %s", self, sge_st)
+                    if not sge_st:
+                        log.debug("%s %s %s", self, sge_st, self.pid)
+                        st = "L"
+                    elif "E" in sge_st:
+                        pass
+                elif self.host == HOSTNAME and not pid_up(self.pid):
+                    st = "L"
+        
+            if st != saved_status:
+                db.update_job(self.jobid, status=st)
+            print "----", self, saved_status, st
+            self.status = st
+            
         return self.status
 
     def save_status(self, status):
@@ -126,3 +157,5 @@ class Job(object):
         
     def clean(self):
         shutil.rmtree(self.jobdir)
+
+

@@ -29,7 +29,7 @@ class Mafft(AlgTask):
         # arguments is important, input file must be the last
         # one.
         args[""] = self.multiseq_file
-        job = Job(self.conf["app"]["mafft"], args)
+        job = Job(self.conf["app"]["mafft"], args, parent_ids=[self.cladeid])
         self.jobs.append(job)
 
     def finish(self):

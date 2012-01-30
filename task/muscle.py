@@ -32,7 +32,7 @@ class Muscle(AlgTask):
         args = self.args.copy()
         args["-in"] = self.multiseq_file
         args["-out"] = "alg.fasta"
-        job = Job(self.conf["app"]["muscle"], args)
+        job = Job(self.conf["app"]["muscle"], args, parent_ids=[self.cladeid])
         self.jobs.append(job)
 
     def finish(self):

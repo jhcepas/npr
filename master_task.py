@@ -8,7 +8,7 @@ from utils import (get_md5, merge_arg_dicts, PhyloTree, SeqGroup,
 from collections import defaultdict
 from master_job import Job
 from errors import RetryException
-
+import db
 isjob = lambda j: isinstance(j, Job)
 istask = lambda j: isinstance(j, Task)
 
@@ -67,6 +67,7 @@ class Task(object):
         self.status = "W"
         self.all_status = None
         self._donejobs = set()
+        self._running_jobs = set()
         self.dependencies = set()
 
         # keeps a counter of how many cores are being used by running jobs
@@ -79,13 +80,18 @@ class Task(object):
         # and Task classes are accepted as elements in the list.
         self.jobs = []
 
-    def get_status(self):
-        saved_status = self.get_saved_status()
-        self.job_status = self.get_jobs_status()
+    def get_status(self, sge_jobs=None):
+        saved_status = db.get_task_status(self.taskid)
+        if saved_status is None:
+            db.add_task(self.taskid, status=self.status, ttype=self.tname)
+            saved_status = self.status
+            
+        #saved_status = self.get_saved_status()
+        self.job_status = self.get_jobs_status(sge_jobs)
         job_status = set(self.job_status.keys())
 
         if job_status == set("D") and saved_status != "D":
-            log.log(20, "Running task post-processing %s", self)
+            log.log(20, "Processing done task: %s", self)
             try:
                 self.finish()
             except RetryException:
@@ -102,6 +108,8 @@ class Task(object):
                 st = "L"
             elif "R" in job_status: 
                 st =  "R"
+            elif "Q" in job_status: 
+                st =  "Q"
             elif "W" in job_status: 
                 st = "W"
             else:
@@ -112,7 +120,8 @@ class Task(object):
                 log.error("Task check not passed")
                 st = "E"
 
-        self.save_status(st)
+        #self.save_status(st)
+        db.update_task(self.taskid, status=st)
         self.status = st
         return st
 
@@ -136,18 +145,21 @@ class Task(object):
         except IOError: 
             return "?" 
 
-    def get_jobs_status(self):
+    def get_jobs_status(self, sge_jobs=None):
         ''' Check the status of all children jobs. '''
         self.cores_used = 0
         all_states = defaultdict(int)
         for j in self.jobs:
             if j not in self._donejobs:
-                st = j.get_status()
+                st = j.get_status(sge_jobs)
                 all_states[st] += 1
                 if st == "D":
                     self._donejobs.add(j)
-                elif st == "R":
-                    self.cores_used += j.cores
+                if st in set("QRL"):
+                    if isjob(j) and not j.host.startswith("@sge"):
+                        self.cores_used += j.cores
+                    elif istask(j):
+                        self.cores_used += j.cores_used
                     
         if not all_states:
             all_states["D"] +=1 

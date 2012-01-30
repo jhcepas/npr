@@ -30,7 +30,7 @@ class Dialigntx(AlgTask):
         # Only one Muscle job is necessary to run this task
         args = self.args.copy()
         args[''] = "%s %s" %(self.multiseq_file, "alg.fasta")
-        job = Job(self.conf["app"]["dialigntx"], args)
+        job = Job(self.conf["app"]["dialigntx"], args, parent_ids=[self.cladeid])
         self.jobs.append(job)
 
     def finish(self):

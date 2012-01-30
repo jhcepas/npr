@@ -37,7 +37,7 @@ class JModeltest(ModelTesterTask):
 
 
     def load_jobs(self):
-        tree_job = Job(self.conf["app"]["jmodeltest"], self.args)
+        tree_job = Job(self.conf["app"]["jmodeltest"], self.args, parent_ids=[self.cladeid])
         self.jobs.append(tree_job)
 
     def finish(self):

@@ -31,7 +31,8 @@ class Uhire(AlgTask):
             "--usersort": "",
             "--uhire": self.multiseq_file,
             }
-        uhire_job = Job(self.conf["app"]["usearch"], uhire_args, "usearch-uhire")
+        uhire_job = Job(self.conf["app"]["usearch"], uhire_args, "usearch-uhire",
+                        parent_ids=[self.cladeid])
 
         # Builds a muscle alignment for each of those clusters. (This
         # is a special job to align all clumps independently. The
@@ -46,7 +47,7 @@ class Uhire(AlgTask):
         done;) """ %(self.conf["app"]["muscle"], 
                      self.conf["uhire"]["_muscle_maxiters"])
 
-        alg_job = Job(cmd, {}, "uhire_muscle_algs")
+        alg_job = Job(cmd, {}, "uhire_muscle_algs", parent_ids=[uhire_job.jobid])
         alg_job.dependencies.add(uhire_job)
 
         # Merge the cluster alignemnts into a single one
@@ -55,7 +56,8 @@ class Uhire(AlgTask):
             "--mergeclumps": "../clumpalgs/",
             "--output": "alg.fasta",
             }
-        umerge_job = Job(self.conf["app"]["usearch"], umerge_args, "usearch-umerge")
+        umerge_job = Job(self.conf["app"]["usearch"], umerge_args, "usearch-umerge",
+                         parent_ids=[alg_job.jobid])
         umerge_job.dependencies.add(alg_job)
         
         # Add all jobs to the task queue queue

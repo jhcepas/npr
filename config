@@ -143,6 +143,8 @@ _outgroup_policy = "mean_dist" # mean_dist, max_dist, min_dist, median_dist
 [sge]
 # standard output and error are automatically set, so any value here
 # will be overwritten
+_cell = cgenomics
 -q = cgen
 -p = -512 
+
 

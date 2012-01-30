@@ -50,7 +50,7 @@ class Phyml(TreeTask):
         args["--model"] = self.model
         args["--datatype"] = self.seqtype
         args["--input"] = self.alg_basename
-        job = Job(self.conf["app"]["phyml"], args)
+        job = Job(self.conf["app"]["phyml"], args, parent_ids=[self.cladeid])
         self.jobs.append(job)
 
     def finish(self):

@@ -8,7 +8,7 @@ log = logging.getLogger("main")
 
 from utils import get_cladeid, render_tree, HOSTNAME
 from errors import ConfigError, DataError, TaskError
-
+import db
 import sge
 
 def schedule(config, processer, schedule_time, execution, retry):
@@ -29,9 +29,16 @@ def schedule(config, processer, schedule_time, execution, retry):
         log.log(28, "------------------------------------")
 
         # Check task status and compute total cores being used
+        if execution == "sge":
+            sgeid2jobs = db.get_sge_jobids()
+            qstat_jobs = sge.qstat()
+        else:
+            qstat_jobs = None
+      
         for task in pending_tasks:
-            task.status = task.get_status()
+            task.status = task.get_status(qstat_jobs)
             cores_used += task.cores_used
+           
             
         sge_jobs = []
         for task in sorted(pending_tasks, sort_by_cladeid):
@@ -54,7 +61,7 @@ def schedule(config, processer, schedule_time, execution, retry):
                             %task)
                 logindent(2)
                 
-            if task.status in set("WRL"):
+            if task.status in set("WQRL"):
                 exec_type = getattr(task, "exec_type", execution)
                 # shows info about unfinished jobs
                 logindent(2)
@@ -71,7 +78,7 @@ def schedule(config, processer, schedule_time, execution, retry):
                     if exec_type == "insitu":
                         log.log(28, "Launching %s" %j)
                         try:
-                            launch_detached(cmd, j.pid_file)
+                            launch_detached(j, cmd, j.pid_file)
                         except Exception:
                             task.save_status("E")
                             task.status = "E"
@@ -81,16 +88,14 @@ def schedule(config, processer, schedule_time, execution, retry):
                             task.status = "R"
                             cores_used += j.cores
                     elif exec_type == "sge":
-                        # sending to cluster.
                         task.status = "R"
                         j.status = "R"
                         j.sge = config["sge"]
                         sge_jobs.append((j,cmd))
                     else:
                         print cmd
-                if task.status == "R":
+                if task.status in set("QRL"):
                     wait_time = schedule_time
-               
                     
             elif task.status == "D":
                 logindent(3)
@@ -128,6 +133,7 @@ def schedule(config, processer, schedule_time, execution, retry):
                     img_file = os.path.join(config["main"]["basedir"], 
                                             "gallery", task.cladeid+".svg")
                     render_tree(main_tree, img_file)
+
 
         sge.launch_jobs(sge_jobs, config)
         sleep(wait_time)
@@ -212,7 +218,7 @@ def get_node2content(node, store={}):
         store[node] = [node.name]
     return store
 
-def launch_detached(cmd, pid_file):
+def launch_detached(j, cmd, pid_file):
     pid1 = os.fork()
     if pid1 == 0:
         pid2 = os.fork()
@@ -224,10 +230,7 @@ def launch_detached(cmd, pid_file):
                 os.chdir("/")
                 os.umask(0)
                 P = Popen(cmd, shell=True)
-                PIDFILE = open(pid_file,"w")
-                PIDFILE.write("%s\t%s" %(HOSTNAME, P.pid))
-                PIDFILE.flush()
-                PIDFILE.close()
+                db.update_job(j.jobid, pid=P.pid, host=HOSTNAME)
                 P.wait()
                 os._exit(0)
             else:

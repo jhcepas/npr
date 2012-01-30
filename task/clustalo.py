@@ -37,7 +37,7 @@ class Clustalo(AlgTask):
         args = self.args.copy()
         args["-i"] = self.multiseq_file
         args["-o"] = "alg.fasta"
-        job = Job(self.conf["app"]["clustalo"], args)
+        job = Job(self.conf["app"]["clustalo"], args, parent_ids=[self.cladeid])
         self.jobs.append(job)
 
     def finish(self):

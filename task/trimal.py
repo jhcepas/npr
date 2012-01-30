@@ -38,7 +38,7 @@ class Trimal(AlgCleanerTask):
         args = self.args.copy()
         args["-in"] = self.alg_fasta_file
         args["-out"] = "clean.alg.fasta"
-        job = Job(self.conf["app"]["trimal"], args)
+        job = Job(self.conf["app"]["trimal"], args, parent_ids=[self.cladeid])
         self.jobs.append(job)
 
     def finish(self):

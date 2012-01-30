@@ -47,7 +47,7 @@ class FastTree(TreeTask):
 
     def load_jobs(self):
         args = self.args.copy()
-        job = Job(self.conf["app"]["fasttree"], args)
+        job = Job(self.conf["app"]["fasttree"], args, parent_ids=[self.cladeid])
         self.jobs.append(job)
 
     def finish(self):
