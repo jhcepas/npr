@@ -1,11 +1,12 @@
 import os
 import shutil
-from utils import get_md5, basename, random_string, strip, pid_up, HOSTNAME
 import re
 import sge
 import db
 import logging
 log = logging.getLogger("main")
+
+from nprlib.utils import get_md5, basename, random_string, strip, pid_up, HOSTNAME
 
 class Job(object):
     ''' A generic program launcher.
@@ -23,8 +24,8 @@ class Job(object):
       self.stderr_file = join(self.jobdir, "__stderr__")
       self.pid_file = join(self.jobdir, "__pid__")
 
-    In addition, job launching command is stored in: 
-
+    In addition, job launching command is stored in:
+    
       self.cmd_file = join(self.jobdir, "__cmd__")
 
     '''

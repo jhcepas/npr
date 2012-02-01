@@ -17,3 +17,8 @@ npr_nt_tree_builder = list()
 
 npr_aa_model_tester = list()
 npr_nt_model_tester = list()
+
+[tree_merger]
+_min_size = integer()
+_max_outgroups = integer()
+

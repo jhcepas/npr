@@ -1,14 +1,16 @@
 import os
 import logging
+from collections import defaultdict
+
 from logger import logindent
 log = logging.getLogger("main")
 
-from utils import (get_md5, merge_arg_dicts, PhyloTree, SeqGroup,
-                   checksum)
-from collections import defaultdict
-from master_job import Job
-from errors import RetryException
-import db
+from nprlib.utils import (get_md5, merge_arg_dicts, PhyloTree, SeqGroup,
+                          checksum)
+from nprlib.master_job import Job
+from nprlib.errors import RetryException
+from nprlib import db
+
 isjob = lambda j: isinstance(j, Job)
 istask = lambda j: isinstance(j, Task)
 
@@ -161,8 +163,9 @@ class Task(object):
                     elif istask(j):
                         self.cores_used += j.cores_used
                 elif st == "E":
-                    log.debug("Error at: %s", j)
-                    
+                    log.log(20, "Error found in: %s", j)
+            else:
+                all_states["D"] += 1
                     
         if not all_states:
             all_states["D"] +=1 

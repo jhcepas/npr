@@ -3,9 +3,9 @@ import re
 import logging
 log = logging.getLogger("main")
 
-from .master_task import ModelTesterTask
-from .master_job import Job
-from .utils import basename, PhyloTree
+from nprlib.master_task import ModelTesterTask
+from nprlib.master_job import Job
+from nprlib.utils import basename, PhyloTree
 
 __all__ = ["Prottest"]
 
@@ -61,7 +61,6 @@ class Prottest(ModelTesterTask):
                                      self.alg_basename+"_phyml_tree.txt")
             stats_file = os.path.join(j.jobdir,
                                       self.alg_basename+"_phyml_stats.txt")
-            print tree_file
             tree = PhyloTree(tree_file)
             m = re.search('Log-likelihood:\s+(-?\d+\.\d+)',
                           open(stats_file).read())

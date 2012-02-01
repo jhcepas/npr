@@ -6,9 +6,9 @@ import shutil
 
 log = logging.getLogger("main")
 
-from .master_task import TreeTask
-from .master_job import Job
-from .utils import basename, PhyloTree, OrderedDict
+from nprlib.master_task import TreeTask
+from nprlib.master_job import Job
+from nprlib.utils import basename, PhyloTree, OrderedDict
 
 __all__ = ["Raxml"]
 

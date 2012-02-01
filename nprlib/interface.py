@@ -3,9 +3,10 @@ import re
 from StringIO import StringIO
 from signal import signal, SIGWINCH
 from collections import deque
-from errors import *
-from logger import get_main_log
 from textwrap import TextWrapper
+
+from nprlib.logger import get_main_log
+from nprlib.errors import *
 
 try:
     import curses

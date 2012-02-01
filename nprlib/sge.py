@@ -9,8 +9,8 @@ from string import strip, split
 import logging
 log = logging.getLogger("main")
 
-import db
-from errors import SgeError
+from nprlib import db
+from nprlib.errors import SgeError
 OK_PATTERN = 'Your job-array ([\d]+).\d+\-\d+:\d+ \("[^"]*"\) has been submitted'
 DEFAULT_SGE_CELL = "cgenomics"
 
@@ -38,18 +38,21 @@ def launch_jobs(jobs, conf):
         for k,v in job_config.iteritems():
             if not k.startswith("_"):
                 script += '#$ %s %s\n' %(k,v)
-        script += '''#$ -o %s\n''' % sge_path
-        script += '''#$ -e %s\n''' % sge_path
-        script += '''#$ -N %s\n''' % "NPR%djobs" %len(commands)
-        script += '''#$ -t 1-%d\n''' % len(commands)
-        script += '''SEEDFILE=%s\n''' % cmds_file
-        script += '''sh -c "`cat $SEEDFILE | head -n $SGE_TASK_ID | tail -n 1`" \n'''
+        script += '#$ -f \n'
+        script += '#$ -o %s\n' % sge_path
+        script += '#$ -e %s\n' % sge_path
+        script += '#$ -N %s\n' % "NPR%djobs" %len(commands)
+        script += '#$ -t 1-%d\n' % len(commands)
+        script += 'SEEDFILE=%s\n' % cmds_file
+        script += 'sh -c "`cat $SEEDFILE | head -n $SGE_TASK_ID | tail -n 1`" \n'
 
         open(cmds_file, "w").write('\n'.join([cmd for j,cmd in commands]))
         open(qsub_file, "w").write(script)
 
         log.log(28, "Launching %d SGE jobs." %len(commands))
+        log.debug(script)
         answer = run("SGE_CELL=%s qsub %s" %(job_config["_cell"], qsub_file))
+        log.debug(answer)
         match =  re.search(OK_PATTERN, answer)
         if match:
             jobid = match.groups()[0]

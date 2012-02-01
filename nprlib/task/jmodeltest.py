@@ -2,9 +2,9 @@ import os
 import logging
 log = logging.getLogger("main")
 
-from .master_task import ModelTesterTask
-from .master_job import Job
-from .utils import basename, PhyloTree
+from nprlib.master_task import ModelTesterTask
+from nprlib.master_job import Job
+from nprlib.utils import basename, PhyloTree
 
 __all__ = ["JModeltest"]
 

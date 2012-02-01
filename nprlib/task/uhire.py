@@ -2,9 +2,9 @@ import os
 import logging
 log = logging.getLogger("main")
 
-from .master_task import AlgTask
-from .master_job import Job
-from .utils import SeqGroup, OrderedDict
+from nprlib.master_task import AlgTask
+from nprlib.master_job import Job
+from nprlib.utils import SeqGroup, OrderedDict
 
 __all__ = ["Uhire"]
 

@@ -2,9 +2,9 @@ import os
 import logging
 log = logging.getLogger("main")
 
-from .master_task import Task
-from .master_job import Job
-from .utils import get_cladeid, PhyloTree, SeqGroup
+from nprlib.master_task import Task
+from nprlib.master_job import Job
+from nprlib.utils import get_cladeid, PhyloTree, SeqGroup
 
 __all__ = ["Msf"]
 

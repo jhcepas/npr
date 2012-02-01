@@ -2,7 +2,7 @@ import os
 import re
 apps = {
     'muscle'         : "%BIN%/muscle",
-    'mafft'          : "MAFFT_BINARIES=~/_Projects/npr/external_apps/mafft-6.861-without-extensions/binaries/  %BIN%/mafft",
+    'mafft'          : "MAFFT_BINARIES=%BIN%/mafft-6.861-without-extensions/binaries/  %BIN%/mafft",
     'clustalo'       : "%BIN%/clustalo",
     'trimal'         : "%BIN%/trimal",
     'readal'         : "%BIN%/readal",
@@ -16,16 +16,14 @@ apps = {
     'fasttree'       : "%BIN%/FastTree",
     }
 
-def get_call(appname, nprpath):
+def get_call(appname, apps_path):
     try:
         cmd = apps[appname]
     except KeyError:
         return None
-    binpath = os.path.join(nprpath, "apps")
-    libpath = os.path.join(binpath, "local_libs")
-    cmd = re.sub("%BIN%", binpath, cmd)
-    cmd = "export LD_LIBRARY_PRELOAD=%s:$LD_LIBRARY_PRELOAD; " %(libpath) +cmd
+    libpath = os.path.join(apps_path, "local_libs")
+    cmd = re.sub("%BIN%", apps_path, cmd)
+    cmd = "export LD_LIBRARY_PATH=%s:$LD_LIBRARY_PATH; " %(libpath) +cmd
     return cmd
-
-    
+  
     

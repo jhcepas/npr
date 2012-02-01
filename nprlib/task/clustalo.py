@@ -1,26 +1,31 @@
 import os
+import sys
 import logging
 log = logging.getLogger("main")
 
-from .master_task import AlgTask
-from .master_job import Job
-from .utils import SeqGroup, OrderedDict
+from nprlib.master_task import AlgTask
+from nprlib.master_job import Job
 
-__all__ = ["Muscle"]
+from nprlib.utils import read_fasta, OrderedDict
 
-class Muscle(AlgTask):
+__all__ = ["Clustalo"]
+
+class Clustalo(AlgTask):
     def __init__(self, cladeid, multiseq_file, seqtype, conf):
-        # fixed Muscle options
+        if seqtype != "aa":
+            raise ValueError("Clustal Omega does only support aa seqtype")
+        
         base_args = OrderedDict({
-                '-in': None,
-                '-out': None,
+                '-i': None,
+                '-o': None,
+                '--outfmt': "fa",
                 })
         # Initialize task
-        AlgTask.__init__(self, cladeid, "alg", "Muscle", 
-                      base_args, conf["muscle"])
+        AlgTask.__init__(self, cladeid, "alg", "Clustal-Omega", 
+                      base_args, conf["clustalo"])
 
         self.conf = conf
-        self.seqtype = seqtype
+        self.seqtype = "aa" # only aa supported
         self.multiseq_file = multiseq_file
 
         self.init()
@@ -30,16 +35,17 @@ class Muscle(AlgTask):
     def load_jobs(self):
         # Only one Muscle job is necessary to run this task
         args = self.args.copy()
-        args["-in"] = self.multiseq_file
-        args["-out"] = "alg.fasta"
-        job = Job(self.conf["app"]["muscle"], args, parent_ids=[self.cladeid])
+        args["-i"] = self.multiseq_file
+        args["-o"] = "alg.fasta"
+        job = Job(self.conf["app"]["clustalo"], args, parent_ids=[self.cladeid])
         self.jobs.append(job)
 
     def finish(self):
         # Once executed, alignment is converted into relaxed
         # interleaved phylip format.
-        alg = SeqGroup(os.path.join(self.jobs[0].jobdir, "alg.fasta"))
+        alg_file = os.path.join(self.jobs[0].jobdir, "alg.fasta")
+        # ClustalO returns a tricky fasta file
+        alg = read_fasta(alg_file, header_delimiter=" ")
         alg.write(outfile=self.alg_fasta_file, format="fasta")
         alg.write(outfile=self.alg_phylip_file, format="iphylip_relaxed")
         AlgTask.finish(self)
-

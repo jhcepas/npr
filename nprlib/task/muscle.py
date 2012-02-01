@@ -1,31 +1,26 @@
 import os
-import sys
 import logging
 log = logging.getLogger("main")
 
-from .master_task import AlgTask
-from .master_job import Job
+from nprlib.master_task import AlgTask
+from nprlib.master_job import Job
+from nprlib.utils import SeqGroup, OrderedDict
 
-from .utils import read_fasta, OrderedDict
+__all__ = ["Muscle"]
 
-__all__ = ["Clustalo"]
-
-class Clustalo(AlgTask):
+class Muscle(AlgTask):
     def __init__(self, cladeid, multiseq_file, seqtype, conf):
-        if seqtype != "aa":
-            raise ValueError("Clustal Omega does only support aa seqtype")
-        
+        # fixed Muscle options
         base_args = OrderedDict({
-                '-i': None,
-                '-o': None,
-                '--outfmt': "fa",
+                '-in': None,
+                '-out': None,
                 })
         # Initialize task
-        AlgTask.__init__(self, cladeid, "alg", "Clustal-Omega", 
-                      base_args, conf["clustalo"])
+        AlgTask.__init__(self, cladeid, "alg", "Muscle", 
+                      base_args, conf["muscle"])
 
         self.conf = conf
-        self.seqtype = "aa" # only aa supported
+        self.seqtype = seqtype
         self.multiseq_file = multiseq_file
 
         self.init()
@@ -35,17 +30,16 @@ class Clustalo(AlgTask):
     def load_jobs(self):
         # Only one Muscle job is necessary to run this task
         args = self.args.copy()
-        args["-i"] = self.multiseq_file
-        args["-o"] = "alg.fasta"
-        job = Job(self.conf["app"]["clustalo"], args, parent_ids=[self.cladeid])
+        args["-in"] = self.multiseq_file
+        args["-out"] = "alg.fasta"
+        job = Job(self.conf["app"]["muscle"], args, parent_ids=[self.cladeid])
         self.jobs.append(job)
 
     def finish(self):
         # Once executed, alignment is converted into relaxed
         # interleaved phylip format.
-        alg_file = os.path.join(self.jobs[0].jobdir, "alg.fasta")
-        # ClustalO returns a tricky fasta file
-        alg = read_fasta(alg_file, header_delimiter=" ")
+        alg = SeqGroup(os.path.join(self.jobs[0].jobdir, "alg.fasta"))
         alg.write(outfile=self.alg_fasta_file, format="fasta")
         alg.write(outfile=self.alg_phylip_file, format="iphylip_relaxed")
         AlgTask.finish(self)
+

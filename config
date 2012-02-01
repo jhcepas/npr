@@ -5,7 +5,7 @@
 #
 [main]
 #basedir  = ./prueba
-pipeline = template/standard1.py
+pipeline = genetree
 
 DNA_sst = 20   # DNA switching size (numebr of seqs) threshold
 DNA_sct = 0.0  # DNA switching conservation threshold
@@ -13,13 +13,14 @@ DNA_sit = 0.95 # DNA switching identity threshold
 
 # Read the following config lines as a table, in which each column
 # represents a different phylogenetic workflow. Different configs are
-# used for different sizes of dataset. 'npr_max_seqs' defines the
-# maximum number of sequences that can be handled by each config
-# block. Note that npr_max_seqs in the last column should be higher
-# than the max number of sequences you plan to analyze. 
-npr_max_seqs          =  100,            500,           3000,          1000000
-#npr_max_seqs          =     4,              5,           6,          1000000
-npr_aa_aligner        =  meta_aligner,   muscle,        clustalo,      uhire  
+# used for different sizes of the dataset. 'npr_max_seqs' defines the
+# maximum number of sequences that can be handled by each workflow
+# Note that npr_max_seqs in the last column should be higher than the
+# max number of sequences you plan to analyze.
+
+npr_max_seqs         =     4,              5,           6,          1000000
+#npr_max_seqs          =  100,            500,           3000,          1000000
+npr_aa_aligner        =  meta_aligner,   muscle,        clustalo,      uhire 
 npr_aa_alg_cleaner    =  trimal,         trimal,        trimal,        none
 npr_aa_model_tester   =  prottest,       prottest,      none,          none  
 npr_aa_tree_builder   =  raxml,          phyml,         fasttree,      fasttree
@@ -34,8 +35,8 @@ npr_nt_tree_builder   =  raxml,          phyml,         fasttree,      fasttree
 render_tree_images = false
 
 [app]
-# Paths to the different applications
-npr_path       = ./
+## By default, portable applications are used
+portables_path = "/users/tg/jhuerta/npr_apps"
 muscle         = npr-portable
 mafft          = npr-portable
 clustalo       = npr-portable
@@ -50,24 +51,40 @@ dialigntx      = npr-portable
 usearch        = npr-portable
 fasttree       = npr-portable
 
-#setup_file     = "export DIR_4_TCOFFEE=/home/jhuerta/_Projects/npr/external_apps/t_coffee_9_01 MAFFT_BINARIES=$DIR_4_TCOFFEE/plugins/linux/ TMP_4_TCOFFEE=/tmp/ LOCKDIR_4_TCOFFEE=/tmp/  PERL5LIB=$PERL5LIB:$DIR_4_TCOFFEE/perl  && $DIR_4_TCOFFEE/bin/t_coffee"
-#muscle         = "/home/jhuerta/_Projects/npr/external_apps/muscle"
-#mafft          = "MAFFT_BINARIES=~/_Projects/npr/external_apps/mafft-6.861-without-extensions/binaries/  /home/jhuerta/_Projects/npr/external_apps/mafft"
-#clustalo       = "/home/jhuerta/_Projects/npr/external_apps/clustalo"
-#trimal         = "/home/jhuerta/_Projects/npr/external_apps/trimal"
-#readal         = "/home/jhuerta/_Projects/npr/external_apps/readal"
-#tcoffee        = "export DIR_4_TCOFFEE=/home/jhuerta/_Projects/npr/external_apps/t_coffee_9_01 MAFFT_BINARIES=$DIR_4_TCOFFEE/plugins/linux/ TMP_4_TCOFFEE=/tmp/ LOCKDIR_4_TCOFFEE=/tmp/  PERL5LIB=$PERL5LIB:$DIR_4_TCOFFEE/perl  && $DIR_4_TCOFFEE/bin/t_coffee"
-#phyml          = "/home/jhuerta/_Projects/npr/external_apps/phyml"
-#raxml-pthreads = "/home/jhuerta/_Projects/npr/external_apps/raxmlHPC-PTHREADS-SSE3"
-#raxml          = "/home/jhuerta/_Projects/npr/external_apps/raxmlHPC-SSE3"
-#jmodeltest     = "JMODELTEST_HOME=~/_Projects/npr/external_apps/jmodeltest2; cd $JMODELTEST_HOME; java -jar $JMODELTEST_HOME/jModelTest.jar"
-#dialigntx      = "/home/jhuerta/_Projects/npr/external_apps/dialign-tx /home/jhuerta/_Projects/npr/external_apps/DIALIGN-TX_1.0.2/conf/"
-#usearch        = "/home/jhuerta/_Projects/npr/external_apps/usearch"
-#fasttree       = "/home/jhuerta/_Projects/npr/external_apps/FastTree"
+## You can also configure you local versions of the applications. In
+## example:
 
-# ----------------------------
-# application config section
-# ----------------------------
+# muscle         = muscle
+# mafft          = mafft
+# clustalo       = clustalo
+# trimal         = trimal
+# readal         = readal
+# tcoffee        = t_coffee
+# phyml          = phyml
+# raxml-pthreads = raxmlHPC-PTHREADS-SSE3
+# raxml          = raxmlHPC-SSE3
+# jmodeltest     = "java -jar $JMODELTEST_HOME/jModelTest.jar"
+# dialigntx      = dialign-tx
+# usearch        = usearch
+# fasttree       = FastTree
+
+
+[sge]
+## If sge execution mode is selected, this config will be used. Note
+## that standard output and error are automatically set, so any value
+## here will be overwritten
+
+# usually "defaul". Leave it blank if unsure.
+_cell = "cgenomics"
+
+# qsub params
+-q = cgen
+-p = -512 
+
+
+## Applications setup section
+## ============================
+##
 
 [muscle]
 -maxhours = 24
@@ -153,14 +170,6 @@ _aa_model = JTT # Model used if no model selection is performed
 
 [tree_merger]
 _min_size = 3
-_min_outgroups = 1
+_max_outgroups = 3
 _outgroup_policy = "mean_dist" # mean_dist, max_dist, min_dist, median_dist
-
-[sge]
-# standard output and error are automatically set, so any value here
-# will be overwritten
-_cell = cgenomics
--q = cgen
--p = -512 
-
 

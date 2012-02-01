@@ -6,17 +6,23 @@ import logging
 from logger import set_logindent, logindent
 log = logging.getLogger("main")
 
-from utils import get_cladeid, render_tree, HOSTNAME
-from errors import ConfigError, DataError, TaskError
-import db
-import sge
+from nprlib.utils import get_cladeid, render_tree, HOSTNAME
+from nprlib.errors import ConfigError, DataError, TaskError
+from nprlib import db, sge
+
+def sort_tasks(x, y):
+    if getattr(x,"nseqs", 0) > getattr(y,"nseqs", 0):
+        return 1
+    elif getattr(x,"nseqs", 0) < getattr(y,"nseqs", 0):
+        return -1
+    else:
+        return 0
 
 def schedule(config, processer, schedule_time, execution, retry):
     # Send seed files to processer to generate the initial task
     pending_tasks, main_tree = processer(None, None, 
                                          config)
     clade2tasks = defaultdict(list)
-    sort_by_cladeid = lambda x,y: cmp(x.cladeid, y.cladeid)
     # Then enters into the pipeline.
     cores_total = config["main"]["_max_cores"]
 
@@ -41,7 +47,7 @@ def schedule(config, processer, schedule_time, execution, retry):
            
             
         sge_jobs = []
-        for task in sorted(pending_tasks, sort_by_cladeid):
+        for task in sorted(pending_tasks, sort_tasks):
             print
             set_logindent(1)
             log.log(28, "(%s) %s" %(task.status, task))
@@ -78,7 +84,8 @@ def schedule(config, processer, schedule_time, execution, retry):
                     if exec_type == "insitu":
                         log.log(28, "Launching %s" %j)
                         try:
-                            launch_detached(j, cmd, j.pid_file)
+                            launch_detached(j, cmd)
+                            log.debug("Command: %s", j.cmd_file)
                         except Exception:
                             task.save_status("E")
                             task.status = "E"
@@ -122,11 +129,11 @@ def schedule(config, processer, schedule_time, execution, retry):
 
             # If last task processed a new tree node, dump snapshots
             if task.ttype == "treemerger":
-                #log.info("Annotating tree")
-                #annotate_tree(main_tree, clade2tasks)
-                #nw_file = os.path.join(config["main"]["basedir"],
-                #                       "tree_snapshots", task.cladeid+".nw")
-                #main_tree.write(outfile=nw_file, features=[])
+                log.info("Annotating tree")
+                annotate_tree(main_tree, clade2tasks)
+                nw_file = os.path.join(config["main"]["basedir"],
+                                       "tree_snapshots", task.cladeid+".nw")
+                main_tree.write(outfile=nw_file, features=[])
                 
                 if config["main"]["render_tree_images"]:
                     log.log(28, "Rendering tree image")
@@ -218,7 +225,7 @@ def get_node2content(node, store={}):
         store[node] = [node.name]
     return store
 
-def launch_detached(j, cmd, pid_file):
+def launch_detached(j, cmd):
     pid1 = os.fork()
     if pid1 == 0:
         pid2 = os.fork()

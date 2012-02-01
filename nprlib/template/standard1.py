@@ -5,11 +5,11 @@ import logging
 import numpy
 from collections import defaultdict
 
-from .utils import del_gaps, GENCODE, PhyloTree, SeqGroup, TreeStyle
-from .task import (MetaAligner, Mafft, Muscle, Uhire, Dialigntx, FastTree,
+from nprlib.utils import del_gaps, GENCODE, PhyloTree, SeqGroup, TreeStyle
+from nprlib.task import (MetaAligner, Mafft, Muscle, Uhire, Dialigntx, FastTree,
                    Clustalo, Raxml, Phyml, JModeltest, Prottest, Trimal,
                    TreeMerger, Msf)
-from .errors import DataError
+from nprlib.errors import DataError
 
 log = logging.getLogger("main")
 
@@ -235,11 +235,10 @@ def process_task(task, main_tree, conf):
         for part in [task.set_a, task.set_b]:
             part_cladeid, seqs, outgroups, fname = part
             # Partition size limit
-            if len(seqs) >= int(conf["tree_merger"]["_min_size"]) and \
-                    len(outgroups) >= int(conf["tree_merger"]["_min_outgroups"]):
-
+            if len(seqs) >= int(conf["tree_merger"]["_min_size"]):
                 new_tasks.append(\
                     Msf(part_cladeid, fname, seqtype))
+                print len(seqs)
            
     return new_tasks, main_tree
 

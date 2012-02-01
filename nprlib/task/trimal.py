@@ -3,10 +3,10 @@ import sys
 import logging
 log = logging.getLogger("main")
 
-from .master_task import AlgCleanerTask
-from .master_job import Job
-from .utils import SeqGroup
-from .errors import RetryException
+from nprlib.master_task import AlgCleanerTask
+from nprlib.master_job import Job
+from nprlib.utils import SeqGroup
+from nprlib.errors import RetryException
 
 __all__ = ["Trimal"]
 
