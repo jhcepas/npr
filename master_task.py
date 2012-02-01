@@ -155,11 +155,14 @@ class Task(object):
                 all_states[st] += 1
                 if st == "D":
                     self._donejobs.add(j)
-                if st in set("QRL"):
+                elif st in set("QRL"):
                     if isjob(j) and not j.host.startswith("@sge"):
                         self.cores_used += j.cores
                     elif istask(j):
                         self.cores_used += j.cores_used
+                elif st == "E":
+                    log.debug("Error at: %s", j)
+                    
                     
         if not all_states:
             all_states["D"] +=1 

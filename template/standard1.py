@@ -6,7 +6,9 @@ import numpy
 from collections import defaultdict
 
 from .utils import del_gaps, GENCODE, PhyloTree, SeqGroup, TreeStyle
-from .task import *
+from .task import (MetaAligner, Mafft, Muscle, Uhire, Dialigntx, FastTree,
+                   Clustalo, Raxml, Phyml, JModeltest, Prottest, Trimal,
+                   TreeMerger, Msf)
 from .errors import DataError
 
 log = logging.getLogger("main")

@@ -49,7 +49,8 @@ class Prottest(ModelTesterTask):
         for m in self.models:
             args = self.args.copy()
             args["--model"] = m
-            job = Job(self.conf["app"]["phyml"], args, parent_ids=[self.cladeid])
+            job = Job(self.conf["app"]["phyml"], args,
+                      parent_ids=[self.cladeid])
             self.jobs.append(job)
         log.log(26, self.models)
 

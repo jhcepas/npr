@@ -35,19 +35,35 @@ render_tree_images = false
 
 [app]
 # Paths to the different applications
-muscle         = "/home/jhuerta/_Projects/npr/external_apps/muscle"
-mafft          = "MAFFT_BINARIES=~/_Projects/npr/external_apps/mafft-6.861-without-extensions/binaries/  /home/jhuerta/_Projects/npr/external_apps/mafft"
-clustalo       = "/home/jhuerta/_Projects/npr/external_apps/clustalo"
-trimal         = "/home/jhuerta/_Projects/npr/external_apps/trimal"
-readal         = "/home/jhuerta/_Projects/npr/external_apps/readal"
-tcoffee        = "export DIR_4_TCOFFEE=/home/jhuerta/_Projects/npr/external_apps/t_coffee_9_01 MAFFT_BINARIES=$DIR_4_TCOFFEE/plugins/linux/ TMP_4_TCOFFEE=/tmp/ LOCKDIR_4_TCOFFEE=/tmp/  PERL5LIB=$PERL5LIB:$DIR_4_TCOFFEE/perl  && $DIR_4_TCOFFEE/bin/t_coffee"
-phyml          = "/home/jhuerta/_Projects/npr/external_apps/phyml"
-raxml-pthreads = "/home/jhuerta/_Projects/npr/external_apps/raxmlHPC-PTHREADS-SSE3"
-raxml          = "/home/jhuerta/_Projects/npr/external_apps/raxmlHPC-SSE3"
-jmodeltest     = "JMODELTEST_HOME=~/_Projects/npr/external_apps/jmodeltest2; cd $JMODELTEST_HOME; java -jar $JMODELTEST_HOME/jModelTest.jar"
-dialigntx      = "/home/jhuerta/_Projects/npr/external_apps/dialign-tx /home/jhuerta/_Projects/npr/external_apps/DIALIGN-TX_1.0.2/conf/"
-usearch        = "/home/jhuerta/_Projects/npr/external_apps/usearch"
-fasttree       = "/home/jhuerta/_Projects/npr/external_apps/FastTree"
+npr_path       = ./
+muscle         = npr-portable
+mafft          = npr-portable
+clustalo       = npr-portable
+trimal         = npr-portable
+readal         = npr-portable
+tcoffee        = npr-portable
+phyml          = npr-portable
+raxml-pthreads = npr-portable
+raxml          = npr-portable
+jmodeltest     = npr-portable
+dialigntx      = npr-portable
+usearch        = npr-portable
+fasttree       = npr-portable
+
+#setup_file     = "export DIR_4_TCOFFEE=/home/jhuerta/_Projects/npr/external_apps/t_coffee_9_01 MAFFT_BINARIES=$DIR_4_TCOFFEE/plugins/linux/ TMP_4_TCOFFEE=/tmp/ LOCKDIR_4_TCOFFEE=/tmp/  PERL5LIB=$PERL5LIB:$DIR_4_TCOFFEE/perl  && $DIR_4_TCOFFEE/bin/t_coffee"
+#muscle         = "/home/jhuerta/_Projects/npr/external_apps/muscle"
+#mafft          = "MAFFT_BINARIES=~/_Projects/npr/external_apps/mafft-6.861-without-extensions/binaries/  /home/jhuerta/_Projects/npr/external_apps/mafft"
+#clustalo       = "/home/jhuerta/_Projects/npr/external_apps/clustalo"
+#trimal         = "/home/jhuerta/_Projects/npr/external_apps/trimal"
+#readal         = "/home/jhuerta/_Projects/npr/external_apps/readal"
+#tcoffee        = "export DIR_4_TCOFFEE=/home/jhuerta/_Projects/npr/external_apps/t_coffee_9_01 MAFFT_BINARIES=$DIR_4_TCOFFEE/plugins/linux/ TMP_4_TCOFFEE=/tmp/ LOCKDIR_4_TCOFFEE=/tmp/  PERL5LIB=$PERL5LIB:$DIR_4_TCOFFEE/perl  && $DIR_4_TCOFFEE/bin/t_coffee"
+#phyml          = "/home/jhuerta/_Projects/npr/external_apps/phyml"
+#raxml-pthreads = "/home/jhuerta/_Projects/npr/external_apps/raxmlHPC-PTHREADS-SSE3"
+#raxml          = "/home/jhuerta/_Projects/npr/external_apps/raxmlHPC-SSE3"
+#jmodeltest     = "JMODELTEST_HOME=~/_Projects/npr/external_apps/jmodeltest2; cd $JMODELTEST_HOME; java -jar $JMODELTEST_HOME/jModelTest.jar"
+#dialigntx      = "/home/jhuerta/_Projects/npr/external_apps/dialign-tx /home/jhuerta/_Projects/npr/external_apps/DIALIGN-TX_1.0.2/conf/"
+#usearch        = "/home/jhuerta/_Projects/npr/external_apps/usearch"
+#fasttree       = "/home/jhuerta/_Projects/npr/external_apps/FastTree"
 
 # ----------------------------
 # application config section

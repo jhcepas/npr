@@ -147,7 +147,6 @@ class Job(object):
         
             if st != saved_status:
                 db.update_job(self.jobid, status=st)
-            print "----", self, saved_status, st
             self.status = st
             
         return self.status
