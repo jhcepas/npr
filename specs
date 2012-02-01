@@ -20,5 +20,5 @@ npr_nt_model_tester = list()
 
 [tree_merger]
 _min_size = integer()
-_max_outgroups = integer()
+_outgroup_size = integer()
 

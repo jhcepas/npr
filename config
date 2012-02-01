@@ -170,6 +170,6 @@ _aa_model = JTT # Model used if no model selection is performed
 
 [tree_merger]
 _min_size = 3
-_max_outgroups = 3
+_outgroup_size = 3
 _outgroup_policy = "mean_dist" # mean_dist, max_dist, min_dist, median_dist
 
