@@ -10,7 +10,7 @@ apps = {
     'phyml'          : "%BIN%/phyml",
     'raxml-pthreads' : "%BIN%/raxmlHPC-PTHREADS-SSE3",
     'raxml'          : "%BIN%/raxmlHPC-SSE3",
-    'jmodeltest'     : "JMODELTEST_HOME=~/_Projects/npr/external_apps/jmodeltest2; cd $JMODELTEST_HOME; java -jar $JMODELTEST_HOME/jModelTest.jar",
+    'jmodeltest'     : "JMODELTEST_HOME=%BIN%/jmodeltest2; cd $JMODELTEST_HOME; java -jar $JMODELTEST_HOME/jModelTest.jar",
     'dialigntx'      : "%BIN%/dialign-tx %BIN%/DIALIGN-TX_1.0.2/conf/",
     'usearch'        : "%BIN%/usearch",
     'fasttree'       : "%BIN%/FastTree",
@@ -23,7 +23,7 @@ def get_call(appname, apps_path):
         return None
     libpath = os.path.join(apps_path, "local_libs")
     cmd = re.sub("%BIN%", apps_path, cmd)
-    cmd = "export LD_LIBRARY_PATH=%s:$LD_LIBRARY_PATH; " %(libpath) +cmd
+    #cmd = "export LD_LIBRARY_PATH=%s:$LD_LIBRARY_PATH; " %(libpath) +cmd
     return cmd
   
     
