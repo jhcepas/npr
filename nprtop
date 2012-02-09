@@ -10,11 +10,9 @@ def top(waiting_time, dbfile):
     while True:
         os.system("clear")
         print time.ctime()
-        dbnodes, dbtasks = db.report()
-        #print_as_table(dbnodes)
-        print_as_table(dbtasks, fields=[0,3,4,5,6])
+        report = db.report()
+        print_as_table(report)
         time.sleep(waiting_time)
-
 
 __DESCRIPTION__ = ""
         
