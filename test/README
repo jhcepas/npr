@@ -1,0 +1,6 @@
+Execute test.sh whithin this directory. You can add arguments as with
+the normal npr script.
+
+Example:
+$ sh test.sh -v5 -t2 -x 
+
