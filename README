@@ -1,0 +1,2 @@
+For portable execution, please do not modify the directory structure or the localtion of files. 
+If you want to add npr commands to your path, use symbolik links or add this directory to your PATH.
