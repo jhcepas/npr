@@ -1,0 +1,1 @@
+{"provides":{"HTTP::Cookies::Microsoft":{"version":"6.00","file":"HTTP/Cookies/Microsoft.pm"},"HTTP::Cookies::Netscape":{"version":"6.00","file":"HTTP/Cookies/Netscape.pm"},"HTTP::Cookies":{"version":"6.00","file":"HTTP/Cookies.pm"}},"version":"6.00","name":"HTTP::Cookies","dist":"HTTP-Cookies-6.00","pathname":"G/GA/GAAS/HTTP-Cookies-6.00.tar.gz","module":"HTTP::Cookies"}
