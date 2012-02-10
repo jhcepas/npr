@@ -1,2 +1,9 @@
-For portable execution, please do not modify the directory structure or the localtion of files. 
-If you want to add npr commands to your path, use symbolik links or add this directory to your PATH.
+For portable execution, please do not modify the directory structure
+or the location of files.  If you want to add "npr"" and "nprtop""
+commands to your path, add this directory to your PATH variable or
+use symbolic links. 
+
+For instance, you can add a line like the following to your .bashrc
+for make npr command permanently accesible:
+
+$ export PATH=/my/path/to/npr:$PATH;
