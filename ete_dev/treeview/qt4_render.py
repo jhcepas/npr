@@ -101,10 +101,18 @@ class _NodeItem(_EmptyItem):
         self.fullRegion = QtCore.QRectF()
         self.highlighted = False
 
-class _LineItem(QtGui.QGraphicsLineItem):
+class _NodeLineItem(QtGui.QGraphicsLineItem, _ActionDelegator):
+    def __init__(self, node, *args, **kargs):
+        self.node = node
+        QtGui.QGraphicsLineItem.__init__(self, *args, **kargs)
+        _ActionDelegator.__init__(self)
     def paint(self, painter, option, widget):
         QtGui.QGraphicsLineItem.paint(self, painter, option, widget)
 
+class _LineItem(QtGui.QGraphicsLineItem):
+    def paint(self, painter, option, widget):
+        QtGui.QGraphicsLineItem.paint(self, painter, option, widget)
+        
 class _PointerItem(QtGui.QGraphicsRectItem):
     def __init__(self, parent=None):
         QtGui.QGraphicsRectItem.__init__(self,0,0,0,0, parent)
@@ -642,6 +650,7 @@ def render_node_content(node, n2i, n2f, img):
     #pen.setCapStyle(QtCore.Qt.RoundCap)
     #pen.setJoinStyle(QtCore.Qt.RoundJoin)
     hz_line = _LineItem()
+    hz_line = _NodeLineItem(node)
     hz_line.setPen(pen)
 
     # the -vt_line_width is to solve small imperfections in line

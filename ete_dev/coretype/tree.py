@@ -1333,7 +1333,7 @@ class TreeNode(object):
            #                          \-b
 
         """
-
+       
         if not self.is_leaf():
             n2s = {}
             for n in self.get_children():
@@ -1361,53 +1361,16 @@ class TreeNode(object):
         criteria should be added to sort nodes.
         unique id is stored in _nid
         """
-        from hashlib import md5
-        for n in self.traverse(strategy="postorder"):
-            if n.is_leaf():
-                key = md5(str(n.name)).hexdigest()
-                n.__idname = key
-            else:
-                key = md5 (str (\
-                    sorted ([c.__idname for c in n.children]))).hexdigest()
-                n.__idname=key
-                children = [[c.__idname, c] for c in n.children]
-                children.sort() # sort list by idname
-                n.children = [item[1] for item in children]
-            counter = 1
-        for n in self.traverse(strategy="postorder"):
-            n.add_features(_nid=counter)
-            counter += 1
 
+        node2content = get_node2content(self)
+        def sort_by_content(x, y):
+            return cmp(md5(str(sorted(node2content[x]))),
+                       md5(str(sorted(node2content[y]))))
 
-
-    def sort_descendants(self):
-        """ 
-        .. versionadded: 2.1 
-
-        This function sort the branches of a given tree by
-        considerening node names. After the tree is sorted, nodes are
-        labeled using ascendent numbers.  This can be used to ensure that
-        nodes in a tree with the same node names are always labeled in
-        the same way.  Note that if duplicated names are present, extra
-        criteria should be added to sort nodes.
-        unique id is stored in _nid
-        """
-        from hashlib import md5
-        for n in self.traverse(strategy="postorder"):
-            if n.is_leaf():
-                key = md5(str(n.name)).hexdigest()
-                n.__idname = key
-            else:
-                key = md5 (str (\
-                    sorted ([c.__idname for c in n.children]))).hexdigest()
-                n.__idname=key
-                children = [[c.__idname, c] for c in n.children]
-                children.sort() # sort list by idname
-                n.children = [item[1] for item in children]
-            counter = 1
-        for n in self.traverse(strategy="postorder"):
-            n.add_features(_nid=counter)
-            counter += 1
+        for n in self.traverse():
+            if not n.is_leaf():
+                n.children.sort(sort_by_content)
+        return node2content
 
     def get_partitions(self):
         """ 
