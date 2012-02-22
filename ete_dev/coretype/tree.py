@@ -126,6 +126,18 @@ class TreeNode(object):
         else:
             raise ValueError, "children:wrong type"
 
+
+    def _get_style(self):
+        if not self._img_style:
+            self._set_style(None)
+        return self._img_style
+
+    def _set_style(self, value):
+        self.set_style(value)
+            
+    #: Branch length distance to parent node. Default = 0.0
+    img_style = property(fget=_get_style, fset=_set_style)
+             
     #: Branch length distance to parent node. Default = 0.0
     dist = property(fget=_get_dist, fset=_set_dist)
     #: Branch support for current node
@@ -149,7 +161,7 @@ class TreeNode(object):
         self._up = None
         self._dist = 1.0
         self._support = 1.0
-
+        self._img_style = None
         self.features = set([])
         # Add basic features
         self.add_features(name="NoName")
@@ -1362,16 +1374,37 @@ class TreeNode(object):
         unique id is stored in _nid
         """
 
-        node2content = get_node2content(self)
+        node2content = self.get_node2content()
         def sort_by_content(x, y):
-            return cmp(md5(str(sorted(node2content[x]))),
-                       md5(str(sorted(node2content[y]))))
+            return cmp(str(sorted([i.name for i in node2content[x]])),
+                       str(sorted([i.name for i in node2content[y]])))
 
         for n in self.traverse():
             if not n.is_leaf():
                 n.children.sort(sort_by_content)
         return node2content
 
+    def get_node2content(self, store=None):
+        """ 
+        .. versionadded: 2.1
+        EXPERIMENTAL METHOD!
+        Returns a dictionary with the preloaded content of each descendant.
+        """
+        if store is None:
+            store = {}
+            
+        for ch in self.children:
+            ch.get_node2content(store=store)
+
+        if self.children:
+            val = []
+            for ch in self.children:
+                val.extend(store[ch])
+            store[self] = val
+        else:
+            store[self] = [self]
+        return store
+        
     def get_partitions(self):
         """ 
         .. versionadded: 2.1
@@ -1463,8 +1496,13 @@ class TreeNode(object):
 
         Set 'node_style' as the fixed style for the current node.
         """
-        if type(node_style) is NodeStyle:
-            self.img_style = node_style
+        if TREEVIEW:
+            if node_style is None:
+                node_style = NodeStyle()
+            if type(node_style) is NodeStyle:
+                self._img_style = node_style
+        else:
+            raise ValueError("Treeview module is disabled")
        
     def phonehome(self):
         from ete_dev import _ph
@@ -1545,3 +1583,5 @@ def asRphylo(ETE_tree):
 # Alias
 #: .. currentmodule:: ete_dev
 Tree = TreeNode
+
+

@@ -2,6 +2,7 @@ import types
 import signal
 
 from PyQt4  import QtGui
+from PyQt4  import QtCore
 from qt4_gui import _GUI, _PropertiesDialog, _BasicNodeActions
 
 import layouts

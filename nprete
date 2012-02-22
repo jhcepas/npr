@@ -5,6 +5,7 @@ import sys
 
 NPRPATH = os.path.split(os.path.realpath(__file__))[0]
 sys.path.insert(0, NPRPATH)
+from nprlib.utils import get_node2content
 try:
     import argparse
 except:
@@ -25,6 +26,8 @@ def master_layout(node):
         N = faces.AttrFace("name", fsize=NAME_FONT_SIZE)
         N.margin_left = 2
         faces.add_face_to_node(N, node, 0, position=LEAF_NAME_POSITION)
+    if "tree_type" in node.features:
+        node.img_style["size"] = 20
         
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__DESCRIPTION__, 
