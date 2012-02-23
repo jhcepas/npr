@@ -115,7 +115,7 @@ class TreeNode(object):
         if type(value) == type(self) or value is None:
             self._up = value
         else:
-            raise ValueError, "up: wrong type"
+            raise ValueError("bad node_up type")
 
     def _get_children(self):
         return self._children
@@ -124,12 +124,12 @@ class TreeNode(object):
            len(set([type(n)==type(self) for n in value]))<2:
             self._children = value
         else:
-            raise ValueError, "children:wrong type"
-
+            raise ValueError("bad children type")
 
     def _get_style(self):
-        if not self._img_style:
+        if self._img_style is None:
             self._set_style(None)
+           
         return self._img_style
 
     def _set_style(self, value):
@@ -1404,6 +1404,29 @@ class TreeNode(object):
         else:
             store[self] = [self]
         return store
+
+    def robinson_foulds(self, t2):
+        """
+        .. versionadded: 2.1
+        
+        Returns the Robinson-Foulds topological distance between this and another node.
+
+        :returns: (RF distance, Max.RF distance)
+        """
+        
+        t1 = self
+        t1content = t1.get_node2content()
+        t2content = t2.get_node2content()
+        r1 = set([",".join(sorted(map(lambda x: x.name, cont))) for cont in t1content.values()])
+        r2 = set([",".join(sorted(map(lambda x: x.name, cont))) for cont in t2content.values()])
+
+        inters = r1.intersection(r2)
+        if len(r1) == len(r2):
+                rf = (len(r1) - len(inters)) * 2
+        else :
+                rf = (len(r1) - len(inters)) + (len(r2) - len(inters))
+        rf_max = len(r1) + len(r2)
+        return rf, rf_max
         
     def get_partitions(self):
         """ 
@@ -1585,3 +1608,6 @@ def asRphylo(ETE_tree):
 Tree = TreeNode
 
 
+
+
+    

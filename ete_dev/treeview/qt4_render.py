@@ -370,6 +370,7 @@ def render(root_node, img, hide_root=False):
     add_title(img, mainRect, frame)
     add_scale(img, mainRect, frame)
     frame.setRect(mainRect)
+
     # Draws a border around the tree
     if not img.show_border:
         frame.setPen(QtGui.QPen(QtCore.Qt.NoPen))
@@ -746,8 +747,10 @@ def set_pen_style(pen, line_style):
         pen.setStyle(QtCore.Qt.DotLine)
 
 def set_style(n, layout_func):
-    if not isinstance(getattr(n, "img_style", None), NodeStyle):
-        n.img_style = NodeStyle()
+    #if not isinstance(getattr(n, "img_style", None), NodeStyle):
+    #    print "Style of", n.name ,"is None"
+    #    n.set_style()
+    #    n.img_style = NodeStyle()
        
     n._temp_faces = _FaceAreas()
 
