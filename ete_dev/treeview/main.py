@@ -513,7 +513,7 @@ def add_face_to_node(face, node, column, aligned=False, position="branch-right")
     :argument node: a tree node instance (:class:`Tree`, :class:`PhyloTree`, etc.)
     :argument column: An integer number starting from 0
     :argument "branch-right" position: Possible values are
-      "branch-right", "branch-top", "branch-bottom", "float", "aligned"
+      "branch-right", "branch-top", "branch-bottom", "float", "float-behind" and "aligned".
     """ 
 
     ## ADD HERE SOME TYPE CHECK FOR node and face

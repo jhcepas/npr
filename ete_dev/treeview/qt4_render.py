@@ -239,7 +239,8 @@ def render(root_node, img, hide_root=False):
     parent.float_layer = _EmptyItem(parent)
     parent.float_behind_layer = _EmptyItem(parent)
 
-    TREE_LAYERS = [parent.bg_layer, parent.tree_layer, parent.float_layer]
+    TREE_LAYERS = [parent.bg_layer, parent.tree_layer,
+                   parent.float_layer, parent.float_behind_layer]
 
     parent.bg_layer.setZValue(0)
     parent.tree_layer.setZValue(2)
