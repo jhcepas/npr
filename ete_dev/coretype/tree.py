@@ -618,7 +618,7 @@ class TreeNode(object):
         """
         Iterate over all desdecendant nodes. 
         """
-        if not is_leaf_fn or not is_leaf_fn(ch):
+        if not is_leaf_fn or not is_leaf_fn(self):
             for ch in self.children:
                 for node in ch._iter_descendants_postorder():
                     yield node
@@ -1254,11 +1254,15 @@ class TreeNode(object):
         self.up = parent
         return new_node
 
-    def _asciiArt(self, char1='-', show_internal=True, compact=False):
+    def _asciiArt(self, char1='-', show_internal=True, compact=False, attributes=None):
         """
         Returns the ASCII representation of the tree. Code taken from the
         PyCogent GPL project.
         """
+        if not attributes:
+            attributes = ["name"]
+        node_name = ', '.join(map(str, [getattr(self, v, "?") for v in attributes]))
+       
         LEN = 5
         PAD = ' ' * LEN
         PA = ' ' * (LEN-1)
@@ -1272,7 +1276,7 @@ class TreeNode(object):
                     char2 = '\\'
                 else:
                     char2 = '-'
-                (clines, mid) = c._asciiArt(char2, show_internal, compact)
+                (clines, mid) = c._asciiArt(char2, show_internal, compact, attributes)
                 mids.append(mid+len(result))
                 result.extend(clines)
                 if not compact:
@@ -1286,20 +1290,20 @@ class TreeNode(object):
             result = [p+l for (p,l) in zip(prefixes, result)]
             if show_internal:
                 stem = result[mid]
-                result[mid] = stem[0] + self.name + stem[len(self.name)+1:]
+                result[mid] = stem[0] + node_name + stem[len(node_name)+1:]
             return (result, mid)
         else:
-            return ([char1 + '-' + self.name], 0)
+            return ([char1 + '-' + node_name], 0)
 
-    def get_ascii(self, show_internal=True, compact=False):
+    def get_ascii(self, show_internal=True, compact=False, attributes=None):
         """
         Returns a string containing an ascii drawing of the tree.
 
         :argument show_internal: includes internal edge names.
         :argument compact: use exactly one line per tip.
         """
-        (lines, mid) = self._asciiArt(
-                show_internal=show_internal, compact=compact)
+        (lines, mid) = self._asciiArt(show_internal=show_internal,
+                                      compact=compact, attributes=attributes)
         return '\n'+'\n'.join(lines)
 
 
