@@ -1016,6 +1016,37 @@ class TreeNode(object):
                     max_node = node
             return max_node, max_dist
 
+    def get_closest_leaf(self, topology_only=False):
+        """Returns node's closest descendant leaf and the distance to
+        it.
+
+        :argument False topology_only: If set to True, distance
+          between nodes will be referred to the number of nodes
+          between them. In other words, topological distance will be
+          used instead of branch length distances.
+
+        :return: A tuple containing the closest leaf referred to the
+          current node and the distance to it.
+
+        """
+        min_dist = None
+        min_node = None
+        if self.is_leaf():
+            return self, 0.0
+        else:
+            for ch in self.children:
+                node, d = ch.get_closest_leaf(topology_only=topology_only)
+                if topology_only:
+                    d += 1.0
+                else:
+                    d += ch.dist
+                if min_dist is None or d<min_dist:
+                    min_dist = d
+                    min_node = node
+            return min_node, min_dist
+
+
+            
     def get_midpoint_outgroup(self):
         """
         Returns the node that divides the current tree into two distance-balanced
@@ -1409,7 +1440,7 @@ class TreeNode(object):
             store[self] = [self]
         return store
 
-    def robinson_foulds(self, t2):
+    def robinson_foulds(self, t2, attr_t1="name", attr_t2="name"):
         """
         .. versionadded: 2.1
         
@@ -1421,8 +1452,12 @@ class TreeNode(object):
         t1 = self
         t1content = t1.get_node2content()
         t2content = t2.get_node2content()
-        r1 = set([",".join(sorted(map(lambda x: x.name, cont))) for cont in t1content.values()])
-        r2 = set([",".join(sorted(map(lambda x: x.name, cont))) for cont in t2content.values()])
+        valid_names = set([getattr(_n, attr_t1) for _n in t1content[t1]])
+        r1 = set([",".join(sorted([getattr(_c, attr_t1) for _c in cont]))
+                  for cont in t1content.values()])
+        r2 = set([",".join(sorted([getattr(_c, attr_t2) for _c in cont
+                                   if getattr(_c, attr_t2) in valid_names]))
+                  for cont in t2content.values()])
 
         inters = r1.intersection(r2)
         if len(r1) == len(r2):

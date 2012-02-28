@@ -2,33 +2,20 @@
 import os 
 import re
 import sys
+import copy
 
 NPRPATH = os.path.split(os.path.realpath(__file__))[0]
 sys.path.insert(0, NPRPATH)
-from nprlib.utils import get_node2content
+from nprlib.utils import get_node2content, NPR_TREE_STYLE, PhyloTree
 try:
     import argparse
 except:
     from ete_dev import _argparse as argparse
 
-from ete_dev import PhyloTree, TreeStyle, faces
-
 __DESCRIPTION__ = """
 ETE tree viewer. 
 """
-
-NAME_FONT_SIZE = 14
-LEAF_NAME_POSITION = "branch-right"
-SHOW_LEAF_NAMES = True
-
-def master_layout(node):
-    if node.is_leaf() and SHOW_LEAF_NAMES:
-        N = faces.AttrFace("name", fsize=NAME_FONT_SIZE)
-        N.margin_left = 2
-        faces.add_face_to_node(N, node, 0, position=LEAF_NAME_POSITION)
-    if "tree_type" in node.features:
-        node.img_style["size"] = 20
-        
+       
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__DESCRIPTION__, 
                             formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -151,7 +138,7 @@ if __name__ == "__main__":
         else:
             outgroup = t & args.root[0]
         t.set_outgroup(outgroup)
-    ts = TreeStyle()
+    ts = copy.deepcopy(NPR_TREE_STYLE)
     ts.mode = args.mode
     ts.show_leaf_name = False
     ts.branch_vertical_margin = args.branch_separation
@@ -172,7 +159,7 @@ if __name__ == "__main__":
     if not args.width: 
         args.width = None
 
-    ts.layout_fn = master_layout
+    #ts.layout_fn = master_layout
     if args.image:
         t.render(args.image, tree_style=ts, w=args.width, h=args.height)
     else:

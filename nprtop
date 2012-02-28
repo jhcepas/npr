@@ -18,10 +18,11 @@ def top(waiting_time, dbfile):
         os.system("clear")
         print time.ctime()
         report = db.report()
-        print_as_table(report)
+        hd = ["taskid", "status", "type", "process_type", "program", "seqs", "outgroups"] 
+        print_as_table(report, fields=[0, 4, 5, 6, 7, 8, 9], header=hd )
         time.sleep(waiting_time)
 
-__DESCRIPTION__ = ""
+__DESCRIPTION__ = " Monitors NPR process execution."
         
 if __name__ == "__main__":
     parser = ArgumentParser(description=__DESCRIPTION__, 
@@ -43,7 +44,8 @@ if __name__ == "__main__":
                         type=float, default=1.5,
                         help="""Schedule time in seconds. """)
 
-    parser.add_argument('nprdir', metavar='N', type=str, nargs=1,
+  
+    parser.add_argument('nprdir', metavar='npr_base_dir', type=str, nargs=1,
                    help='path to an NPR execution directory')
        
   

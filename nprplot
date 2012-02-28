@@ -3,8 +3,7 @@ import os
 import time
 import sys
 from glob import glob
-import logging
-log = logging
+import copy
 
 # This avoids installing nprlib module. npr script will find it in the
 # same directory in which it is
@@ -13,26 +12,11 @@ sys.path.insert(0, NPRPATH)
 from nprlib.argparse import ArgumentParser, RawDescriptionHelpFormatter
 from nprlib.errors import DataError
 from nprlib.utils import (PhyloTree, TreeStyle, NodeStyle, faces,
-                          random_color, md5, get_node2content, generate_id)
+                          random_color, md5, get_node2content, generate_id,
+                          NPR_TREE_STYLE)
 
 __DESCRIPTION__ = ("Render tree snapshot images and creates a tree"
                    " growing animation")
-
-def layout(node):
-    if getattr(node, "tree_model", None):
-        node.img_style["fgcolor"] = "red"
-        node.img_style["size"] = 30
-    else:
-        node.img_style["size"] = 0
-
-    if getattr(node, "_bgcolor", None):
-        node.img_style["bgcolor"] = node._bgcolor
-       
-        
-    if node.is_leaf():
-        faces.add_face_to_node(faces.AttrFace("name", fsize=40),
-                               node, column=0, position="aligned")
-
         
 def plot(args):
     trees_dir = os.path.join(args.nprdir[0], "tree_snapshots")
@@ -40,17 +24,14 @@ def plot(args):
 
     node2children = {}
     for fname in sorted(glob(trees_dir+"/Iter*.nw")):
-        print fname
         basename = os.path.split(fname)[1]
         #if not basename.startswith("Iter_00030"):
         #    continue
             
         t = PhyloTree(fname)
-        ts = TreeStyle()
-        ts.legend.add_face(faces.TextFace(basename, fsize=260), 0)
-        ts.layout_fn = layout
+        ts = copy.deepcopy(NPR_TREE_STYLE)
+        #ts.legend.add_face(faces.TextFace(basename, fsize=260), 0)
         ts.mode = args.mode
-        ts.scale = t.get_farthest_leaf()[1] * 700.0
 
         t.sort_descendants()
         
@@ -66,34 +47,34 @@ def plot(args):
                     if topology not in node2children.get(parent_id,[set()])[0]:
                         n._bgcolor = random_color(s=0.8)
                     else:
-                        print "OK"
                         n._bgcolor =  node2children[parent_id][1]
                     node2children[n.cladeid] = (set([topology_ch0,
                                                      topology_ch1]),
                                                 n._bgcolor)
 
-                    font_size = ts.scale /216
-                    print ts.scale, font_size
-                    ts.legend.add_face(faces.TextFace(n.alg_type, fsize=260), 0)
-
-                    ts.legend.add_face(faces.TextFace(n.tree_type, fsize=260), 0)
-                    ts.legend.add_face(faces.TextFace(str(len(topology)), fsize=260), 0)
+                    #font_size = ts.scale /216
+                    #print ts.scale, font_size
+                    #ts.legend.add_face(faces.TextFace(n.alg_type, fsize=260), 0)
+                    # 
+                    #ts.legend.add_face(faces.TextFace(n.tree_type, fsize=260), 0)
+                    #ts.legend.add_face(faces.TextFace(str(len(topology)), fsize=260), 0)
                 else:
                     n._bgcolor =  node2children[n.cladeid][1]
 
-        log.error("plotting %s", basename)
-
-
-        
+        print "plotting %s" %basename
         t.render(os.path.join(imgs_dir, basename+".png"),
                  h=800,w=800, tree_style = ts)
-
-
+        
+    print "\nAnimating tree images..."
     cmd = """
-    mencoder mf://%s/*.png -mf w=800:h=800:fps=2:type=png -ovc copy -oac copy -o %s/npr.avi;
-    """ %(imgs_dir, imgs_dir)
+    mencoder mf://%s/*.png -mf w=1000:h=1000:fps=%s:type=png -ovc copy -oac copy -o %s/npr.avi;
+    """ %(imgs_dir, args.fps, imgs_dir)
     os.system(cmd)
-    
+
+    print "\n\nVideo file: %s/npr.avi" %imgs_dir
+
+
+
     """
 mencoder %s/npr.avi \
 -o testvid.flv -of lavf \
@@ -125,8 +106,12 @@ if __name__ == "__main__":
     parser.add_argument('-m', "--mode", dest="mode",
                         default = "c", choices=["c", "r"],
                         help='"c" or "r": circular or rectangular trees')
-      
-  
+
+    parser.add_argument('--fps',  dest="fps",
+                        default = 1.0, type=float,
+                        help='Frames per second')
+   
+ 
     args = parser.parse_args()
     if not os.path.isdir(args.nprdir[0]):
         raise DataError("NPR dir [%s] not found." %args.nprdir[0])
