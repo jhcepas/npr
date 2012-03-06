@@ -1453,6 +1453,12 @@ class TreeNode(object):
         t1content = t1.get_node2content()
         t2content = t2.get_node2content()
         valid_names = set([getattr(_n, attr_t1) for _n in t1content[t1]])
+        ref_names = set([getattr(_n, attr_t2) for _n in t2content[t2]])
+        if len(valid_names & ref_names) < 2:
+            print valid_names & ref_names
+            print self
+            raise ValueError("Trees share less than 2 nodes")
+        
         r1 = set([",".join(sorted([getattr(_c, attr_t1) for _c in cont]))
                   for cont in t1content.values()])
         r2 = set([",".join(sorted([getattr(_c, attr_t2) for _c in cont
