@@ -538,22 +538,6 @@ class TreeNode(object):
             else:
                 if is_leaf_fn(n):
                     yield n
-
-    def iter_leaves2(self, is_leaf_fn=None):
-        """ 
-        Returns an iterator over the leaves under this node. 
-
-        :argument None is_leaf_fn: See :func:`TreeNode.traverse` for
-          documentation.
-        """
-        for n in self._iter_descendants_preorder2(is_leaf_fn=is_leaf_fn):
-            print len(n), is_leaf_fn(n)
-           
-            if not is_leaf_fn and n.is_leaf():
-                yield n
-            elif is_leaf_fn(n):
-                yield n
-
                     
     def get_leaves(self, is_leaf_fn=None):
         """
@@ -655,7 +639,6 @@ class TreeNode(object):
         """
         Iterator over all descendant nodes. 
         """
-       
         to_visit = deque()
         node = self
         while node is not None:
@@ -667,25 +650,6 @@ class TreeNode(object):
             except:
                 node = None
 
-    def _iter_descendants_preorder2(self, is_leaf_fn=None):
-        def _is_leaf(n):
-            if is_leaf_fn:
-                return is_leaf_fn(n)
-            else:
-                return n.is_leaf()
-        to_visit = deque()
-        node = self
-        
-        while node is not None:
-            yield node
-            if not _is_leaf(node):
-                to_visit.extendleft(node.children) 
-            try:
-                node = to_visit.popleft()
-            except:
-                node = None
-
-                
     # def _iter_descendants_postorder_OLD(self):
     #     """
     #     Iterative version. Slower.
@@ -1468,12 +1432,12 @@ class TreeNode(object):
             ch.get_node2content(store=store)
 
         if self.children:
-            val = []
+            val = set()
             for ch in self.children:
-                val.extend(store[ch])
+                val.update(store[ch])
             store[self] = val
         else:
-            store[self] = [self]
+            store[self] = set([self])
         return store
 
     def robinson_foulds(self, t2, attr_t1="name", attr_t2="name"):

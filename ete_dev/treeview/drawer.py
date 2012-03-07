@@ -52,8 +52,8 @@ def show_tree(t, layout=None, tree_style=None):
     tree_item.setParentItem(scene.master_item)
     scene.addItem(scene.master_item)
     mainapp = _GUI(scene)
-    print mainapp.scene.sceneRect().size()
-    print mainapp.maximumSize()
+    #print mainapp.scene.sceneRect().size()
+    #print mainapp.maximumSize()
     mainapp.show()
     mainapp.on_actionFit2tree_triggered()
     # Restore Ctrl-C behavior
