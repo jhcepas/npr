@@ -1,40 +1,177 @@
 #!/usr/bin/env python
+from os import path
 import os
+import re
 import time
 import sys
 from glob import glob
 import copy
+import imp
 
 # This avoids installing nprlib module. npr script will find it in the
 # same directory in which it is
-NPRPATH = os.path.split(os.path.realpath(__file__))[0]
+NPRPATH = path.split(path.realpath(__file__))[0]
 sys.path.insert(0, NPRPATH)
+
+nprete = imp.load_source('nprete', path.join(NPRPATH, 'nprete'))
 from nprlib.argparse import ArgumentParser, RawDescriptionHelpFormatter
 from nprlib.errors import DataError
 from nprlib.utils import (PhyloTree, TreeStyle, NodeStyle, faces,
                           random_color, md5, get_node2content, generate_id,
-                          NPR_TREE_STYLE)
+                          NPR_TREE_STYLE, SeqGroup, ask)
+
+
+sys.path.insert(0, "/home/jhuerta/_Devel/pycepas/")
+from ncbi_taxa import ncbi_consensus as ncbi
 
 __DESCRIPTION__ = ("Render tree snapshot images and creates a tree"
                    " growing animation")
-        
+
+class Args(dict):
+    def __getattribute__(self,k):
+        try:
+            return dict.__getattribute__(self, k)
+        except AttributeError:
+            try:
+                return dict.__getitem__(self, k)
+            except KeyError:
+                return None
+
+def bind_alg(t, alg_path, basepath):
+    A = SeqGroup(alg_path)
+    id_conversion_file = os.path.join(basepath, "id_conversion.txt")
+    if os.path.exists(id_conversion_file):
+        id2name = dict([line.strip().split("\t") for line in open(id_conversion_file)])
+        for i,n in A.id2name.items():
+            A.id2name[i] = id2name[n]
+            A.name2id[id2name[n]] = i
+    t.link_to_alignment(A)
+                
 def plot(args):
-    trees_dir = os.path.join(args.nprdir[0], "tree_snapshots")
-    imgs_dir =  os.path.join(args.nprdir[0], "gallery")
+    base_dir = args.nprdir[0]
+    trees_dir = path.join(base_dir, "tree_snapshots")
+    imgs_dir =  path.join(base_dir, "gallery")
 
-    node2children = {}
-    for fname in sorted(glob(trees_dir+"/Iter*.nw")):
-        basename = os.path.split(fname)[1]
-        #if not basename.startswith("Iter_00030"):
-        #    continue
-            
-        t = PhyloTree(fname)
-        ts = copy.deepcopy(NPR_TREE_STYLE)
-        #ts.legend.add_face(faces.TextFace(basename, fsize=260), 0)
-        ts.mode = args.mode
+    if path.isdir(imgs_dir):
+        if ask("clear current gallery?", ["y","n"]) == "y":
+            for delfile in glob(imgs_dir+"/*.png"):
+                os.remove(delfile)
+            print "Done"
+          
+            node2children = {}
+            for line in open(path.join(trees_dir, "last_run_iters.txt")):
+                line = line.strip()
+                basename = path.basename(line)
+                tree_file =  path.join(trees_dir, basename)
+                info_file =  path.join(trees_dir, basename+".info")
+             
+                iter_info = get_iter_info(info_file)
+                t = PhyloTree(tree_file)
 
-        t.sort_descendants()
+                if args.tax_info:
+                    ncbi.annotate_tree_with_taxa(t, args.tax_info)
+                    subtrees, dups = ncbi.get_speciation_trees(t.copy())
+                    valid_subtrees, broken_subtrees, ncbi_mistakes, total_rf = ncbi.analyze_subtrees(t, subtrees)
+                
+                iter_node = t.search_nodes(cladeid=iter_info["cladeid"])[0]
+                iter_node.add_features(highlighted = True)
+             
+                # Bind alg if possible
+                alg_path = iter_info.get("clean_alg_path", iter_info.get("alg_path", None))
+                if alg_path:
+                    # TEMPORAL CORRECTION
+                    m = re.search("tasks/.+", alg_path)
+                    if m:
+                        alg_path = m.group()
+                    # END OF CORRECTION
+                    alg_path = path.join(base_dir, alg_path)
+                    bind_alg(iter_node, alg_path, base_dir)
+               
+                outfile = path.join(imgs_dir, str(iter_info["npr_iter"])+".png")
+                print outfile
+                ts = copy.deepcopy(NPR_TREE_STYLE)
+                ts.layout_fn.append(ncbi.ncbi_layout)
+                t.render(outfile, tree_style=ts, h=1024)
         
+    print "\nAnimating tree images..."
+    cmd = """
+    mencoder mf://%s/*.png -mf fps=%s:type=png -ovc copy -oac copy -vf scale "320:240" -o %s/npr.avi ;
+    """ %(imgs_dir, args.fps, imgs_dir)
+    os.system(cmd)
+
+    cmd =  """
+    mencoder %s/npr.avi \
+    -of lavf \
+    -oac mp3lame -lameopts abr:br=64 -srate 22050 -ovc lavc \
+    -lavcopts 'vcodec=flv:keyint=50:vbitrate=300:mbd=2:mv0:trell:v4mv:cbp:last_pred=3' -vf scale '320:241' -o %s/npr.flv;
+    """ %(imgs_dir, imgs_dir)
+    os.system(cmd)
+    
+    print "\n\nVideo file: %s/npr.avi" %imgs_dir
+
+
+def get_iter_info(fname):
+    iter_info = {}
+    for line in open(fname):
+        k, v = line.strip("\n").split("\t")
+        try:
+            iter_info[k] = int(v)
+        except ValueError:
+            try:
+                iter_info[k] = float(v)
+            except ValueError:
+                iter_info[k] = str(v)
+    return iter_info
+
+    
+
+    
+        
+if __name__ == "__main__":
+    parser = ArgumentParser(description=__DESCRIPTION__, 
+                            formatter_class=RawDescriptionHelpFormatter)
+    # name or flags - Either a name or a list of option strings, e.g. foo or -f, --foo.
+    # action - The basic type of action to be taken when this argument is encountered at the command line. (store, store_const, store_true, store_false, append, append_const, version)
+    # nargs - The number of command-line arguments that should be consumed. (N, ? (one or default), * (all 1 or more), + (more than 1) )
+    # const - A constant value required by some action and nargs selections. 
+    # default - The value produced if the argument is absent from the command line.
+    # type - The type to which the command-line argument should be converted.
+    # choices - A container of the allowable values for the argument.
+    # required - Whether or not the command-line option may be omitted (optionals only).
+    # help - A brief description of what the argument does.
+    # metavar - A name for the argument in usage messages.
+    # dest - The name of the attribute to be added to the object returned by parse_args().
+   
+    parser.add_argument('nprdir', metavar='N', type=str, nargs=1,
+                   help='path to an NPR execution directory')
+
+    parser.add_argument('-m', "--mode", dest="mode",
+                        default = "c", choices=["c", "r"],
+                        help='"c" or "r": circular or rectangular trees')
+
+    
+    parser.add_argument("--tax", dest="tax_info", type=str,
+                        help="If the taxid attribute is not set in the"
+                        " newick file for all leaf nodes, a tab file file"
+                        " with the translation of name and taxid can be"
+                        " provided with this option.")
+    
+    parser.add_argument('--fps',  dest="fps",
+                        default = 1.0, type=float,
+                        help='Frames per second')
+    
+    args = parser.parse_args()
+    args.nprdir[0] = path.realpath(args.nprdir[0])
+
+    if not path.isdir(args.nprdir[0]):
+        raise DataError("NPR dir [%s] not found." %args.nprdir[0])
+    if not path.exists(path.join(args.nprdir[0], "db.sqlite3")):
+        raise DataError("[%s] does not look an NPR directory ." %args.nprdir[0])
+
+    plot(args)
+
+
+"""
         node2content = get_node2content(t)
         for n in t.traverse():
             n.cladeid = generate_id(node2content[n])
@@ -60,67 +197,4 @@ def plot(args):
                     #ts.legend.add_face(faces.TextFace(str(len(topology)), fsize=260), 0)
                 else:
                     n._bgcolor =  node2children[n.cladeid][1]
-
-        print "plotting %s" %basename
-        t.render(os.path.join(imgs_dir, basename+".png"),
-                 h=800,w=800, tree_style = ts)
-        
-    print "\nAnimating tree images..."
-    cmd = """
-    mencoder mf://%s/*.png -mf w=1000:h=1000:fps=%s:type=png -ovc copy -oac copy -o %s/npr.avi;
-    """ %(imgs_dir, args.fps, imgs_dir)
-    os.system(cmd)
-
-    print "\n\nVideo file: %s/npr.avi" %imgs_dir
-
-
-
-    """
-mencoder %s/npr.avi \
--o testvid.flv -of lavf \
--oac mp3lame -lameopts abr:br=64 -srate 22050 -ovc lavc \
--lavcopts vcodec=flv:keyint=50:vbitrate=300:mbd=2:mv0:trell:v4mv:cbp:last_pred=3 -vf scale "320:240";
-   
-   
-    os.system(cmd)
 """
-        
-if __name__ == "__main__":
-    parser = ArgumentParser(description=__DESCRIPTION__, 
-                            formatter_class=RawDescriptionHelpFormatter)
-    # name or flags - Either a name or a list of option strings, e.g. foo or -f, --foo.
-    # action - The basic type of action to be taken when this argument is encountered at the command line. (store, store_const, store_true, store_false, append, append_const, version)
-    # nargs - The number of command-line arguments that should be consumed. (N, ? (one or default), * (all 1 or more), + (more than 1) )
-    # const - A constant value required by some action and nargs selections. 
-    # default - The value produced if the argument is absent from the command line.
-    # type - The type to which the command-line argument should be converted.
-    # choices - A container of the allowable values for the argument.
-    # required - Whether or not the command-line option may be omitted (optionals only).
-    # help - A brief description of what the argument does.
-    # metavar - A name for the argument in usage messages.
-    # dest - The name of the attribute to be added to the object returned by parse_args().
-   
-    parser.add_argument('nprdir', metavar='N', type=str, nargs=1,
-                   help='path to an NPR execution directory')
-
-    parser.add_argument('-m', "--mode", dest="mode",
-                        default = "c", choices=["c", "r"],
-                        help='"c" or "r": circular or rectangular trees')
-
-    parser.add_argument('--fps',  dest="fps",
-                        default = 1.0, type=float,
-                        help='Frames per second')
-   
- 
-    args = parser.parse_args()
-    if not os.path.isdir(args.nprdir[0]):
-        raise DataError("NPR dir [%s] not found." %args.nprdir[0])
-    if not os.path.exists(os.path.join(args.nprdir[0], "db.sqlite3")):
-        raise DataError("[%s] does not look an NPR directory ." %args.nprdir[0])
-
-    plot(args)
-
-
-
-
-    
