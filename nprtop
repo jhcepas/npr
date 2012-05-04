@@ -39,7 +39,7 @@ def change_status():
     if len(tid) < 6:
         print "  Error: tid must contain at least the first 6 characters"
     else:
-        report = db.report(None, 40)
+        report = db.report(0, -1)
         for entry in report:
             if entry[0].startswith(tid):
                 stfile = os.path.join(args.nprdir[0], "tasks", entry[0], "__status__")
@@ -89,7 +89,6 @@ def update_top(a1, a2):
         r = list(r)
         r[11] = 0 if r[11] == "None" else r[11]
         r[12] = 0 if r[12] == "None" else r[12]
-
         if not r[11] or not r[12]:
             try:
                 start, end = read_time_file(os.path.join(args.nprdir[0], "tasks", r[0], "__time__"))
@@ -137,7 +136,7 @@ if __name__ == "__main__":
     # dest - The name of the attribute to be added to the object returned by parse_args().
    
     parser.add_argument("-t", "--schedule-time", dest="schedule_time", 
-                        type=float, default=2,
+                        type=int, default=2,
                         help="""Schedule time in seconds. """)
   
     parser.add_argument('nprdir', metavar='npr_base_dir', type=str, nargs=1,
