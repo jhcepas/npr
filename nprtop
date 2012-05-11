@@ -80,16 +80,17 @@ def top(waiting_time, dbfile):
             pass
           
 def update_top(a1, a2):
+    short_date = lambda secs: time.strftime("%d %b %y, %H:%M", time.gmtime(secs))
     os.system("clear")
     print time.ctime()
-    report = db.report(args.start_entry, args.entries)
+    report = db.report(args.start_entry, args.entries, args.filter_states)
     hd = ["id", "st", "type", "task", "program", "seqs", "outs", "elapsed", "start", "end"]
     mod_report = []
     for r in report:
         r = list(r)
         r[11] = 0 if r[11] == "None" else r[11]
         r[12] = 0 if r[12] == "None" else r[12]
-        if not r[11] or not r[12]:
+        if 1 or not r[11] or not r[12]:
             try:
                 start, end = read_time_file(os.path.join(args.nprdir[0], "tasks", r[0], "__time__"))
                 r[11] = start
@@ -101,8 +102,9 @@ def update_top(a1, a2):
             r[10] = sec2time(r[10])
         r[0] = r[0][:6]
         r[10] = str(r[10])[:16]
-        r[11] = time.ctime(r[11])[:10]
-        r[12] = time.ctime(r[12])[:10]
+                
+        r[11] = short_date(r[11])
+        r[12] = short_date(r[12])
 
         if args.colors:
             if r[4] == "E":
@@ -153,8 +155,10 @@ if __name__ == "__main__":
     parser.add_argument("-s", dest="start_entry", 
                         type=int, default=-40,
                         help="""starting point to show DB entries.""")
-  
 
+    parser.add_argument("-f", dest="filter_states", 
+                        type=set, default=set(),
+                        help="""Filter out entries whose state is in filter_state""")
     
   
     args = parser.parse_args()
