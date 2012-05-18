@@ -1,0 +1,101 @@
+#!/usr/bin/env python
+import sys
+import os
+import cPickle
+
+# This avoids installing nprlib module. npr script will find it in the
+# same directory in which it is
+NPRPATH = os.path.split(os.path.realpath(__file__))[0]
+sys.path.insert(0, NPRPATH)
+
+from nprlib.argparse import ArgumentParser, RawDescriptionHelpFormatter
+from nprlib import db
+from nprlib.errors import DataError
+from nprlib.logger import get_main_log
+
+def assembly_tree(runid):
+    log.info("Reading nodes from database...")
+    task_nodes = db.get_runid_nodes(runid)
+    task_nodes.reverse()
+    main_tree = None
+    iternumber = 1
+    log.info("Dumping iterations...")
+    while task_nodes:
+        cladeid, packtree, size = task_nodes.pop(-1)
+        log.info("Dumping iteration %s, size of optimized node: %d", iternumber, size)
+        tree = db.decode(packtree)
+      
+        # Restore original gene names
+        for leaf in tree.iter_leaves():
+            leaf.name = leaf.realname
+            
+        if main_tree:
+            # substitute node in main tree by the optimized one
+            target_node = main_tree.search_nodes(cladeid=cladeid)[0]
+            target_node.up.add_child(tree)
+            target_node.detach()
+        else:
+            main_tree = tree
+
+        base_fname = os.path.join(args.outdir, "%05d" %iternumber)
+        tree.add_features(iternumber=iternumber)
+        OUT = open(base_fname+".info", "w")
+        for k in sorted(tree.features):
+            print >>OUT, "\t".join([k, str(getattr(tree, k))])
+        OUT.close()
+        main_tree.write(features=[], outfile=base_fname+".nhx")
+        iternumber += 1
+
+    return main_tree
+   
+__DESCRIPTION__ = "Dump each iteration (tree and info) of a NPR execution."
+       
+if __name__ == "__main__":
+    log = get_main_log(sys.stderr)
+    
+    parser = ArgumentParser(description=__DESCRIPTION__, 
+                            formatter_class=RawDescriptionHelpFormatter)
+ 
+    parser.add_argument('nprdir', metavar='npr_base_dir', type=str, nargs=1,
+                   help='path to an NPR execution directory')
+
+    parser.add_argument("-c", dest="colors", 
+                        action="store_true", 
+                        help="""Color interface""")
+
+    parser.add_argument("-r", dest="runid", 
+                        type=str,
+                        help="""RunID""")
+
+    parser.add_argument("-o", dest="outdir", 
+                        type=str,
+                        help="""Where iteration snapshots will be saved""")
+    
+  
+    args = parser.parse_args()
+        
+    if not os.path.isdir(args.nprdir[0]):
+        raise DataError("NPR dir [%s] not found." %args.nprdir[0])
+    if not os.path.exists(os.path.join(args.nprdir[0], "db.sqlite3")):
+        raise DataError("[%s] does not look an NPR directory ." %args.nprdir[0])
+
+    base_dir = os.path.realpath(args.nprdir[0])
+    dbfile = os.path.join(base_dir, "db.sqlite3")
+    db.connect(dbfile)
+    if not args.runid:
+        args.runid = open(os.path.join(base_dir, "runid"), "rU").readline().strip()
+       
+    if not args.outdir: 
+        args.outdir = os.path.join(base_dir, "npr_dump_%s" %args.runid)
+    else:
+        args.outdir = os.path.join(args.outdir, "npr_dump_%s" %args.runid)
+    log.info("Dump directory: %s", args.outdir)
+    try:
+        os.mkdir(args.outdir)
+    except OSError, e:
+        log.warning(e)
+        
+    main_tree = assembly_tree(args.runid)
+    from nprlib.utils import Tree
+    print main_tree.robinson_foulds(Tree(os.path.join(os.path.realpath(args.nprdir[0]), "final_tree.nw")))[:2]
+       

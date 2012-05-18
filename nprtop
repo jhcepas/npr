@@ -83,7 +83,7 @@ def update_top(a1, a2):
     short_date = lambda secs: time.strftime("%d %b %y, %H:%M", time.gmtime(secs))
     os.system("clear")
     print time.ctime()
-    report = db.report(args.start_entry, args.entries, args.filter_states)
+    report = db.report(args.runid, args.start_entry, args.entries, args.filter_states)
     hd = ["id", "st", "type", "task", "program", "seqs", "outs", "elapsed", "start", "end"]
     mod_report = []
     for r in report:
@@ -160,6 +160,10 @@ if __name__ == "__main__":
                         type=set, default=set(),
                         help="""Filter out entries whose state is in filter_state""")
     
+    parser.add_argument("-i", dest="runid", 
+                        type=str, 
+                        help="""RunID 2 show""")
+   
   
     args = parser.parse_args()
     if not os.path.isdir(args.nprdir[0]):
@@ -169,4 +173,7 @@ if __name__ == "__main__":
         
     dbfile = os.path.join(os.path.realpath(args.nprdir[0]), "db.sqlite3")
     log = get_main_log(sys.stderr)
+    if not args.runid:
+        args.runid = open(os.path.join(os.path.realpath(args.nprdir[0]), "runid"), "rU").readline().strip()
+        
     top(args.schedule_time, dbfile)
