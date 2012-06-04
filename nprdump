@@ -13,20 +13,141 @@ from nprlib import db
 from nprlib.errors import DataError
 from nprlib.logger import get_main_log
 
+def iter_prepostorder(tree):
+    finished_nodes = set()
+    node = tree
+    while node:
+        if node.children:
+            next_node = None
+            for ch in node.children:
+                if ch not in finished_nodes:
+                    next_node = ch
+                    yield next_node, "pre"
+                    break
+            if not next_node:
+                finished_nodes.add(node)
+                yield node, "post"
+                node = node.up
+            else:
+                node = next_node
+        else:
+            finished_nodes.add(node)
+            node = node.up
+           
+
+def walk(runid):
+    log.info("Reading nodes from database...")
+    thread_fname =  os.path.join(args.outdir, "threads")
+    THREAD = open(thread_fname, "w")
+    task_nodes = db.get_runid_nodes(runid)
+    task_nodes.reverse()
+    clade2tree = {}
+    for cladeid, packtree, size in task_nodes:
+        clade2tree[cladeid] = [packtree, size]
+    
+    node = main_tree = db.decode(task_nodes[-1][1])
+    visited_nodes = set()
+    dumpiter = 0
+    main_tree.add_features(dumpiter=dumpiter)
+    dump(dumpiter, main_tree, main_tree)
+    #print main_tree.get_ascii(attributes=["dumpiter", "name"])
+    iter_string = [0]
+    while node:
+        child_node = None
+        for ch in node.children:
+            if ch not in visited_nodes:
+                child_node = ch
+                break
+        if child_node:
+            visited_nodes.add(child_node)
+            if child_node.cladeid in clade2tree:
+                new_thread = True
+                packtree, size  = clade2tree[child_node.cladeid]
+                dumpiter += 1
+                iter_string.append(dumpiter)
+                log.info("Dumping iteration %s, size of optimized node: %d. %s", dumpiter, size, iter_string)
+                task_tree = db.decode(packtree)
+                orig_node = child_node
+                # exchange orig node by optimized one
+                orig_node.detach() 
+                node.add_child(task_tree)
+                task_tree.orig_node = orig_node
+                child_node = task_tree
+                child_node.add_features(dumpiter=dumpiter)
+                dump(dumpiter, child_node, main_tree)
+
+                #print main_tree.get_ascii(attributes=["dumpiter", "name"])
+                #raw_input()
+            node = child_node
+        else:
+            parent = node.up
+            if hasattr(node, "orig_node"):
+                if new_thread:
+                    print >>THREAD, ','.join(map(lambda x: "%05d.nhx" %x, iter_string))
+                    THREAD.flush()
+                    new_thread = False
+                log.info("Detaching cladeid %s", node.cladeid)
+                node.detach()
+                for ch in node.children:
+                    visited_nodes.discard(ch)
+                parent.add_child(node.orig_node)
+                node.orig_node = None
+                del clade2tree[node.cladeid]
+                iter_string.pop(-1)
+            node = parent
+    THREAD.close()
+    log.info("Threads written in %s", thread_fname)
+
+def dump(dumpiter, target, tree):
+    # Restore original gene names
+    for leaf in tree.iter_leaves():
+        leaf.add_features(safename=leaf.name)
+        leaf.name = leaf.realname
+
+    base_fname = os.path.join(args.outdir, "%05d" %dumpiter)
+    OUT = open(base_fname+".info", "w")
+    for k in sorted(target.features):
+        print >>OUT, "\t".join([k, str(getattr(target, k))])
+    OUT.close()
+    tree.write(features=[], outfile=base_fname+".nhx")
+
+            
 def assembly_tree(runid):
     log.info("Reading nodes from database...")
     task_nodes = db.get_runid_nodes(runid)
     task_nodes.reverse()
+
+    clade_tree = None
+    clade_content = None
+    if args.cladeid:
+        for cladeid, packtree, size in task_nodes:
+            if cladeid == args.cladeid:
+                clade_tree = db.decode(packtree)
+                clade_content = set(clade_tree.get_leaf_names())
+        log.info("Tracking clade %s of size %d", args.cladeid, len(clade_content))
+    
     main_tree = None
     iternumber = 1
     log.info("Dumping iterations...")
     while task_nodes:
         cladeid, packtree, size = task_nodes.pop(-1)
+        if cladeid == args.cladeid:
+            tree = clade_tree
+            log.info("Cladeid reached!. Now descending from target node!")
+            #task_nodes = [] # do not continue dumping iterations
+        else:
+            tree = db.decode(packtree)
+
+        if clade_content:
+            if not (clade_content & set(tree.get_leaf_names())):
+                log.info("Skipping optimized node in a different branch (size: %d).", size)
+                continue
+
         log.info("Dumping iteration %s, size of optimized node: %d", iternumber, size)
-        tree = db.decode(packtree)
-      
+        #print tree.dist
         # Restore original gene names
         for leaf in tree.iter_leaves():
+            leaf.add_features(safename=leaf.name)
             leaf.name = leaf.realname
             
         if main_tree:
@@ -70,12 +191,25 @@ if __name__ == "__main__":
     parser.add_argument("-o", dest="outdir", 
                         type=str,
                         help="""Where iteration snapshots will be saved""")
+
+    parser.add_argument("--cladeid", dest="cladeid", 
+                        type=str,
+                        help="""Dump only iteration involving a given clade""")
+
+    parser.add_argument("-a",  dest="assembly", 
+                        action="store_true",
+                        help="""Assembly final tree node by node, from larger to smaller optimized partitions.""")
+
+    parser.add_argument("-b",  dest="branch_assembly", 
+                        action="store_true",
+                        help="""Per branch assembly of the tree. Note that optimized partitions of independent branches are not combined. """)
+
     
-  
     args = parser.parse_args()
         
     if not os.path.isdir(args.nprdir[0]):
         raise DataError("NPR dir [%s] not found." %args.nprdir[0])
+        
     if not os.path.exists(os.path.join(args.nprdir[0], "db.sqlite3")):
         raise DataError("[%s] does not look an NPR directory ." %args.nprdir[0])
 
@@ -84,18 +218,31 @@ if __name__ == "__main__":
     db.connect(dbfile)
     if not args.runid:
         args.runid = open(os.path.join(base_dir, "runid"), "rU").readline().strip()
-       
+
+    if args.cladeid: 
+        file_label = "nprdump_cid_%s_runid_%s" %(args.cladeid, args.runid[:8])
+    elif args.assembly:
+        file_label = "nprdump_assembly_runid_%s" %args.runid[:8]
+    elif args.branch_assembly:
+        file_label = "nprdump_branch_assembly_runid_%s" %args.runid[:8]
+        
     if not args.outdir: 
-        args.outdir = os.path.join(base_dir, "npr_dump_%s" %args.runid)
+        args.outdir = os.path.join(base_dir, file_label)
     else:
-        args.outdir = os.path.join(args.outdir, "npr_dump_%s" %args.runid)
+        args.outdir = os.path.join(args.outdir, file_label)
+        
     log.info("Dump directory: %s", args.outdir)
     try:
         os.mkdir(args.outdir)
     except OSError, e:
         log.warning(e)
-        
-    main_tree = assembly_tree(args.runid)
-    from nprlib.utils import Tree
-    print main_tree.robinson_foulds(Tree(os.path.join(os.path.realpath(args.nprdir[0]), "final_tree.nw")))[:2]
-       
+
+
+    if args.assembly:
+        main_tree = assembly_tree(args.runid)
+        from nprlib.utils import Tree
+        dist = main_tree.robinson_foulds(Tree(os.path.join(os.path.realpath(args.nprdir[0]), "final_tree.nw")))[:2]
+        log.info("Distance with final tree: %s", str(dist))
+    elif args.branch_assembly:
+        print args.runid
+        walk(args.runid)       

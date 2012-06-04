@@ -7,6 +7,7 @@ import copy
 NPRPATH = os.path.split(os.path.realpath(__file__))[0]
 sys.path.insert(0, NPRPATH)
 from nprlib.utils import get_node2content, NPR_TREE_STYLE, PhyloTree, SeqGroup
+
 try:
     import argparse
 except:
@@ -27,7 +28,10 @@ def draw(args):
         t = PhyloTree(tfile)        
 
     t.dist = 0
-        
+
+    if args.cladeid:
+        t = t.search_nodes(cladeid=args.cladeid)[0]
+    
     if args.ladderize:
         t.ladderize()
 
@@ -50,6 +54,10 @@ def draw(args):
     ts.mode = args.mode
     ts.show_leaf_name = False
     ts.branch_vertical_margin = args.branch_separation
+
+    if args.force_topology:
+        ts.force_topology = True
+    
     if args.scale:
         ts.scale = args.scale
     else:
@@ -107,6 +115,9 @@ if __name__ == "__main__":
 
     parser.add_argument('--basepath',  dest="basepath", type=str,
                         help='Basepath to look for node/task related information')
+
+    parser.add_argument('--cladeid',  dest="cladeid", type=str,
+                        help='Show only a given node')
     
     parser.add_argument("-a", "--alg", dest="alg", 
                         action="store_true",
@@ -125,6 +136,11 @@ if __name__ == "__main__":
                         help="Roots the tree to the node grouping the list"
                         " of nodes provided (space separated)")
 
+
+    parser.add_argument("-ft", "--force-topology", dest="force_topology", 
+                        type=str, nargs="*",
+                        help="")
+    
     parser.add_argument("-i", "--image", dest="image", 
                         type=str, 
                         help="Render tree image instead of showing it. A filename "
@@ -183,6 +199,7 @@ if __name__ == "__main__":
                         action="store_true",
                         help="""Process newick as raxml bootstrap values""")
 
+    
     args = parser.parse_args()
     draw(args)
 
