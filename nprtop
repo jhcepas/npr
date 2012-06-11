@@ -73,8 +73,6 @@ def top(waiting_time, dbfile):
                 change_status()
             if cmd == "m":
                 change_status()
-
-                
             update_top(0, 0)
         except EOFError:
             pass
@@ -86,6 +84,7 @@ def update_top(a1, a2):
     report = db.report(args.runid, args.start_entry, args.entries, args.filter_states)
     hd = ["id", "st", "type", "task", "program", "seqs", "outs", "elapsed", "start", "end"]
     mod_report = []
+   
     for r in report:
         r = list(r)
         r[11] = 0 if r[11] == "None" else r[11]
