@@ -43,7 +43,8 @@ def walk(runid):
     task_nodes.reverse()
     clade2tree = {}
     for cladeid, packtree, size in task_nodes:
-        clade2tree[cladeid] = [packtree, size]
+        if packtree:
+            clade2tree[cladeid] = [packtree, size]
     
     node = main_tree = db.decode(task_nodes[-1][1])
     visited_nodes = set()
@@ -135,9 +136,12 @@ def assembly_tree(runid):
             tree = clade_tree
             log.info("Cladeid reached!. Now descending from target node!")
             #task_nodes = [] # do not continue dumping iterations
-        else:
+        elif packtree:
             tree = db.decode(packtree)
-
+        else:
+            iternumber += 1
+            continue
+            
         if clade_content:
             if not (clade_content & set(tree.get_leaf_names())):
                 log.info("Skipping optimized node in a different branch (size: %d).", size)

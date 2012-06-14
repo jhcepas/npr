@@ -81,6 +81,7 @@ def update_top(a1, a2):
     short_date = lambda secs: time.strftime("%d %b %y, %H:%M", time.gmtime(secs))
     os.system("clear")
     print time.ctime()
+    print args.runid
     report = db.report(args.runid, args.start_entry, args.entries, args.filter_states)
     hd = ["id", "st", "type", "task", "program", "seqs", "outs", "elapsed", "start", "end"]
     mod_report = []
