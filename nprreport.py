@@ -60,8 +60,8 @@ if __name__ == "__main__":
                 if os.path.basename(fname) in prev_data:
                     continue
 
-            #ABC = "--tax /users/tg/jhuerta/ABC/seqname2tax.txt --rf-only --ref /users/tg/jhuerta/ABC/ref_tree_fungi_jaime_taxIDs.nw  --tax2name /users/tg/jhuerta/ABC/tax2name.pkl --tax2track /users/tg/jhuerta/ABC/tax2track.pkl"
-            ABC = "--tax name2tax --ref /users/tg/jhuerta/cytb_ncbi/ref_NCBI_for_2520cb.nw"
+            ABC = "--tax /users/tg/jhuerta/ABC/seqname2tax.txt --rf-only --ref /users/tg/jhuerta/ABC/ref_tree_fungi_jaime_taxIDs.nw  --tax2name /users/tg/jhuerta/ABC/tax2name.pkl --tax2track /users/tg/jhuerta/ABC/tax2track.pkl"
+            #ABC = "--tax name2tax --ref /users/tg/jhuerta/cytb_ncbi/ref_NCBI_for_2520cb.nw"
                     
             cmd = "python /users/tg/jhuerta/ncbi_taxa/ncbi_consensus.py -t %s -o %s %s" %(fname, reportfile, ABC)
             print cmd
@@ -96,7 +96,8 @@ if __name__ == "__main__":
 
                     #name, refname, subtrees, ndups, broken, broken_clades, rf, rf_med, rf_std, rf_max = map(strip, line.split("\t"))
                     name, refname, subtrees, ndups, broken, broken_clades, rf, rf_med, rf_std, rf_max = [0] * 10
-                    name, kk1, kk2, kk3, rf, rf_max, size_avg, size_min = map(strip, line.split("\t"))
+                    fields = map(strip, line.split("\t"))
+                    name, kk1, kk2, kk3, rf, rf_max, size_avg, size_min = fields[:8]
                     
                     if name.strip() == itername:
                         info["itername"] = name

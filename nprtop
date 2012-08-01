@@ -39,7 +39,7 @@ def change_status():
     if len(tid) < 6:
         print "  Error: tid must contain at least the first 6 characters"
     else:
-        report = db.report(0, -1)
+        report = db.report(args.runid, start=0, max_records=-1)
         for entry in report:
             if entry[0].startswith(tid):
                 stfile = os.path.join(args.nprdir[0], "tasks", entry[0], "__status__")
@@ -69,8 +69,6 @@ def top(waiting_time, dbfile):
         try:
             cmd = raw_input(":")
             signal.alarm(0)
-            if cmd == "m":
-                change_status()
             if cmd == "m":
                 change_status()
             update_top(0, 0)
