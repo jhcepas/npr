@@ -67,7 +67,7 @@ if __name__ == "__main__":
             print cmd
             
     else:
-        plotvalues = ["iternumber", "itername", "nseqs", "tree_seqtype",
+        plotvalues = ["iternumber", "itername", "size", "tree_seqtype",
                       "clean_alg_mean_ident", "alg_mean_ident", "subtrees", "ndups",
                       "broken_clades", "treemerger_out_match_dist",
                       "rf", "max_rf"]
