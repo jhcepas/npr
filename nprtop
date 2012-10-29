@@ -78,10 +78,10 @@ def top(waiting_time, dbfile):
 def update_top(a1, a2):
     short_date = lambda secs: time.strftime("%d %b %y, %H:%M", time.gmtime(secs))
     os.system("clear")
-    print time.ctime()
-    print args.runid
+    print "NPR execution:", color("magenta", args.runid), "started:", color("yellow", runid_date)
+    print "Current time:", time.ctime()
     report = db.report(args.runid, args.start_entry, args.entries, args.filter_states)
-    hd = ["id", "st", "type", "task", "program", "seqs", "outs", "elapsed", "start", "end"]
+    hd = ["id", "st", "task", "Task type", "Application", "size", "outs", "ex.time", "start", "end"]
     mod_report = []
    
     for r in report:
@@ -167,11 +167,10 @@ if __name__ == "__main__":
     if not os.path.isdir(args.nprdir[0]):
         raise DataError("NPR dir [%s] not found." %args.nprdir[0])
     if not os.path.exists(os.path.join(args.nprdir[0], "db.sqlite3")):
-        raise DataError("[%s] does not look an NPR directory ." %args.nprdir[0])
+        raise DataError("[%s] does not contain NPR data." %args.nprdir[0])
         
     dbfile = os.path.join(os.path.realpath(args.nprdir[0]), "db.sqlite3")
     log = get_main_log(sys.stderr)
     if not args.runid:
-        args.runid = open(os.path.join(os.path.realpath(args.nprdir[0]), "runid"), "rU").readline().strip()
-        
+        args.runid, runid_date = open(os.path.join(os.path.realpath(args.nprdir[0]), "runid"), "rU").readlines()[-1].split("\t")
     top(args.schedule_time, dbfile)
