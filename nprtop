@@ -8,14 +8,18 @@ import time
 NPRPATH = os.path.split(os.path.realpath(__file__))[0]
 sys.path.insert(0, NPRPATH)
 import signal
+from collections import defaultdict
 
 from nprlib.argparse import ArgumentParser, RawDescriptionHelpFormatter
 from nprlib import db
-from nprlib.utils import print_as_table, read_time_file, sec2time
+from nprlib.utils import print_as_table, read_time_file, sec2time, Getch, Tree, iter_prepostorder
 from nprlib.errors import DataError
 from nprlib.logger import get_main_log
 
 def color(color, string):
+    if not args.colors:
+        return string
+        
     color2code = {
         "header": '\033[95m',
         "blue": '\033[94m',
@@ -39,7 +43,8 @@ def change_status():
     if len(tid) < 6:
         print "  Error: tid must contain at least the first 6 characters"
     else:
-        report = db.report(args.runid, start=0, max_records=-1)
+        report = db.report(args.runid)
+       
         for entry in report:
             if entry[0].startswith(tid):
                 stfile = os.path.join(args.nprdir[0], "tasks", entry[0], "__status__")
@@ -62,16 +67,38 @@ def change_status():
 def top(waiting_time, dbfile):
     db.connect(dbfile)
     signal.signal(signal.SIGALRM, update_top)
-    update_top(0, 0)
+    max_entries = update_top(0, 0)
 
     while True:
         signal.alarm(waiting_time)
         try:
-            cmd = raw_input(":")
+            print ":",
+            cmd = Getch().__call__()
             signal.alarm(0)
-            if cmd == "m":
+            if cmd == "q":
+                sys.exit(0)
+            elif cmd == "m":
+                print "(M)odify entry"
                 change_status()
-            update_top(0, 0)
+            elif cmd == "n":
+                args.start_entry = min(args.start_entry + args.entries, max(0, max_entries - args.entries))
+            elif cmd == "p":
+                args.start_entry = max(0, args.start_entry - args.entries)
+            elif cmd == "f":
+                print "apply (F)ilter"
+                valid_colums =  set(["taskid", "nodeid", "parentid", "cladeid", "status", "type", "subtype", "name", "target_size", "out_size", "tm_start", "tm_end"])
+                valid_cond =  set(["==", "IN", "!=", ">=", "<=", "<", ">"])
+                col_name, cond, value = None, None, None
+                print "** Valid colums:", ", ".join(valid_colums)
+                while col_name not in valid_colums:
+                    col_name = raw_input("Column: ")
+                print "** Valid conditions: ", ", ".join(valid_cond)                    
+                while cond not in valid_cond: 
+                    cond =  raw_input("Condition: ").strip().lower()
+                value =  '"%s"' %raw_input("Value: ").strip()
+                FILTERS[col_name] = " ".join([col_name, cond, value])
+            max_entries = update_top(0, 0)
+            print max_entries
         except EOFError:
             pass
           
@@ -80,11 +107,39 @@ def update_top(a1, a2):
     os.system("clear")
     print "NPR execution:", color("magenta", args.runid), "started:", color("yellow", runid_date)
     print "Current time:", time.ctime()
-    report = db.report(args.runid, args.start_entry, args.entries, args.filter_states)
-    hd = ["id", "st", "task", "Task type", "Application", "size", "outs", "ex.time", "start", "end"]
+    print "Showing %s-%s records" %(args.start_entry, args.start_entry + args.entries)
+    report = db.report(args.runid, FILTERS.values())
+    
+    treedict = lambda: Tree()
+    id2node = defaultdict(treedict)
+    for entry in report:
+        tid = entry[0]
+        nid = entry[1]
+        pid = entry[2]
+        if pid: 
+            parent_node = id2node[pid]
+        else:
+            parent_node = None
+        task_node = id2node[tid]
+        task_node.record = entry
+        task_node.name = tid
+        if parent_node and pid != tid:
+            parent_node.add_child(task_node)
+    for node in id2node.values():
+        if node.up is None:
+            indent = 0
+            for postorder, n in iter_prepostorder(node):
+                if not postorder:
+                    #print " "*indent + str(n.record[5:10])
+                    indent += 1
+                else:
+                    indent -= 1
+    #raw_input("Done")
+    
+    hd = ["t.id", "st", "t.type", "t.subtype", "t.name", "size", "outs", "ex.time", "start", "end"]
     mod_report = []
    
-    for r in report:
+    for r in report[args.start_entry:args.start_entry + args.entries]:
         r = list(r)
         r[11] = 0 if r[11] == "None" else r[11]
         r[12] = 0 if r[12] == "None" else r[12]
@@ -104,20 +159,20 @@ def update_top(a1, a2):
         r[11] = short_date(r[11])
         r[12] = short_date(r[12])
 
-        if args.colors:
-            if r[4] == "E":
-                r[4] = color("green", r[4])
-            elif r[4] == "W":
-                r[4] = color("yellow", r[4])
-            elif r[4] == "R":
-                r[4] = color("orange", r[4])
-            elif r[4] == "D":
-                r[4] = color("blue", r[4])
+
+        if r[4] == "E":
+            r[4] = color("green", r[4])
+        elif r[4] == "W":
+            r[4] = color("yellow", r[4])
+        elif r[4] == "R":
+            r[4] = color("orange", r[4])
+        elif r[4] == "D":
+            r[4] = color("blue", r[4])
                 
         mod_report.append(r)
 
     print_as_table(mod_report, fields=[0, 4, 5, 6, 7, 8, 9, 10, 11, 12], header=hd )
-
+    return len(report)
 __DESCRIPTION__ = "Monitors NPR process execution."
         
 if __name__ == "__main__":
@@ -136,22 +191,22 @@ if __name__ == "__main__":
     # dest - The name of the attribute to be added to the object returned by parse_args().
    
     parser.add_argument("-t", "--schedule-time", dest="schedule_time", 
-                        type=int, default=2,
+                        type=int, default=5,
                         help="""Schedule time in seconds. """)
   
     parser.add_argument('nprdir', metavar='npr_base_dir', type=str, nargs=1,
                    help='path to an NPR execution directory')
 
-    parser.add_argument("-c", dest="colors", 
-                        action="store_true", 
-                        help="""Color interface""")
+    parser.add_argument("-C", dest="colors", 
+                        action="store_false", 
+                        help="""Disable colors""")
 
     parser.add_argument("-n", dest="entries", 
                         type=int, default=40,
                         help="""Number of entries (rows) to show.""")
 
     parser.add_argument("-s", dest="start_entry", 
-                        type=int, default=-40,
+                        type=int, default=0,
                         help="""starting point to show DB entries.""")
 
     parser.add_argument("-f", dest="filter_states", 
@@ -172,5 +227,9 @@ if __name__ == "__main__":
     dbfile = os.path.join(os.path.realpath(args.nprdir[0]), "db.sqlite3")
     log = get_main_log(sys.stderr)
     if not args.runid:
-        args.runid, runid_date = open(os.path.join(os.path.realpath(args.nprdir[0]), "runid"), "rU").readlines()[-1].split("\t")
+        args.runid, runid_date = open(os.path.join(os.path.realpath(args.nprdir[0]), "runid"), "rU").readlines()[0].split("\t")
+    if args.filter_states:
+        FILTERS = {"status": "status IN (%s)" %",".join(map(lambda x: '"%s"'%x, args.filter_states))}
+    else:
+        FILTERS = {}
     top(args.schedule_time, dbfile)
