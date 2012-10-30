@@ -12,6 +12,7 @@ from nprlib.argparse import ArgumentParser, RawDescriptionHelpFormatter
 from nprlib import db
 from nprlib.errors import DataError
 from nprlib.logger import get_main_log
+from nprlib.utils import Tree
 
 def iter_prepostorder(tree):
     finished_nodes = set()
@@ -111,6 +112,7 @@ def dump(dumpiter, target, tree):
         print >>OUT, "\t".join([k, str(getattr(target, k))])
     OUT.close()
     tree.write(features=[], outfile=base_fname+".nhx")
+    tree.write(outfile=base_fname+".nw")
 
             
 def assembly_tree(runid):
@@ -147,7 +149,7 @@ def assembly_tree(runid):
                 log.info("Skipping optimized node in a different branch (size: %d).", size)
                 continue
 
-        log.info("Dumping iteration %s, size of optimized node: %d", iternumber, size)
+
         #print tree.dist
         # Restore original gene names
         for leaf in tree.iter_leaves():
@@ -169,6 +171,13 @@ def assembly_tree(runid):
             print >>OUT, "\t".join([k, str(getattr(tree, k))])
         OUT.close()
         main_tree.write(features=[], outfile=base_fname+".nhx")
+        main_tree.write(outfile=base_fname+".nw")
+        if FINAL_TREE:
+            main_tree.set_outgroup(REF_OUT)
+            dist = FINAL_TREE.robinson_foulds(main_tree)[:2]
+            log.info("Dumped iteration % 3d, size of optimized node: % 4d (dist to final tree=%s)", iternumber, size, dist)
+        else: 
+            log.info("Dumped iteration %s, size of optimized node: %d", iternumber, size)            
         iternumber += 1
 
     return main_tree
@@ -183,10 +192,6 @@ if __name__ == "__main__":
  
     parser.add_argument('nprdir', metavar='npr_base_dir', type=str, nargs=1,
                    help='path to an NPR execution directory')
-
-    parser.add_argument("-c", dest="colors", 
-                        action="store_true", 
-                        help="""Color interface""")
 
     parser.add_argument("-r", dest="runid", 
                         type=str,
@@ -211,17 +216,18 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
         
+    args = parser.parse_args()
     if not os.path.isdir(args.nprdir[0]):
         raise DataError("NPR dir [%s] not found." %args.nprdir[0])
-        
     if not os.path.exists(os.path.join(args.nprdir[0], "db.sqlite3")):
-        raise DataError("[%s] does not look an NPR directory ." %args.nprdir[0])
+        raise DataError("[%s] does not contain NPR data." %args.nprdir[0])
+      
 
     base_dir = os.path.realpath(args.nprdir[0])
     dbfile = os.path.join(base_dir, "db.sqlite3")
     db.connect(dbfile)
     if not args.runid:
-        args.runid = open(os.path.join(base_dir, "runid"), "rU").readline().strip()
+        args.runid = open(os.path.join(base_dir, "runid"), "rU").readline().split("\t")[0].strip()
 
     if args.cladeid: 
         file_label = "nprdump_cid_%s_runid_%s" %(args.cladeid, args.runid[:8])
@@ -241,12 +247,15 @@ if __name__ == "__main__":
     except OSError, e:
         log.warning(e)
 
-
     if args.assembly:
+        final_tree_path = os.path.join(os.path.realpath(args.nprdir[0]), "final_tree.nw")
+        if os.path.exists(final_tree_path):
+            FINAL_TREE = Tree(final_tree_path)
+            REF_OUT = FINAL_TREE.get_leaf_names()[0]
+            FINAL_TREE.set_outgroup(REF_OUT)
+        else:
+            REF_OUT = None
+            FINAL_TREE = None
         main_tree = assembly_tree(args.runid)
-        from nprlib.utils import Tree
-        dist = main_tree.robinson_foulds(Tree(os.path.join(os.path.realpath(args.nprdir[0]), "final_tree.nw")))[:2]
-        log.info("Distance with final tree: %s", str(dist))
     elif args.branch_assembly:
-        print args.runid
         walk(args.runid)       
