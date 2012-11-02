@@ -172,14 +172,14 @@ def assembly_tree(runid):
         OUT.close()
         main_tree.write(features=[], outfile=base_fname+".nhx")
         main_tree.write(outfile=base_fname+".nw")
-        if FINAL_TREE:
+        if REF_TREE:
             cmp_tree = main_tree.copy() # do not change main tree topology
             if len(REF_OUT) == 1:
                 cmp_tree.set_outgroup(REF_OUT[0])
             else:
                 common = cmp_tree.get_common_ancestor(REF_OUT)
                 cmp_tree.set_outgroup(common)
-            dist = FINAL_TREE.robinson_foulds(cmp_tree)[:2]
+            dist = REF_TREE.robinson_foulds(cmp_tree)[:2]
             log.info("Dumped iteration % 3d, size of optimized node: % 4d (dist to final tree=%s)", iternumber, size, dist)
         else: 
             log.info("Dumped iteration %s, size of optimized node: %d", iternumber, size)            
@@ -223,7 +223,10 @@ if __name__ == "__main__":
                         "provided sequence/species name. You can refer " 
                         "to common ancestor nodes by providing several " 
                         "species names: i.e. --root human,mouse ")
-    
+
+    parser.add_argument("--ref", dest="reftree", type=str,
+                        help="Compare topology of iteration trees with"
+                        " a reference topology")
     
     args = parser.parse_args()
         
@@ -238,7 +241,11 @@ if __name__ == "__main__":
     dbfile = os.path.join(base_dir, "db.sqlite3")
     db.connect(dbfile)
     if not args.runid:
-        args.runid = open(os.path.join(base_dir, "runid"), "rU").readlines()[-1].split("\t")[0].strip()
+        lines = open(os.path.join(base_dir, "runid"), "rU").readlines()
+        selected_runid = lines[-1]
+        print ''.join(lines)
+        print "**", selected_runid
+        args.runid = selected_runid.split("\t")[0].strip()
 
     if args.cladeid: 
         file_label = "nprdump_cid_%s_runid_%s" %(args.cladeid, args.runid[:8])
@@ -263,17 +270,26 @@ if __name__ == "__main__":
                       
     if args.assembly:
         final_tree_path = os.path.join(os.path.realpath(args.nprdir[0]), "final_tree.nw")
-        if os.path.exists(final_tree_path):
-            FINAL_TREE = Tree(final_tree_path)
+        if not args.reftree and os.path.exists(final_tree_path):
+            REF_TREE = Tree(final_tree_path)
             if not args.root: 
-                REF_OUT = [FINAL_TREE.get_leaf_names()[0]]
+                REF_OUT = [REF_TREE.get_leaf_names()[0]]
             if len(REF_OUT) == 1:
-                FINAL_TREE.set_outgroup(REF_OUT[0])
+                REF_TREE.set_outgroup(REF_OUT[0])
             else:
-                common = FINAL_TREE.get_common_ancestor(REF_OUT)
-                FINAL_TREE.set_outgroup(common)
+                common = REF_TREE.get_common_ancestor(REF_OUT)
+                REF_TREE.set_outgroup(common)
+        elif args.reftree:
+            REF_TREE = Tree(args.reftree)
+            if not args.root: 
+                REF_OUT = [REF_TREE.get_leaf_names()[0]]
+            if len(REF_OUT) == 1:
+                REF_TREE.set_outgroup(REF_OUT[0])
+            else:
+                common = REF_TREE.get_common_ancestor(REF_OUT)
+                REF_TREE.set_outgroup(common)
         else:
-            FINAL_TREE = None
+            REF_TREE = None
         main_tree = assembly_tree(args.runid)
 
     elif args.branch_assembly:
