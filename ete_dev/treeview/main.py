@@ -7,7 +7,17 @@ from sys import stderr
 from PyQt4.QtGui import *
 from PyQt4 import QtCore
 
-from svg_colors import SVG_COLORS
+from svg_colors import SVG_COLORS, COLOR_SCHEMES
+
+import time
+def tracktime(f):
+    def a_wrapper_accepting_arguments(*args, **kargs):
+        t1 = time.time()
+        r = f(*args, **kargs)
+        print "                         -> TIME:", f.func_name, time.time() - t1
+        return r
+    return a_wrapper_accepting_arguments
+
 
 _LINE_TYPE_CHECKER = lambda x: x in (0,1,2)
 _SIZE_CHECKER = lambda x: isinstance(x, int)
@@ -18,7 +28,7 @@ _BOOL_CHECKER =  lambda x: isinstance(x, bool) or x in (0,1)
 
 FACE_POSITIONS = set(["branch-right", "branch-top", "branch-bottom", "float", "float-behind", "aligned"])
 
-__all__  = ["NodeStyle", "TreeStyle", "FaceContainer", "_leaf", "add_face_to_node"]
+__all__  = ["NodeStyle", "TreeStyle", "FaceContainer", "_leaf", "add_face_to_node", "COLOR_SCHEMES"]
 
 NODE_STYLE_DEFAULT = [
     ["fgcolor",          "#0030c1",    _COLOR_CHECKER                           ],
@@ -74,7 +84,7 @@ class _Background(object):
     """
     def __init__(self):
         self.color = None
-
+        
     def apply(self, item):
         if self.color: 
             r = item.boundingRect()
@@ -204,119 +214,145 @@ class TreeStyle(object):
 
     Contains all the general image properties used to render a tree
 
-    **TREE SHAPE AND IMAGE DESIGN**
-        
-    :var "r" mode: Valid modes are 'c'(ircular)  or 'r'(ectangular).
+    **-- About tree design --**
 
-    :var "False" allow_face_overlap: This option applies only for
-      circular mode. It prevents aligned faces to overlap each other
-      by increasing the radius of the circular tree. In very large
-      trees, this may produce huge image representations. By setting
-      this option to *True*, you will obtain smaller images in which
-      aligned faces (typically node names) may overlap. 
-
-    :var None layout_fn: Layout function used to dynamically control
+    :param None layout_fn: Layout function used to dynamically control
       the aspect of nodes. Valid values are: None or a pointer to a method,
       function, etc.
-                   
-    :var 0 orientation: If 0, tree is drawn from left-to-right. If
+    
+    **-- About tree shape --**
+        
+    :param "r" mode: Valid modes are 'c'(ircular)  or 'r'(ectangular).
+
+    :param 0 orientation: If 0, tree is drawn from left-to-right. If
        1, tree is drawn from right-to-left. This property only makes
        sense when "r" mode is used.
     
-    :var 0 rotation: Tree figure will be rotate X degrees (clock-wise rotation)
-
-    :var None scale: Scale used to convert branch lengths to
-      pixels. If 'None', the scale will be calculated using the
-      "tree_width" attribute (read bellow)
-
-
-    :var 200 tree_width: Total width, in pixels, that tree
-      branches are allowed to used. This is, the distance in
-      pixels from root to the most distant leaf. If set, this
-      value will be used to automatically calculate the branch
-      scale.  In practice, increasing this number will cause an
-      X-zoom in.
-
-    :var 1 min_leaf_separation: Min separation, in pixels, between
+    :param 0 rotation: Tree figure will be rotate X degrees (clock-wise
+       rotation).
+    
+    :param 1 min_leaf_separation: Min separation, in pixels, between
       two adjacent branches
 
-    :var 0 branch_vertical_margin: Leaf branch separation margin,
-      in pixels. This will add a separation of X pixels between
-      adjacent leaf branches. In practice this produces a Y-zoom
-      in.
+    :param 0 branch_vertical_margin: Leaf branch separation margin, in
+      pixels. This will add a separation of X pixels between adjacent
+      leaf branches. In practice, increasing this value work as
+      increasing Y axis scale.
 
-    :var 0 arc_start: When circular trees are drawn, this defines
-      the starting angle (in degrees) from which leaves are
-      distributed (clock-wise) around the total arc. 0 = 3 o'clock
+    :param 0 arc_start: When circular trees are drawn, this defines the
+      starting angle (in degrees) from which leaves are distributed
+      (clock-wise) around the total arc span (0 = 3 o'clock).
 
-    :var 360 arc_span: Total arc used to draw circular trees (in
-      degrees)
+    :param 359 arc_span: Total arc used to draw circular trees (in
+      degrees).
 
-    :var 0 margin_left: Left tree image margin, in pixels
-    :var 0 margin_right: Right tree image margin, in pixels
-    :var 0 margin_top: Top tree image margin, in pixels
-    :var 0 margin_bottom: Bottom tree image margin, in pixels
+    :param 0 margin_left: Left tree image margin, in pixels.
+    :param 0 margin_right: Right tree image margin, in pixels.
+    :param 0 margin_top: Top tree image margin, in pixels.
+    :param 0 margin_bottom: Bottom tree image margin, in pixels.
 
-    **TREE BRANCHES**
+    **-- About Tree branches --**
 
-    :var True complete_branch_lines_when_necessary: True or False.
-      When top-branch and bottom-branch faces are larger than
-      branch length, branch line can be completed. Also, when
-      circular trees are drawn
-    :var 2 extra_branch_line_type:  0 solid, 1 dashed, 2 dotted
-    :var "gray" extra_branch_line_color": RGB code or name in
+    :param None scale: Scale used to draw branch lengths. If None, it will 
+      be automatically calculated. 
+
+    :param "mid" optimal_scale_level: Two levels of automatic branch
+      scale detection are available: :attr:`"mid"` and
+      :attr:`"full"`. In :attr:`full` mode, branch scale will me
+      adjusted to fully avoid dotted lines in the tree image. In other
+      words, scale will be increased until the extra space necessary
+      to allocated all branch-top/bottom faces and branch-right faces
+      (in circular mode) is covered by real branches. Note, however,
+      that the optimal scale in trees with very unbalanced branch
+      lengths might be huge. If :attr:`"mid"` mode is selected (as it is by default),
+      optimal scale will only satisfy the space necessary to allocate
+      branch-right faces in circular trees. Some dotted lines
+      (artificial branch offsets) will still appear when
+      branch-top/bottom faces are larger than branch length. Note that
+      both options apply only when :attr:`scale` is set to None
+      (automatic).
+
+    :param 0.25 root_opening_factor: (from 0 to 1). It defines how much the center of
+      a circular tree could be opened when adjusting optimal scale, referred
+      to the total tree length. By default (0.25), a blank space up to 4
+      times smaller than the tree width could be used to calculate the
+      optimal tree scale. A 0 value would mean that root node should
+      always be tightly adjusted to the center of the tree.
+    
+    :param True complete_branch_lines_when_necessary: True or False.
+      Draws an extra line (dotted by default) to complete branch lengths when the space to cover is larger than the branch itself.
+        
+    :param 2 extra_branch_line_type:  0=solid, 1=dashed, 2=dotted
+    
+    :param "gray" extra_branch_line_color": RGB code or name in
       :data:`SVG_COLORS`
     
-    :var False force_topology: Convert tree branches to a fixed length, thus allowing to
+    :param False force_topology: Convert tree branches to a fixed length, thus allowing to
       observe the topology of tight nodes
 
-
-    :var True draw_guiding_lines: Draw guidelines from leaf nodes
+    :param True draw_guiding_lines: Draw guidelines from leaf nodes
       to aligned faces
     
-    :var 2 guiding_lines_type: 0 solid, 1 dashed, 2 dotted
-    :var "gray" guiding_lines_color: RGB code or name in :data:`SVG_COLORS` 
+    :param 2 guiding_lines_type: 0=solid, 1=dashed, 2=dotted.
+    
+    :param "gray" guiding_lines_color: RGB code or name in :data:`SVG_COLORS` 
 
-    **FACES**
+    **-- About node faces --**
 
-    :var True draw_aligned_faces_as_table: Aligned faces will be
+    :param False allow_face_overlap: If True, node faces are not taken
+      into account to scale circular tree images, just like many other
+      visualization programs. Overlapping among branch elements (such
+      as node labels) will be therefore ignored, and tree size
+      will be a lot smaller. Note that in most cases, manual setting
+      of tree scale will be also necessary.
+    
+    :param True draw_aligned_faces_as_table: Aligned faces will be
       drawn as a table, considering all columns in all node faces.
 
-    :var True children_faces_on_top: When floating faces from
+    :param True children_faces_on_top: When floating faces from
       different nodes overlap, children faces are drawn on top of
       parent faces. This can be reversed by setting this attribute
       to false.
 
-    **Addons**
+    **-- Addons --**
 
-    :var False show_border: Draw a border around the whole tree
+    :param False show_border: Draw a border around the whole tree
 
-    :var True show_scale: Include the scale legend in the tree
+    :param True show_scale: Include the scale legend in the tree
       image
 
-    :var False show_leaf_name: Automatically adds a text Face to
+    :param False show_leaf_name: Automatically adds a text Face to
       leaf nodes showing their names
 
-    :var False show_branch_length: Automatically adds branch
+    :param False show_branch_length: Automatically adds branch
       length information on top of branches
 
-    :var False show_branch_support: Automatically adds branch
+    :param False show_branch_support: Automatically adds branch
       support text in the bottom of tree branches
 
-    Initialize aligned face headers
+    **-- Tree surroundings --**
+    
+    The following options are actually Face containers, so graphical
+    elements can be added just as it is done with nodes. In example,
+    to add tree legend:
+    
+       ::
 
-    :var aligned_header: a :class:`FaceContainer` aligned to the end
+          TreeStyle.legend.add_face(CircleFace(10, "red"), column=0)
+          TreeStyle.legend.add_face(TextFace("0.5 support"), column=1)
+    
+    :param aligned_header: a :class:`FaceContainer` aligned to the end
       of the tree and placed at the top part.
 
-    :var aligned_foot: a :class:`FaceContainer` aligned to the end
+    :param aligned_foot: a :class:`FaceContainer` aligned to the end
       of the tree and placed at the bottom part.
 
-    :var legend: a :class:`FaceContainer` with an arbitrary number of faces
+    :param legend: a :class:`FaceContainer` with an arbitrary number of faces
       representing the legend of the figure. 
-    :var 4 legend_position=4: TopLeft corner if 1, TopRight
+    :param 4 legend_position=4: TopLeft corner if 1, TopRight
       if 2, BottomLeft if 3, BottomRight if 4
     
-    :var title: A Face container that can be used as tree title
+    :param title: A Face container that can be used as tree title
 
     """
    
@@ -367,17 +403,16 @@ class TreeStyle(object):
         self.rotation = 0 
        
         # Scale used to convert branch lengths to pixels. If 'None',
-        # the scale will be calculated using the "tree_width"
-        # attribute (read bellow)
+        # the scale will be automatically calculated.
         self.scale = None
 
-        # Total width, in pixels, that tree branches are allowed to
-        # used. This is, the distance in pixels from root to the most
-        # distant leaf. If set, this value will be used to
-        # automatically calculate the branch scale.  In practice,
-        # increasing this number will cause an X-zoom in.
-        self.tree_width = None
-
+        # How much the center of a circular tree can be opened,
+        # referred to the total tree length.
+        self.root_opening_factor = 0.25
+            
+        # mid, or full
+        self.optimal_scale_level = "mid" 
+        
         # Min separation, in pixels, between to adjacent branches
         self.min_leaf_separation = 1 
 
@@ -392,7 +427,7 @@ class TreeStyle(object):
         self.arc_start = 0 
 
         # Total arc used to draw circular trees (in degrees)
-        self.arc_span = 360
+        self.arc_span = 359
 
         # Margins around tree picture
         self.margin_left = 1
@@ -467,6 +502,7 @@ class TreeStyle(object):
         
         self.__closed__ = 1
 
+
     def __setattr__(self, attr, val):
         if hasattr(self, attr) or not getattr(self, "__closed__", 0):
             if TREE_STYLE_CHECKER.get(attr, lambda x: True)(val):
@@ -532,7 +568,7 @@ def add_face_to_node(face, node, column, aligned=False, position="branch-right")
     if getattr(node, "_temp_faces", None):
         getattr(node._temp_faces, position).add_face(face, column)
     else:
-        raise Exception("This function can only be called within a layout function. Use node.add_face() instead")
+         raise Exception("This function can only be called within a layout function. Use node.add_face() instead")
 
 def random_color(h=None, l=None, s=None):
     def rgb2hex(rgb):
@@ -652,7 +688,7 @@ def save(scene, imgName, w=None, h=None, dpi=300,\
         pp.setRenderHint(QPainter.Antialiasing)
         pp.setRenderHint(QPainter.TextAntialiasing)
         pp.setRenderHint(QPainter.SmoothPixmapTransform)
+
         scene.render(pp, targetRect, scene.sceneRect(), ratio_mode)
         pp.end()
         ii.save(imgName)
-

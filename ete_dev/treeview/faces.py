@@ -1,30 +1,17 @@
 #START_LICENSE###########################################################
-#
-# Copyright (C) 2009 by Jaime Huerta Cepas. All rights reserved.
-# email: jhcepas@gmail.com
-#
-# This file is part of the Environment for Tree Exploration program (ETE).
-# http://ete.cgenomics.org
-#
-# ETE is free software: you can redistribute it and/or modify it
-# under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# ETE is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with ETE.  If not, see <http://www.gnu.org/licenses/>.
-#
-# #END_LICENSE#############################################################
+#END_LICENSE#############################################################
 
-from PyQt4 import QtCore, QtGui
+from PyQt4.QtGui import (QGraphicsRectItem, QGraphicsLineItem,
+                         QGraphicsPolygonItem, QGraphicsEllipseItem,
+                         QPen, QColor, QBrush, QPolygonF, QFont,
+                         QPixmap, QFontMetrics, QPainter,
+                         QRadialGradient, QGraphicsSimpleTextItem,
+                         QGraphicsItem)
+from PyQt4.QtCore import Qt,  QPointF, QRect, QRectF
+
 from numpy import isfinite as _isfinite, ceil
-
-from main import add_face_to_node, _Background, _Border
+import math
+from main import add_face_to_node, _Background, _Border, COLOR_SCHEMES
 
 isfinite = lambda n: n and _isfinite(n)
 
@@ -111,20 +98,13 @@ _ntbgcolors = {
 __all__ = ["Face", "TextFace", "AttrFace", "ImgFace",
            "ProfileFace", "SequenceFace", "TreeFace",
            "RandomFace", "DynamicItemFace", "StaticItemFace",
-           "CircleFace", "PieChartFace", "BarChartFace", "SeqFace"]
+           "CircleFace", "PieChartFace", "BarChartFace", "SeqMotifFace"]
 
 class Face(object):
-    """ 
-    Standard definition of a Face node object.
+    """Base Face object. All Face types (i.e. TextFace, SeqMotifFace,
+    etc.) inherit the following options:
 
-    This class is not functional and it should only be used to create
-    other face objects. By inheriting this class, you set all the
-    essential attributes, however the update_pixmap() function is
-    required to be reimplemented for convenience.
-
-    User adjustable properties: 
-
-    :param 0 margin_left: in pixels 
+    :param 0 margin_left: in pixels
     :param 0 margin_right: in pixels
     :param 0 margin_top: in pixels
     :param 0 margin_bottom: in pixels 
@@ -133,26 +113,24 @@ class Face(object):
       (i.e. when circular mode is enabled and face occupies an inverted position.)
     :param 0 hz_align: 0 left, 1 center, 2 right
     :param 1 vt_align: 0 top, 1 center, 2 bottom
-    :param background: background of face plus its margins
-    :param inner_background: background of the face
+    :param background.color: background color of face plus all its margins.
+    :param inner_background.color: background color of the face excluding margins
+    :param border: Border around face margins.
+    :param inner_border: Border around face excluding margins.
+    
+    **border and inner_border sub-parameters:**
+    
+    :param 0 (inner\_)border.type: 0=solid, 1=dashed, 2=dotted
+    :param None (inner\_)border.width: a positive integer number. Zero
+                             indicates a cosmetic pen. This means that
+                             the pen width is always drawn one pixel
+                             wide, independent of the transformation
+                             set on the painter. A "None" value means
+                             invisible border.
+    :param black (inner\_)border.color: RGB or color name in :data:`SVG_COLORS`
 
-    :param None border: Border around face margins. Integer number
-                        representing the width of the face border line
-                        in pixels.  A line width of zero indicates a
-                        cosmetic pen. This means that the pen width is
-                        always drawn one pixel wide, independent of
-                        the transformation set on the painter. A
-                        "None" value means invisible border.
-
-    :param None inner_border: Border around face . Integer number
-                              representing the width of the face
-                              border line in pixels.  A line width of
-                              zero indicates a cosmetic pen. This
-                              means that the pen width is always drawn
-                              one pixel wide, independent of the
-                              transformation set on the painter. A
-                              "None" value means invisible border.
-
+    See also specific options for each face type.
+    
     """
 
     def __init__(self):
@@ -192,60 +170,102 @@ class Face(object):
             return 0
 
     def load_pixmap_from_file(self, filename):
-        self.pixmap = QtGui.QPixmap(filename)
+        self.pixmap = QPixmap(filename)
 
     def update_pixmap(self):
         pass
-
+     
+        
 class TextFace(Face):
-    """ 
-    Static text Face object
+    """Static text Face object
 
     .. currentmodule:: ete_dev
     
-    :argument text:     Text to be drawn
-    :argument ftype:    Font type, e.g. Arial, Verdana, Courier
-    :argument fsize:    Font size, e.g. 10,12,6, (default=10)
-    :argument fgcolor:  Foreground font color. RGB code or name in :data:`SVG_COLORS` 
-    :argument penwidth: Penwdith used to draw the text.
-    :argument fstyle: "normal" or "italic" 
+    :param text:     Text to be drawn
+    :param ftype:    Font type, e.g. Arial, Verdana, Courier
+    :param fsize:    Font size, e.g. 10,12,6, (default=10)
+    :param fgcolor:  Foreground font color. RGB code or color name in :data:`SVG_COLORS` 
+    :param penwidth: Penwdith used to draw the text.
+    :param fstyle: "normal" or "italic"
+    
+    :param True tight_text: When False, boundaries of the text are
+    approximated according to general font metrics, producing slightly
+    worse aligned text faces but improving the performance of tree
+    visualization in scenes with a lot of text faces.
     """
-
-    def __init__(self, text, ftype="Verdana", fsize=10, fgcolor="#000000", penwidth=0, fstyle="normal"):
-
+        
+    def _load_bounding_rect(self, txt=None):
+        if txt is None:
+            txt= self.get_text()
+        fm = QFontMetrics(self._get_font())
+        tx_w = fm.width(txt)
+        if self.tight_text:
+            textr = fm.tightBoundingRect(self.get_text())
+            down = textr.height() + textr.y()
+            up = textr.height() - down
+            asc = fm.ascent()
+            des = fm.descent()
+            center = (asc + des) / 2.0
+            xcenter = ((up+down)/2.0) + asc - up
+            self._bounding_rect = QRectF(0, asc - up, tx_w, textr.height())
+            self._real_rect = QRectF(0, 0, tx_w, textr.height())
+        else:
+            textr = fm.boundingRect(txt)
+            self._bounding_rect = QRectF(0, 0, tx_w, textr.height())
+            self._real_rect = QRectF(0, 0, tx_w, textr.height())
+            
+    def _get_text(self):
+        return self._text
+        
+    def _set_text(self, txt):
+        self._text = txt
+        
+    def get_bounding_rect(self):
+        if not self._bounding_rect:
+            self._load_bounding_rect()
+        return self._bounding_rect
+        
+    def get_real_rect(self):
+        if not self._real_rect:
+            self._load_bounding_rect()
+        return self._bounding_rect
+        
+    text = property(_get_text, _set_text)
+    def __init__(self, text, ftype="Verdana", fsize=10,
+                 fgcolor="black", penwidth=0, fstyle="normal",
+                 tight_text=True):
+        self._text = ""
+        self._bounding_rect = None
+        self._real_rect = None
+        
         Face.__init__(self)
-
         self.pixmap = None
         self.type = "text"
-
-        self.text = str(text)
         self.fgcolor = fgcolor
         self.ftype = ftype 
         self.fsize = fsize
         self.fstyle = fstyle
         self.penwidth = penwidth
+        self.tight_text = tight_text
+        if text:
+            self.text = text
 
     def _get_font(self):
-        font = QtGui.QFont(self.ftype, self.fsize)
+        font = QFont(self.ftype, self.fsize)
         if self.fstyle == "italic":
-            font.setStyle(QtGui.QFont.StyleItalic)
+            font.setStyle(QFont.StyleItalic)
         elif self.fstyle == "oblique":
-            font.setStyle(QtGui.QFont.StyleOblique)
+            font.setStyle(QFont.StyleOblique)
         return font
 
     def _height(self):
-        fm = QtGui.QFontMetrics(self._get_font())
-        h =  fm.boundingRect(QtCore.QRect(), \
-                                 QtCore.Qt.AlignLeft, \
-                                 self.get_text()).height()
-        return h
+        return self.get_bounding_rect().height()
 
     def _width(self):
-        fm = QtGui.QFontMetrics(self._get_font())
-        return fm.size(QtCore.Qt.AlignTop, self.get_text()).width()
+        return self.get_bounding_rect().width()
 
     def get_text(self):
-        return self.text
+        return self._text
 
 class AttrFace(TextFace):
     """ 
@@ -253,64 +273,99 @@ class AttrFace(TextFace):
     Dynamic text Face. Text rendered is taken from the value of a
     given node attribute.
 
-    :argument attr:     Node's attribute that will be drawn as text
-    :argument ftype:    Font type, e.g. Arial, Verdana, Courier, (default="Verdana")
-    :argument fsize:    Font size, e.g. 10,12,6, (default=10)
-    :argument fgcolor:  Foreground font color. RGB code or name in :data:`SVG_COLORS` 
-    :argument penwidth: Penwdith used to draw the text. (default is 0)
-    :argument text_prefix: text_rendered before attribute value
-    :argument text_suffix: text_rendered after attribute value
-    :argument formatter: a text string defining a python formater to
+    :param attr:     Node's attribute that will be drawn as text
+    :param ftype:    Font type, e.g. Arial, Verdana, Courier, (default="Verdana")
+    :param fsize:    Font size, e.g. 10,12,6, (default=10)
+    :param fgcolor:  Foreground font color. RGB code or name in :data:`SVG_COLORS` 
+    :param penwidth: Penwdith used to draw the text. (default is 0)
+    :param text_prefix: text_rendered before attribute value
+    :param text_suffix: text_rendered after attribute value
+    :param formatter: a text string defining a python formater to
       process the attribute value before renderer. e.g. "%0.2f"
-    :argument fstyle: "normal" or "italic" 
+    :param fstyle: "normal" or "italic" 
     """
-
-    def __init__(self, attr, ftype="Verdana", fsize=10, fgcolor="#000000", \
-                     penwidth=0, text_prefix="", text_suffix="", formatter=None, fstyle="normal"):
-        Face.__init__(self)
-        TextFace.__init__(self, "", ftype, fsize, fgcolor, penwidth, fstyle)
-        self.attr     = attr
-        self.type     = "text"
-        self.text_prefix = text_prefix
-        self.text_suffix = text_suffix
-        self.attr_formatter = formatter
-
+   
     def get_text(self):
         if self.attr_formatter:
             text = self.attr_formatter % getattr(self.node, self.attr)
         else:
             text = str(getattr(self.node, self.attr))
-        return ''.join(map(str, [self.text_prefix, \
+        text = ''.join(map(str, [self.text_prefix, \
                                      text, \
                                      self.text_suffix]))
+        return text
+        
+    def get_bounding_rect(self):
+        current_text = self.get_text()
+        if current_text != self._bounding_rect_text:
+            self._load_bounding_rect(current_text)
+            self._bounding_rect_text = current_text
+        return self._bounding_rect
 
+    def get_real_rect(self):
+        current_text = self.get_text()
+        if current_text != self._bounding_rect_text:
+            self._load_bounding_rect(current_text)
+            self._bounding_rect_text = current_text
+        return self._real_rect
+    
+    def __init__(self, attr, ftype="Verdana", fsize=10,
+                 fgcolor="black", penwidth=0, text_prefix="",
+                 text_suffix="", formatter=None, fstyle="normal",
+                 tight_text=True):
+        
+        Face.__init__(self)
+        TextFace.__init__(self, None, ftype, fsize, fgcolor, penwidth,
+                          fstyle, tight_text)
+        self.attr = attr
+        self.type  = "text"
+        self.text_prefix = text_prefix
+        self.text_suffix = text_suffix
+        self.attr_formatter = formatter
+        self._bounding_rect_text = ""
+        
 class ImgFace(Face):
-    """ 
-    Creates a new image face object.
+    """Creates a node Face using an external image file.
 
-    :argument img_file: Image file in png,jpg,bmp format
+    :param img_file: path to the image file. 
+    :param None width: if provided, image will be scaled to this width (in pixels)
+    :param None height: if provided, image will be scaled to this height (in pixels)
+
+    If only one dimension value (width or height) is provided, the other
+    will be calculated to keep aspect ratio. 
 
     """
-    def __init__(self,img_file):
+    
+    def __init__(self, img_file, width=None, height=None):
         Face.__init__(self)
         self.img_file = img_file
-
+        self.width = width
+        self.height = height
+        
     def update_pixmap(self):
-        self.load_pixmap_from_file(self.img_file)
-
+        self.pixmap = QPixmap(self.img_file)
+        
+        if self.width or self.height:
+            w, h = self.width, self.height
+            ratio = self.pixmap.width() / float(self.pixmap.height())
+            if not w:
+                w = ratio * h
+            if not h:
+                h = w  / ratio
+            self.pixmap = self.pixmap.scaled(w, h)
 
 class ProfileFace(Face):
     """ 
     A profile Face for ClusterNodes 
 
-    :argument max_v: maximum value used to build the build the plot scale.
-    :argument max_v: minimum value used to build the build the plot scale.
-    :argument center_v: Center value used to scale plot and heatmap.
-    :argument 200 width:  Plot width in pixels. 
-    :argument 40 height: Plot width in pixels. 
-    :argument lines style: Plot style: "lines", "bars", "cbars" or "heatmap".
+    :param max_v: maximum value used to build the build the plot scale.
+    :param max_v: minimum value used to build the build the plot scale.
+    :param center_v: Center value used to scale plot and heatmap.
+    :param 200 width:  Plot width in pixels. 
+    :param 40 height: Plot width in pixels. 
+    :param lines style: Plot style: "lines", "bars", "cbars" or "heatmap".
 
-    :argument 2 colorscheme: colors used to create the gradient from
+    :param 2 colorscheme: colors used to create the gradient from
       min values to max values. 0=green & blue; 1=green & red; 2=red &
       blue. In all three cases, missing values are rendered in black
       and transition color (values=center) is white.
@@ -342,51 +397,51 @@ class ProfileFace(Face):
         if self.colorscheme == 0:
             # Blue and Green
             for a in xrange(100,0,-1):
-                color=QtGui.QColor()
+                color=QColor()
                 color.setRgb( 200-2*a,255,200-2*a )
                 colors.append(color)
 
-            colors.append(QtGui.QColor("white"))
+            colors.append(QColor("white"))
 
             for a in xrange(0,100):
-                color=QtGui.QColor()
+                color=QColor()
                 color.setRgb( 200-2*a,200-2*a,255 )
                 colors.append(color)
-#            color=QtGui.QColor()
+#            color=QColor()
 #            color.setRgb( 0,255,255 )
 #            colors.append(color)
 
         elif self.colorscheme == 1:
             for a in xrange(100,0,-1):
-                color=QtGui.QColor()
+                color=QColor()
                 color.setRgb( 200-2*a,255,200-2*a )
                 colors.append(color)
 
-            colors.append(QtGui.QColor("white"))
+            colors.append(QColor("white"))
 
             for a in xrange(0,100):
-                color=QtGui.QColor()
+                color=QColor()
                 color.setRgb( 255,200-2*a,200-2*a )
                 colors.append(color)
-#            color=QtGui.QColor()
+#            color=QColor()
 #            color.setRgb(255,255,0 )
 #            colors.append(color)
 
         else:
             # Blue and Red
             for a in xrange(100,0,-1):
-                color=QtGui.QColor()
+                color=QColor()
                 color.setRgb( 200-2*a,200-2*a,255 )
                 colors.append(color)
 
-            colors.append(QtGui.QColor("white"))
+            colors.append(QColor("white"))
 
             for a in xrange(0,100):
-                color=QtGui.QColor()
+                color=QColor()
                 color.setRgb( 255,200-2*a,200-2*a )
                 colors.append(color)
 
-#            color=QtGui.QColor()
+#            color=QColor()
 #            color.setRgb( 255,0,255 )
 #            colors.append(color)
 
@@ -411,9 +466,9 @@ class ProfileFace(Face):
         y_alpha = float ( (profile_height-1) / (self.max_value-self.min_value) )
 
         # Creates a pixmap
-        self.pixmap = QtGui.QPixmap(self.width,self.height)
-        self.pixmap.fill(QtGui.QColor("white"))
-        p = QtGui.QPainter(self.pixmap)
+        self.pixmap = QPixmap(self.width,self.height)
+        self.pixmap.fill(QColor("white"))
+        p = QPainter(self.pixmap)
 
         x2 = 0 
         y  = 0
@@ -424,14 +479,14 @@ class ProfileFace(Face):
         line3_y     = mean_line_y - profile_height/4
 
         # Draw axis and scale
-        p.setPen(QtGui.QColor("black"))
+        p.setPen(QColor("black"))
         p.drawRect(x2,y,profile_width, profile_height-1)
-        p.setFont(QtGui.QFont("Verdana",8))
+        p.setFont(QFont("Verdana",8))
         p.drawText(profile_width,y+10,"%0.3f" %self.max_value)
         p.drawText(profile_width,y+profile_height,"%0.3f" %self.min_value)
 
-        dashedPen = QtGui.QPen(QtGui.QBrush(QtGui.QColor("#ddd")), 0)
-        dashedPen.setStyle(QtCore.Qt.DashLine)
+        dashedPen = QPen(QBrush(QColor("#ddd")), 0)
+        dashedPen.setStyle(Qt.DashLine)
 
         # Draw hz grid
         p.setPen(dashedPen)
@@ -467,10 +522,10 @@ class ProfileFace(Face):
             mean_y1     = int ( (mean1 - self.min_value) * y_alpha)
 
             # Draw bar border
-            p.setPen(QtGui.QColor("black"))
+            p.setPen(QColor("black"))
             #p.drawRect(x1+2,mean_y1, x_alpha-3, profile_height-mean_y1+1)
             # Fill bar with custom color
-            p.fillRect(x1+3,profile_height-mean_y1, x_alpha-4, mean_y1-1, QtGui.QBrush(customColor))
+            p.fillRect(x1+3,profile_height-mean_y1, x_alpha-4, mean_y1-1, QBrush(customColor))
 
             # Draw error bars
             if dev1 != 0:
@@ -500,9 +555,9 @@ class ProfileFace(Face):
         y_alpha_down = float ( ((profile_height-1)/2) / (self.min_value-self.center_v) )
 
         # Creates a pixmap
-        self.pixmap = QtGui.QPixmap(self.width,self.height)
-        self.pixmap.fill(QtGui.QColor("white"))
-        p = QtGui.QPainter(self.pixmap)
+        self.pixmap = QPixmap(self.width,self.height)
+        self.pixmap.fill(QColor("white"))
+        p = QPainter(self.pixmap)
 
         x2 = 0
         y  = 0 
@@ -513,15 +568,15 @@ class ProfileFace(Face):
         line3_y     = mean_line_y - profile_height/4
 
         # Draw axis and scale
-        p.setPen(QtGui.QColor("black"))
+        p.setPen(QColor("black"))
         p.drawRect(x2,y,profile_width, profile_height-1)
-        p.setFont(QtGui.QFont("Verdana",8))
+        p.setFont(QFont("Verdana",8))
         p.drawText(profile_width,y+10,"%0.3f" %self.max_value)
         p.drawText(profile_width,y+profile_height,"%0.3f" %self.min_value)
         p.drawText(profile_width,mean_line_y,"%0.3f" %self.center_v)
 
-        dashedPen = QtGui.QPen(QtGui.QBrush(QtGui.QColor("#ddd")), 0)
-        dashedPen.setStyle(QtCore.Qt.DashLine)
+        dashedPen = QPen(QBrush(QColor("#ddd")), 0)
+        dashedPen.setStyle(Qt.DashLine)
 
         # Draw hz grid
         p.setPen(dashedPen)
@@ -565,13 +620,13 @@ class ProfileFace(Face):
                 mean_y1 = int(abs((mean1 - self.center_v) * y_alpha_up))
 
             # Draw bar border
-            p.setPen(QtGui.QColor("black"))
+            p.setPen(QColor("black"))
             #p.drawRect(x1+2,mean_y1, x_alpha-3, profile_height-mean_y1+1)
             # Fill bar with custom color
             if mean1<self.center_v:
-                p.fillRect(x1+3, mean_line_y, x_alpha-4, mean_y1, QtGui.QBrush(customColor))
+                p.fillRect(x1+3, mean_line_y, x_alpha-4, mean_y1, QBrush(customColor))
             else:
-                p.fillRect(x1+3, mean_line_y-mean_y1, x_alpha-4, mean_y1+1, QtGui.QBrush(customColor))
+                p.fillRect(x1+3, mean_line_y-mean_y1, x_alpha-4, mean_y1+1, QBrush(customColor))
 
             # Draw error bars
             if dev1 != 0:
@@ -605,9 +660,9 @@ class ProfileFace(Face):
         y_alpha = float ( (profile_height-1) / (self.max_value-self.min_value) )
 
         # Creates a pixmap
-        self.pixmap = QtGui.QPixmap(self.width,self.height)
-        self.pixmap.fill(QtGui.QColor("white"))
-        p = QtGui.QPainter(self.pixmap)
+        self.pixmap = QPixmap(self.width,self.height)
+        self.pixmap.fill(QColor("white"))
+        p = QPainter(self.pixmap)
 
         x2 = 0
         y  = 0
@@ -618,15 +673,15 @@ class ProfileFace(Face):
         line3_y     = mean_line_y - profile_height/4
         
         # Draw axis and scale
-        p.setPen(QtGui.QColor("black"))
+        p.setPen(QColor("black"))
         p.drawRect(x2,y,profile_width, profile_height-1)
-        p.setFont(QtGui.QFont("Verdana",8))
+        p.setFont(QFont("Verdana",8))
         p.drawText(profile_width,y+10,"%0.3f" %self.max_value)
         p.drawText(profile_width,y+profile_height,"%0.3f" %self.min_value)
         p.drawText(profile_width,mean_line_y+5,"%0.3f" %self.center_v)
 
-        dashedPen = QtGui.QPen(QtGui.QBrush(QtGui.QColor("#ddd")), 0)
-        dashedPen.setStyle(QtCore.Qt.DashLine)
+        dashedPen = QPen(QBrush(QColor("#ddd")), 0)
+        dashedPen.setStyle(Qt.DashLine)
 
         # Draw hz grid
         p.setPen(dashedPen)
@@ -663,11 +718,11 @@ class ProfileFace(Face):
                 # Second Y postions for deviations
                 dev_y2   = (dev2 - self.min_value) * y_alpha
                 # Draw red deviation lines
-                p.setPen(QtGui.QColor("red"))
+                p.setPen(QColor("red"))
                 p.drawLine(x1, profile_height-dev_y1, x2, profile_height-dev_y2)
                 p.drawLine(x1, profile_height+dev_y1, x2, profile_height+dev_y2)
             # Draw blue mean line
-            p.setPen(QtGui.QColor("blue"))
+            p.setPen(QColor("blue"))
             p.drawLine(x1, profile_height-mean_y1, x2, profile_height-mean_y2)
  
 
@@ -692,9 +747,9 @@ class ProfileFace(Face):
         x_alpha = float( profile_width / (len(vector)) )
 
         # Creates a pixmap
-        self.pixmap = QtGui.QPixmap(self.width,img_height)
-        self.pixmap.fill(QtGui.QColor("white"))
-        p = QtGui.QPainter(self.pixmap)
+        self.pixmap = QPixmap(self.width,img_height)
+        self.pixmap.fill(QColor("white"))
+        p = QPainter(self.pixmap)
 
         x2 = 0
         y  = 0
@@ -711,7 +766,7 @@ class ProfileFace(Face):
                 mean1 = self.fit_to_scale( mean_vector[pos]        )
                 # Set heatmap color
                 if not isfinite(mean1):
-                    customColor = QtGui.QColor("#000000")
+                    customColor = QColor("black")
                 elif mean1>self.center_v:
                     color_index = abs(int(ceil(((self.center_v-mean1)*100)/(self.max_value-self.center_v))))
                     customColor = colors[100 + color_index]
@@ -722,7 +777,7 @@ class ProfileFace(Face):
                     customColor = colors[100]
 
                 # Fill bar with custom color
-                p.fillRect(x1, y, x_alpha, y_step, QtGui.QBrush(customColor))
+                p.fillRect(x1, y, x_alpha, y_step, QBrush(customColor))
             y+= y_step
             x2 = 0
 
@@ -739,22 +794,22 @@ class SequenceFace(Face):
     """ Creates a new molecular sequence face object.
 
 
-    :argument seq:  Sequence string to be drawn
-    :argument seqtype: Type of sequence: "nt" or "aa"
-    :argument fsize:   Font size,  (default=10)
+    :param seq:  Sequence string to be drawn
+    :param seqtype: Type of sequence: "nt" or "aa"
+    :param fsize:   Font size,  (default=10)
 
     You can set custom colors for aminoacids or nucleotides: 
 
-    :argument aafg: a dictionary in which keys are aa codes and values
+    :param aafg: a dictionary in which keys are aa codes and values
       are foreground RGB colors
 
-    :argument aabg: a dictionary in which keys are aa codes and values
+    :param aabg: a dictionary in which keys are aa codes and values
       are background RGB colors
 
-    :argument ntfg: a dictionary in which keys are nucleotides codes
+    :param ntfg: a dictionary in which keys are nucleotides codes
       and values are foreground RGB colors
 
-    :argument ntbg: a dictionary in which keys are nucleotides codes and values
+    :param ntbg: a dictionary in which keys are nucleotides codes and values
       are background RGB colors
 
     """
@@ -782,17 +837,16 @@ class SequenceFace(Face):
         self.ntfg = ntfg
         self.ntbg = ntbg
 
-
     def update_pixmap(self):
-        font = QtGui.QFont("Courier", self.fsize)
-        fm = QtGui.QFontMetrics(font)
+        font = QFont("Courier", self.fsize)
+        fm = QFontMetrics(font)
         height = fm.leading() + fm.overlinePos() + fm.underlinePos()
-        #width  = fm.size(QtCore.Qt.AlignTop, self.seq).width()
+        #width  = fm.size(Qt.AlignTop, self.seq).width()
         width = self.fsize * len(self.seq)
 
-        self.pixmap = QtGui.QPixmap(width,height)
+        self.pixmap = QPixmap(width,height)
         self.pixmap.fill()
-        p = QtGui.QPainter(self.pixmap)
+        p = QPainter(self.pixmap)
         x = 0
         y = height - fm.underlinePos()*2
 
@@ -800,12 +854,13 @@ class SequenceFace(Face):
 
         for letter in self.seq:
             letter = letter.upper()
+               
             if self.style=="nt":
-                letter_brush = QtGui.QBrush(QtGui.QColor(self.ntbg.get(letter,"#ffffff" )))
-                letter_pen = QtGui.QPen(QtGui.QColor(self.ntfg.get(letter, "#000000")))
+                letter_brush = QBrush(QColor(self.ntbg.get(letter,"white" )))
+                letter_pen = QPen(QColor(self.ntfg.get(letter, "black")))
             else:
-                letter_brush = QtGui.QBrush(QtGui.QColor(self.aabg.get(letter,"#ffffff" )))
-                letter_pen = QtGui.QPen(QtGui.QColor(self.aafg.get(letter,"#000000" )))
+                letter_brush = QBrush(QColor(self.aabg.get(letter,"white" )))
+                letter_pen = QPen(QColor(self.aafg.get(letter,"black" )))
 
             p.setPen(letter_pen)
             p.fillRect(x,0,width, height,letter_brush)
@@ -819,8 +874,8 @@ class TreeFace(Face):
 
     Creates a Face containing a Tree object. Yes, a tree within a tree :)
 
-    :argument tree: An ETE Tree instance (Tree, PhyloTree, etc...)
-    :argument tree_style: A TreeStyle instance defining how tree show be drawn 
+    :param tree: An ETE Tree instance (Tree, PhyloTree, etc...)
+    :param tree_style: A TreeStyle instance defining how tree show be drawn 
     
     """
     def __init__(self, tree, tree_style):
@@ -831,11 +886,12 @@ class TreeFace(Face):
         self.item = None
 
     def update_items(self):
-        from qt4_render import render
+        from qt4_render import render, init_tree_style
+        ts = init_tree_style(self.root_node, self.img)
         hide_root = False
         if self.root_node is self.node:
             hide_root = True
-        self.item, self.n2i, self.n2f = render(self.root_node, self.img, hide_root)
+        self.item, self.n2i, self.n2f = render(self.root_node, ts, hide_root)
 
     def _width(self):
         return self.item.rect().width()
@@ -844,20 +900,20 @@ class TreeFace(Face):
         return self.item.rect().height()
 
 
-class _SphereItem(QtGui.QGraphicsEllipseItem):
+class _SphereItem(QGraphicsEllipseItem):
     def __init__(self, radius, color, solid=False):
         r = radius
         d = r*2 
-        QtGui.QGraphicsEllipseItem.__init__(self, 0, 0, d, d)
-        self.gradient = QtGui.QRadialGradient(r, r, r,(d)/3,(d)/3)
-        self.gradient.setColorAt(0.05, QtCore.Qt.white)
-        self.gradient.setColorAt(1, QtGui.QColor(color))
+        QGraphicsEllipseItem.__init__(self, 0, 0, d, d)
+        self.gradient = QRadialGradient(r, r, r,(d)/3,(d)/3)
+        self.gradient.setColorAt(0.05, Qt.white)
+        self.gradient.setColorAt(1, QColor(color))
         if solid:
-            self.setBrush(QtGui.QBrush(QtGui.QColor(color)))
+            self.setBrush(QBrush(QColor(color)))
         else:
-            self.setBrush(QtGui.QBrush(self.gradient))
-        self.setPen(QtGui.QPen(QtGui.QColor(color)))
-        #self.setPen(QtCore.Qt.NoPen)
+            self.setBrush(QBrush(self.gradient))
+        self.setPen(QPen(QColor(color)))
+        #self.setPen(Qt.NoPen)
 
 class CircleFace(Face):
     """
@@ -865,9 +921,9 @@ class CircleFace(Face):
 
     Creates a Circle or Sphere Face.
 
-    :arguments radius: integer number defining the radius of the face
-    :arguments color: Color used to fill the circle. RGB code or name in :data:`SVG_COLORS` 
-    :arguments "circle" style: Valid values are "circle" or "sphere"
+    :param radius: integer number defining the radius of the face
+    :param color: Color used to fill the circle. RGB code or name in :data:`SVG_COLORS` 
+    :param "circle" style: Valid values are "circle" or "sphere"
     """
 
     def __init__(self, radius, color, style="circle"):
@@ -900,7 +956,7 @@ class StaticItemFace(Face):
     properties, so its content is assumed to be static (drawn only
     once, no updates when tree changes). 
 
-    :arguments item: an object based on QGraphicsItem
+    :param item: an object based on QGraphicsItem
     """
     def __init__(self, item):
         Face.__init__(self)
@@ -924,7 +980,7 @@ class DynamicItemFace(Face):
     Creates a face based on an external QGraphicsItem object whose
     content depends on the node that is linked to. 
 
-    :arguments constructor: A pointer to a method (function or class
+    :param constructor: A pointer to a method (function or class
       constructor) returning a QGraphicsItem based
       object. "constructor" method is expected to receive a node
       instance as the first argument. The rest of arguments passed to
@@ -952,15 +1008,15 @@ class DynamicItemFace(Face):
 
 class RandomFace(Face):
     def __init__(self):
-        faces.Face.__init__(self)
+        Face.__init__(self)
         self.type = "item"
 
     def update_items(self):
         import random
         w = random.randint(4, 100)
         h = random.randint(4, 100)
-        self.tree_partition = QtGui.QGraphicsRectItem(0,0,w, h)
-        self.tree_partition.setBrush(QtGui.QBrush(QtGui.QColor("green")))
+        self.tree_partition = QGraphicsRectItem(0,0,w, h)
+        self.tree_partition.setBrush(QBrush(QColor("green")))
 
     def _width(self):
         return self.tree_partition.rect().width()
@@ -968,59 +1024,58 @@ class RandomFace(Face):
     def _height(self):
         return self.tree_partition.rect().height()
 
-
-class BackgroundFace(Face):
-    def __init__(self, min_width=0, min_height=0):
-        faces.Face.__init__(self)
-        self.type = "background"
-        self.min_height = min_height
-        self.min_height = min_width
-
-    def _width(self):
-        return self.min_width
-
-    def _height(self):
-        return self.min_height
-
-
-class _PieChartItem(QtGui.QGraphicsRectItem):
-    def __init__(self, percents, width, height, colors):
-        QtGui.QGraphicsRectItem.__init__(self, 0, 0, width, height)
+class _PieChartItem(QGraphicsRectItem):
+    def __init__(self, percents, width, height, colors, line_color=None):
+        QGraphicsRectItem.__init__(self, 0, 0, width, height)
         self.percents = percents
         self.colors = colors
+        self.line_color = line_color
+        
     def paint(self, painter, option, widget):
         a = 5760
         angle_start = 0
+        if not self.line_color:
+            painter.setPen(Qt.NoPen)
+        else:
+            painter.setPen(QColor(self.line_color))
+            
         for i, p in enumerate(self.percents):
             col = self.colors[i]
-            painter.setBrush(QtGui.QBrush(QtGui.QColor(col)))
-            painter.setPen(QtCore.Qt.NoPen)
+            painter.setBrush(QBrush(QColor(col)))
             angle_span = (p/100.) * a
             painter.drawPie(self.rect(), angle_start, angle_span )
             angle_start += angle_span
 
 
-class PieChartFace(Face):
+class PieChartFace(StaticItemFace):
     """ 
     .. versionadded:: 2.2
 
-    :arguments percents: a list of values summing up 100. 
-    :arguments width: width of the piechart 
-    :arguments height: height of the piechart
-    :arguments colors: a list of colors (same length as percents)
+    :param percents: a list of values summing up 100. 
+    :param width: width of the piechart 
+    :param height: height of the piechart
+    :param colors: a list of colors (same length as percents)
    
     """
-    def __init__(self, percents, width, height, colors):
+    def __init__(self, percents, width, height, colors=None, line_color=None):
         Face.__init__(self)
+        print round(sum(percents))
+        if round(sum(percents)) > 100:
+            raise ValueError("PieChartItem: percentage values > 100")
+
         self.type = "item"
         self.item = None
         self.percents = percents
+        if not colors:
+            colors = COLOR_SCHEMES["paired"]
         self.colors =  colors
         self.width = width
         self.height = height
-
+        self.line_color = line_color
+        
     def update_items(self):
-        self.item = _PieChartItem(self.percents, self.width, self.height, self.colors)
+        self.item = _PieChartItem(self.percents, self.width,
+                                  self.height, self.colors, self.line_color)
         
     def _width(self):
         return self.item.rect().width()
@@ -1033,28 +1088,41 @@ class BarChartFace(Face):
     """ 
     .. versionadded:: 2.2
 
-    :arguments percents: a list of values summing up 100. 
-    :arguments width: width of the piechart 
-    :arguments height: height of the piechart
-    :arguments colors: a list of colors (same length as percents)
+    :param percents: a list of values summing up 100. 
+    :param width: width of the piechart 
+    :param height: height of the piechart
+    :param colors: a list of colors (same length as percents)
    
     """
-    def __init__(self, values, deviations, width, height, colors, labels, max_value):
+    def __init__(self, values, deviations=None, width=200, height=100, colors=None, labels=None, min_value=0, max_value=None):
         Face.__init__(self)
         self.type = "item"
         self.item = None
         self.values = values
-        self.deviations = deviations
+        if not deviations:
+            self.deviations = [0] * len(values)
+        else:
+            self.deviations = deviations
+
+        if not colors:
+            colors = COLOR_SCHEMES["paired"]
         self.colors =  colors
+       
+        
         self.width = width
         self.height = height
         self.labels = labels
         self.max_value = max_value
-
+        self.min_value = min_value
+        self.margin_left = 1
+        self.margin_right = 1
+        self.margin_top = 2
+        self.margin_bottom = 2
+        
     def update_items(self):
         self.item = _BarChartItem(self.values, self.deviations, self.width,
                                   self.height, self.colors, self.labels, 
-                                  self.max_value)
+                                  self.min_value, self.max_value)
         
     def _width(self):
         return self.item.rect().width()
@@ -1063,11 +1131,10 @@ class BarChartFace(Face):
         return self.item.rect().height()
 
 
-class _BarChartItem(QtGui.QGraphicsRectItem):
-    def __init__(self, values, deviations, width, height, colors, labels, max_value):
-        QtGui.QGraphicsRectItem.__init__(self, 0, 0, width, height)
+class _BarChartItem(QGraphicsRectItem):
+    def __init__(self, values, deviations, width, height, colors, labels, min_value, max_value):
+        QGraphicsRectItem.__init__(self, 0, 0, width, height)
         self.values = values
-        self.deviations = deviations
         self.colors = colors
         self.width = width
         self.height = height
@@ -1076,32 +1143,52 @@ class _BarChartItem(QtGui.QGraphicsRectItem):
         self.draw_scale = True
         self.labels = labels
         self.max_value = max_value
-
-    def paint(self, p, option, widget):
-
+        self.min_value = min_value
+        self.deviations = deviations
         
-
+    def paint(self, p, option, widget):
         colors = self.colors
         values = self.values
         deviations = self.deviations
+
         spacer = 3
-        scale_length = self.draw_scale * 40
-        width = self.width - scale_length
         spacing_length = (spacer*(len(values)-1))
         height=  self.height 
+        
         if self.max_value is None:
             max_value = max([v+d for v,d in zip(values, deviations) if isfinite(v)])
         else:
             max_value = self.max_value
 
-        min_value = 0
-        x_alpha = float((width - spacing_length) / (len(values))) 
+        if self.min_value is None:
+            min_value = min([v+d for v,d in zip(values, deviations) if isfinite(v)])
+        else:
+            min_value = 0
+            
+        scale_length = 0
+        scale_margin = 2
+        if self.draw_scale: 
+            p.setFont(QFont("Verdana", 8))
+            max_string = "%g" %max_value
+            min_string = "%g" %min_value
+            fm = QFontMetrics(p.font())
+            max_string_metrics = fm.boundingRect(QRect(), \
+                                                 Qt.AlignLeft, \
+                                                 max_string)
+            min_string_metrics = fm.boundingRect(QRect(), \
+                                                 Qt.AlignLeft, \
+                                                 min_string)
+            scale_length = scale_margin + max(max_string_metrics.width(),
+                              min_string_metrics.width())
+        
+
+        real_width = self.width - scale_length
+        x_alpha = float((real_width - spacing_length) / (len(values))) 
         if x_alpha < 1:
-            print scale_length + spacing_length + len(values)
             raise ValueError("BarChartFace is too small")
         
         y_alpha = float ( (height-1) / float(max_value - min_value) )
-        x2 = 0 
+        x = 0 
         y  = 0
 
         # Mean and quartiles y positions
@@ -1110,25 +1197,29 @@ class _BarChartItem(QtGui.QGraphicsRectItem):
         line3_y     = mean_line_y - height/4
 
         if self.draw_border:
-            p.setPen(QtGui.QColor("black"))
-            p.drawRect(x2, y, width, height - 1)
+            p.setPen(QColor("black"))
+            p.drawRect(x, y, real_width + scale_margin - 1 , height)
+            
         if self.draw_scale: 
-            p.setFont(QtGui.QFont("Verdana", 8))
-            p.drawText(width, y + 10,"%0.3f" %max_value)
-            p.drawText(width, y + height,"%0.3f" %min_value)
+            p.drawText(real_width + scale_margin, max_string_metrics.height(), max_string)
+            p.drawText(real_width + scale_margin, height - 2, min_string)
+            p.drawLine(real_width + scale_margin - 1, 0, real_width + scale_margin - 1, height)
+            p.drawLine(real_width + scale_margin - 1, 0, real_width + scale_margin + 2, y)
+            p.drawLine(real_width + scale_margin - 1, height, real_width + scale_margin + 2, height)
+            
         if self.draw_grid: 
-            dashedPen = QtGui.QPen(QtGui.QBrush(QtGui.QColor("#ddd")), 0)
-            dashedPen.setStyle(QtCore.Qt.DashLine)
+            dashedPen = QPen(QBrush(QColor("#ddd")), 0)
+            dashedPen.setStyle(Qt.DashLine)
             p.setPen(dashedPen)
-            p.drawLine(x2+1, mean_line_y, width - 2, mean_line_y )
-            p.drawLine(x2+1, line2_y, width - 2, line2_y )
-            p.drawLine(x2+1, line3_y, width - 2, line3_y )
+            p.drawLine(x+1, mean_line_y, real_width - 2, mean_line_y )
+            p.drawLine(x+1, line2_y, real_width - 2, line2_y )
+            p.drawLine(x+1, line3_y, real_width - 2, line3_y )
 
         # Draw bars
         for pos in xrange(len(values)):
             # first and second X pixel positions
-            x1 = x2
-            x2 = x1 + x_alpha + spacer
+            x1 = x
+            x = x1 + x_alpha + spacer
 
             std =  deviations[pos]
             val = values[pos]
@@ -1137,14 +1228,14 @@ class _BarChartItem(QtGui.QGraphicsRectItem):
             if not isfinite(val):
                 continue
 
-            color = QtGui.QColor(colors[pos])
+            color = QColor(colors[pos])
             # mean bar high
             mean_y1     = int((val - min_value) * y_alpha)
             # Draw bar border
-            p.setPen(QtGui.QColor("black"))
+            p.setPen(QColor("black"))
 
             # Fill bar with custom color
-            p.fillRect(x1, height-mean_y1, x_alpha, mean_y1 - 1, QtGui.QBrush(color))
+            p.fillRect(x1, height-mean_y1, x_alpha, mean_y1 - 1, QBrush(color))
 
             # Draw error bars
             if std != 0:
@@ -1156,123 +1247,308 @@ class _BarChartItem(QtGui.QGraphicsRectItem):
                 p.drawLine(center_x + 1, height - dev_down_y1, center_x -1, height - dev_down_y1)
 
             if self.labels: 
-                p.save();
-                p.translate(x1, -height-30);
-                p.rotate(90);
-                p.drawText(0, 0, self.labels[pos]);
-                p.restore();
+                p.save()
+                p.translate(x1, -height-30)
+                p.rotate(90)
+                p.drawText(0, 0, str(self.labels[pos]))
+                p.restore()
 
 
+class QGraphicsTriangleItem(QGraphicsPolygonItem):
+    def __init__(self, width, height, orientation=1):
+        tri = QPolygonF()
+        if orientation == 1:
+            tri.append(QPointF(0, 0))
+            tri.append(QPointF(0, height))
+            tri.append(QPointF(width, height / 2.0))
+            tri.append(QPointF(0, 0))
+        elif orientation == 2:
+            tri.append(QPointF(0, 0))
+            tri.append(QPointF(width, 0))
+            tri.append(QPointF(width / 2.0, height))
+            tri.append(QPointF(0, 0))
+        elif orientation == 3:
+            tri.append(QPointF(0, height / 2.0))
+            tri.append(QPointF(width, 0))
+            tri.append(QPointF(width, height))
+            tri.append(QPointF(0, height / 2.0))
+        elif orientation == 4:
+            tri.append(QPointF(0, height))
+            tri.append(QPointF(width, height))
+            tri.append(QPointF(width / 2.0, 0))
+            tri.append(QPointF(0, height))
+                       
+        QGraphicsPolygonItem.__init__(self, tri)
 
-class SeqFace(Face):
-    def __init__(self, seq, motifs=None, seqtype="aa"):
-        Face.__init__(self)
-        self.motifs = motifs or []
-        self.seq  = seq
-        
-        self.style = seqtype
-        self.aafg = _aafgcolors
-        self.aabg = _aabgcolors
-        self.ntfg = _ntfgcolors
-        self.ntbg = _ntbgcolors
+class QGraphicsDiamondItem(QGraphicsPolygonItem):
+    def __init__(self, width, height):
+        pol = QPolygonF()
+        pol.append(QPointF(width / 2.0, 0))
+        pol.append(QPointF(width, height / 2.0))
+        pol.append(QPointF(width / 2.0, height))
+        pol.append(QPointF(0, height / 2.0))
+        pol.append(QPointF(width / 2.0, 0))
+        QGraphicsPolygonItem.__init__(self, pol)
 
-        self.type2info = {"s": [2, 12],
-                          "m": [10, 12],
-                          "*": [2, 12],
-                      }
+class QGraphicsRoundRectItem(QGraphicsRectItem):
+    def __init__(self, *args, **kargs):
+        QGraphicsRectItem.__init__(self, *args, **kargs)
+    def paint(self, p, option, widget):
+        p.setPen(self.pen())
+        p.setBrush(self.brush())
+        p.drawRoundedRect(self.rect(), 3, 3)
 
-        self.regions = make_regions(self.seq, self.motifs)
-        
-    def update_pixmap(self):
-        #regions = []
-        #for r in self.regions:
-        #    last_end = 0
-        #    if r[2] == "s":
-        #        for same_letter in re.finditer("((.)\\2{2}\\2+)", self.seq[r[0]:r[1]]):
-        #            start, end =  same_letter.span()
-        #            if start > last_end + 1:
-        #                regions.append([last_end, start, r[2]])
-        #            regions.append([start, end, "*"])
-        #            last_end = end
-        #    if last_end < r[1]:
-        #        regions.append([last_end, r[1], r[2]])
-        regions = self.regions
-        w, h = 0, 0
-        for r in regions:
-            rw, rh = self.type2info[r[2]]
-            w += rw * (r[1]-r[0])
-            h = max(h, rh)
+class SequenceItem(QGraphicsRectItem):
+    def __init__(self, seq, seqtype="aa", poswidth=1, posheight=10,
+                 draw_text=False):
+        QGraphicsRectItem.__init__(self)
+        self.seq = seq
+        self.seqtype = seqtype
+        self.poswidth = poswidth
+        self.posheight = posheight
+        if draw_text:
+            self.poswidth = self.posheight = max(poswidth, posheight)
+        self.draw_text = draw_text
+        if seqtype == "aa":
+            self.fg = _aafgcolors
+            self.bg = _aabgcolors
+        elif seqtype == "nt":
+            self.fg = _ntfgcolors
+            self.bg = _ntbgcolors
+        self.setRect(0, 0, len(seq) * poswidth, posheight)
 
-        self.pixmap = QtGui.QPixmap(w, h)
-        self.pixmap.fill()
-        p = QtGui.QPainter(self.pixmap)
-
-        pen = QtGui.QPen()
-        #pen.setWidth(0)
-        brush = QtGui.QBrush()
-        p.setPen(pen)
-        p.setBrush(brush)
-        QColor = QtGui.QColor
-        x = 0                
-        for r in regions:
-            rw, rh = self.type2info[r[2]]
-            y = (h/2) - (rh/2) # draw vertically centered
-
-            if r[2] == "*":
-                # Performance increase if a group by blocks?
-                letter = self.seq[r[0]].upper()
-                rw = rw * (r[1]-r[0])
-                if self.style=="nt":
-                    bgcolor = self.ntbg.get(letter, "#eeeeee")
-                else:
-                    bgcolor = self.aabg.get(letter, "#eeeeee")
-                if letter == "-":
-                    pass #p.drawRect(x, y, rw*), rh)
-                else:
-                    p.fillRect(x, y, rw, rh, QColor(bgcolor))
-                x += rw
-                a
+    def paint(self, p, option, widget):
+        x, y = 0, 0
+        qfont = QFont("Courier")
+        for letter in self.seq:
+            br = QBrush(QColor(self.bg.get(letter, "white")))
+            p.fillRect(x, 0, self.poswidth-1, self.posheight, br)
+            if letter == "-" or letter == ".":
+                p.drawLine(x, self.posheight/2, x+self.poswidth, self.posheight/2)
+            elif self.draw_text and self.poswidth >= 8:
+                qfont.setPixelSize(self.poswidth)
+                p.setFont(qfont)
+                p.setBrush(QBrush(QColor("black")))
+                p.drawText(x + self.poswidth * 0.1, self.posheight *0.9, letter)
+               
             else:
-                for pos in xrange(r[0], r[1]):
-                    letter = self.seq[pos].upper()
-                    #print letter,
-                    if self.style=="nt":
-                        bgcolor = self.ntbg.get(letter, "#eeeeee")
-                    else:
-                        bgcolor = self.aabg.get(letter, "#eeeeee")
+                p.fillRect(x, 0, self.poswidth, self.posheight, br)
+            x += self.poswidth
+            
+class SeqMotifFace(StaticItemFace):
+    """.. versionadded:: 2.2
 
-                    if letter in(["-","."]):
-                        #pen.setColor(QColor("black"))
-                        #p.drawLine(x, h/2, x+rw, h/2)
-                        pass # skip gaps
-                    else:
-                        p.fillRect(x, y, rw, rh, QColor(bgcolor))
-                    x += rw
-        p.end()
+    Creates a face based on an amino acid or nucleotide sequence and a
+    list of motif regions.
 
-def make_regions(seq, motifs):
-    poswidth = 2
-    posheight = 4
-    motifposwidth = 12
-    motifposheight = 12
+    :param None seq: a text string containing an aa or nt sequence. If
+        not provided, ``seq`` and ``compactseq`` motif modes will not be
+        available.
+
+    :param None motifs: a list of motif regions referred to original
+        sequence. Each motif is defined as a list containing the
+        following information:
+
+        ::
     
-    #Sort regions
-    regions = []
-    current_pos = 0
-    end = 0
-    for mf in motifs:
-        start, end = mf
-        start -= 1
-        if start < current_pos:
-            print current_pos, start, mf
-            raise ValueError("Overlaping motifs are not supported")
-        if start > current_pos:
-            regions.append([current_pos, start, "s"])
-        regions.append([start, end, "m"])
-        current_pos = end
-    if len(seq) > end:
-        regions.append([end, len(seq), "s"])
+          motifs = [[seq.start, seq.end, shape, width, height, fgcolor, bgcolor, name],
+                   [seq.start, seq.end, shape, width, height, fgcolor, bgcolor, name],
+                   ...
+                  ]
     
-    return regions
+        Where:
+    
+         * **seq.start:** Motif start position referred to the full sequence
+         * **seq.end:** Motif end position referred to the full sequence
+         * **shape:** Shape used to draw the motif. Available values are:
+    
+            * ``o`` = circle or ellipse
+            * ``>``  = triangle (base to the left)
+            * ``<``  = triangle (base to the left)
+            * ``^``  = triangle (base at bottom)
+            * ``v``  = triangle (base on top )
+            * ``<>`` = diamond
+            * ``[]`` = rectangle
+            * ``()`` = round corner rectangle
+            * ``seq`` = Show a color and the corresponding letter of each sequence position
+            * ``compactseq`` = Show a color for each sequence position
+               
+         * **width:** total width of the motif (or sequence position width if seq motif type)
+         * **height:** total height of the motif (or sequence position height if seq motif type)
+         * **fgcolor:** color for the motif shape border
+         * **bgcolor:** motif background color. Color code or name can be preceded with the "rgradient:" tag to create a radial gradient effect.
 
+    :param line intermotif_format: How should spaces among motifs be filled. Available values are: "line", "blank", "none" and "seq", "compactseq".
+    :param none seqtail_format: How should remaining tail sequence be drawn. Available values are: "line", "seq", "compactseq" or "none"
+    :param compactseq seq_format: How should sequence be rendered in case no motif regions are provided. Available values are: "seq" and "compactseq"
+    """
+
+    def __init__(self, seq=None, motifs=None, seqtype="aa",
+                 intermotif_format="line", seqtail_format="none",
+                 seq_format="compactseq"):
+        
+        StaticItemFace.__init__(self, None)
+        self.seq  = seq or []
+        self.motifs = motifs
+        self.intermotif_format = intermotif_format
+        self.seqtail_format = seqtail_format
+        self.seq_format = seq_format
+        if seqtype == "aa":
+            self.fg = _aafgcolors
+            self.bg = _aabgcolors
+        elif seqtype == "nt":
+            self.fg = _ntfgcolors
+            self.bg = _ntbgcolors
+
+        self.build_regions()
+
+    def build_regions(self): 
+        # Sort regions
+        seq = self.seq or []
+        motifs = self.motifs
+        if not motifs:
+            if self.seq_format == "seq":
+                motifs = [[1, len(seq), "seq", 10, 10, None, None]]
+            elif self.seq_format == "compactseq":
+                motifs = [[1, len(seq), "compactseq", 1, 10, None, None]]
+        motifs.sort()
+        intermotif = self.intermotif_format
+        self.regions = []
+        current_pos = 0
+        end = 0
+        for mf in motifs:
+            start, end, typ, w, h, fg, bg, name = mf
+            start -= 1
+            if start < current_pos:
+                print current_pos, start, mf
+                raise ValueError("Overlaping motifs are not supported")
+            if start > current_pos:
+                if intermotif == "blank": 
+                    self.regions.append([current_pos, start, " ", 1, 1, None, None, None])
+                elif intermotif == "line":
+                    self.regions.append([current_pos, start, "-", 1, 1, "black", None, None])
+                elif intermotif == "seq":
+                    # Colors are read from built-in dictionary
+                    self.regions.append([current_pos, start, "seq", 10, 10, None, None, None])
+                elif intermotif == "compactseq":
+                    # Colors are read from built-in dictionary
+                    self.regions.append([current_pos, start, "compactseq", 1, 10, None, None, None])
+                elif intermotif == "none":
+                    self.regions.append([current_pos, start, " ", 0, 0, None, None, None]) 
+            self.regions.append(mf)
+            current_pos = end
+
+        if len(seq) > end:
+            if self.seqtail_format == "line":
+                self.regions.append([end, len(seq), "-", 1, 1, "black", None, None])
+            elif self.seqtail_format == "seq":
+                self.regions.append([end, len(seq), "seq", 10, 10, None, None, None])
+            elif self.seqtail_format == "compactseq":
+                self.regions.append([end, len(seq), "compactseq", 1, 10, None, None, None])
                 
+    def update_items(self):
+        self.item = QGraphicsRectItem()
+        name_items = []
+        # Computes dimension of text labels
+        for index, (start, end, typ, w, h, fg, bg, name) in enumerate(self.regions):
+            if name and  typ != "seq":
+                family, fsize, fcolor, text = name.split("|")
+                qfont = QFont()
+                qfont.setFamily(family)
+                qfont.setPointSize(int(fsize))
+                qfmetrics = QFontMetrics(qfont)
+                txth = qfmetrics.height()
+                txtw = qfmetrics.width(text)
+                txt_item = QGraphicsSimpleTextItem(text, self.item)
+                txt_item.setFont(qfont)
+                txt_item.setBrush(QBrush(QColor(fcolor)))
+                txt_item.setZValue(2)
+                name_items.append([txt_item, txtw, txth])
+                # enlarges circle domains to fit text
+                if typ == "o":
+                    min_r = math.hypot(txtw/2.0, txth/2.0)
+                    txtw = max(txtw, min_r*2)
+                    
+                # Corrects domain figure dimensions to fit text
+                self.regions[index][3] = max(self.regions[index][3], txtw)
+                self.regions[index][4] = max(self.regions[index][4], txth)
+                    
+                
+            else:
+                name_items.append([None, 0, 0])
+                    
+        max_h = max([max(reg[4],name_items[index][2]) for index, reg
+                     in enumerate(self.regions)])
+        y_center = max_h / 2
+        xstart = 0
+        for index, (start, end, typ, w, h, fg, bg, name) in enumerate(self.regions):
+            txt_item = name_items[index][0]
+            if txt_item:
+                align_center = (w - name_items[index][1]) / 2.0
+                txt_item.setPos(xstart + align_center, y_center - name_items[index][2]/2.0)
+                
+            y_start = y_center - (h/2)
+            if typ == "-":
+                w = w * (end - start)
+                x_end = xstart + w
+                i = QGraphicsLineItem(xstart, y_center, x_end, y_center)
+            elif typ == " ":
+                w = w * (end - start)
+                i = None
+            elif typ == "o":
+                i = QGraphicsEllipseItem(xstart, y_start, w, h)
+            elif typ == ">":
+                i = QGraphicsTriangleItem(w, h, orientation=1)
+                i.setPos(xstart, y_start)
+            elif typ == "v":
+                i = QGraphicsTriangleItem(w, h, orientation=2)
+                i.setPos(xstart, y_start)
+            elif typ == "<":
+                i = QGraphicsTriangleItem(w, h, orientation=3)
+                i.setPos(xstart, y_start)
+            elif typ == "^":
+                i = QGraphicsTriangleItem(w, h, orientation=4)
+                i.setPos(xstart, y_start)
+            elif typ == "<>":
+                i = QGraphicsDiamondItem(w, h)
+                i.setPos(xstart, y_start)
+            elif typ == "[]":
+                i = QGraphicsRectItem(xstart, y_start, w, h)
+            elif typ == "()":
+                i = QGraphicsRoundRectItem(xstart, y_start, w, h)
+            elif typ == "seq" and self.seq:
+                i = SequenceItem(self.seq[start:end], poswidth=w,
+                                 posheight=h, draw_text=True)
+                w = i.rect().width()
+                h = i.rect().height()
+                i.setPos(xstart, y_center - (h/2.0))
+            elif typ == "compactseq" and self.seq:
+                i = SequenceItem(self.seq[start:end], poswidth=w,
+                                 posheight=h, draw_text=False)
+                w = i.rect().width()
+                h = i.rect().height()
+                i.setPos(xstart, y_center - (h/2.0))
+            else:
+                i = QGraphicsSimpleTextItem("?")
+                
+            if i: 
+                i.setParentItem(self.item)
+            if bg:
+                if bg.startswith("rgradient:"):
+                    rect = i.boundingRect()
+                    gr = QRadialGradient(rect.center(), rect.width()/2)
+                    gr.setColorAt(0, QColor("white"))
+                    bg = bg.replace("rgradient:", "")
+                    gr.setColorAt(1, QColor(bg))
+                    i.setBrush(gr)
+                else:
+                    i.setBrush(QColor(bg))
+            if fg:
+                i.setPen(QColor(fg))
+            xstart += w
+            
+        self.item.setRect(0, 0, xstart, max_h)
+        self.item.setPen(QPen(Qt.NoPen))
+
+
+        

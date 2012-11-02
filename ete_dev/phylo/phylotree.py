@@ -33,7 +33,6 @@ import re
 import itertools
 from collections import defaultdict
 from ete_dev import TreeNode, SeqGroup
-from ete_dev.treeview.main import  TreeStyle
 from reconciliation import get_reconciled_tree
 import spoverlap
 
@@ -42,21 +41,71 @@ __all__ = ["PhyloNode", "PhyloTree"]
 def _parse_species(name):
     return name[:3]
 
-def merge_dicts(source, target):
-    for k, v in source.iteritems():
-        target[k] = v
+def is_dup(n):
+    return getattr(n, "evoltype", None) == "D"
 
-def get_subtrees(node):
-    #import pdb; pdb.set_trace()
-    def is_dup(n):
-        return getattr(n, "evoltype", None) == "D"
+def get_subtrees(tree, full_copy=False, features=None):
+    """Calculate all possible species trees within a gene tree. I
+    tested several recursive and iterative approaches to do it and
+    this is the most efficient way I found. The method is now fast and
+    light enough to deal with very large gene trees, and it scales
+    linearly instead of exponentially. For instance, a tree with ~8000
+    nodes, ~100 species and ~400 duplications returns ~10,000 sptrees
+    that could be loaded in few minutes.
+
+    """
+
+    nid = 0
+    dups = set()
+    n2nid = {}
+    nid2node = {}
+    n2subtrees = defaultdict(list)
+    for n in tree.traverse("postorder"):
+        n2nid[n] = nid
+        nid2node[nid] = n
+        nid += 1
+        if n.children: 
+            if is_dup(n):
+                dups.add(n2nid[n])
+                subtrees = []
+                for ch in n.children: 
+                    subtrees.extend(n2subtrees[n2nid[ch]])
+            else:
+                subtrees = tuple([val for val in
+                                  itertools.product(n2subtrees[n2nid[n.children[0]]],
+                                                    n2subtrees[n2nid[n.children[1]]])])
+        else:
+            subtrees = tuple([n2nid[n]])
+       
+        n2subtrees[n2nid[n]] = subtrees
+        for ch in n.children:
+            del n2subtrees[n2nid[ch]]
+    sp_trees = n2subtrees[n2nid[tree]]
+    return len(sp_trees), len(dups), iter_sptrees(sp_trees, nid2node, features)
+
+def iter_sptrees(sptrees, nid2node, features=None, full_map=True):
+    """ Loads and map the species trees returned by get_subtrees"""
     
+    features = set(features) if features else set()
+    features.update(["name"])
+    for nw in sptrees:
+        # I take advantage from the fact that I generated the subtrees
+        # using tuples, so str representation is actually a newick :)
+        t = PhyloTree(str(nw)+";")
+        # Map features from original tree
+        for leaf in t.iter_leaves():
+            _nid = int(leaf.name)
+            for f in features:
+                leaf.add_feature(f, getattr(nid2node[_nid], f))
+        yield t
+        
+def get_subtrees_recursive(node, full_copy=True):
     if is_dup(node):
         sp_trees = []
         for ch in node.children:
-            sp_trees.extend(get_subtrees(ch))
+            sp_trees.extend(get_subtrees_recursive(ch, full_copy=full_copy))
         return sp_trees
-        
+
     # saves a list of duplication nodes under current node
     dups = []
     for _n in node.iter_leaves(is_leaf_fn=is_dup):
@@ -75,7 +124,9 @@ def get_subtrees(node):
             #get all sibling sptrees in each side of the
             #duplication. Each subtree is pointed to its anchor
             for ch in dp.children:
-                for subt in get_subtrees(ch):
+                for subt in get_subtrees_recursive(ch, full_copy=full_copy):
+                    if not full_copy:
+                        subt = node.__class__(subt)
                     subt.up = anchor
                     duptrees.append(subt)
 
@@ -94,22 +145,28 @@ def get_subtrees(node):
                     #print subt.up
                 else:
                     sp_trees.append(subt)
-            back_up = node.up
-            node.up = None
-            _node = node.copy()
-            node.up = back_up
-            #_node.detach()
+            if full_copy:
+                 back_up = node.up
+                 node.up = None
+                 _node = node.copy()
+                 node.up = back_up
+            else:
+                _node = node.write(format=9, features=["name", "evoltype"])
             sp_trees.append(_node)
             # Clear current node
             for subt in comb:
                 subt.up.children.pop(-1)
     else:
-        back_up = node.up
-        node.up = None
-        _node = node.copy()
-        node.up = back_up
+        if full_copy:
+            back_up = node.up
+            node.up = None
+            _node = node.copy()
+            node.up = back_up
+        else:
+            _node = node.write(format=9, features=["name", "evoltype"])
         #node.detach()
         sp_trees = [_node]
+        
     return sp_trees
                
 def get_subparts(n):
@@ -222,7 +279,7 @@ class PhyloNode(TreeNode):
     species = property(fget = _get_species, fset = _set_species)
 
     def __init__(self, newick=None, alignment=None, alg_format="fasta", \
-                 sp_naming_function=_parse_species, format=0):
+                 sp_naming_function=_parse_species, format=0, **kargs):
 
         # _update names?
         self._name = "NoName"
@@ -230,7 +287,7 @@ class PhyloNode(TreeNode):
         self._speciesFunction = None
         # Caution! native __init__ has to be called after setting
         # _speciesFunction to None!!
-        TreeNode.__init__(self, newick=newick, format=format)
+        TreeNode.__init__(self, newick=newick, format=format, **kargs)
 
         # This will be only executed after reading the whole tree,
         # because the argument 'alignment' is not passed to the
@@ -448,20 +505,36 @@ class PhyloNode(TreeNode):
 
         return outgroup_node
 
-    def get_speciation_trees(self, autodetect_duplications=True):
-        """Returns a list of all species-tree-topologies contained
-        in the current gene tree.
+    def get_speciation_trees(self, map_features=None, autodetect_duplications=True):
+        """Calculates all possible species trees contained within a
+        duplicated gene family tree.
 
         :argument True autodetect_duplications: If True, duplication
         nodes will be automatically detected using the Species Overlap
-        algorithm. If False, duplication nodes are expected to contain
-        the attribute "evoltype=D".
+        algorithm. If False, duplication nodes within the original
+        tree are expected to contain the feature "evoltype=D".
 
-        :returns: species_trees
+        :argument None features: A list of features that should be
+        mapped from the original gene tree to each species trees copy.
+
+        :returns: (number_of_sptrees, number_of_dups, species_tree_iterator)
 
         .. versionadded: 2.x
 
         """
+        t = self
+        if autodetect_duplications:
+            n2content, n2species = t.get_node2species()
+            for node in n2content:
+                sp_subtotal = sum([len(n2species[_ch]) for _ch in node.children])
+                if  len(n2species[node]) > 1 and len(n2species[node]) != sp_subtotal:
+                    node.add_features(evoltype="D")
+               
+        sp_trees = get_subtrees(t, features=map_features)
+        
+        return sp_trees
+
+    def get_speciation_trees_recursive(self):
         t = self.copy()
         if autodetect_duplications:
             dups = 0
@@ -478,8 +551,8 @@ class PhyloNode(TreeNode):
         else:
             for node in t.iter_leaves():
                 node._leaf = True
-        sp_trees= get_subtrees(t)
-        return sp_trees
+        subtrees = get_subtrees_recursive(t)
+        return len(subtrees), 0, subtrees
 
     def split_by_dups(self, autodetect_duplications=True):
         """Returns the list of all subtrees resulting from splitting
@@ -511,7 +584,7 @@ class PhyloNode(TreeNode):
         else:
             for node in t.iter_leaves():
                 node._leaf = True
-        sp_trees= get_subparts(t)
+        sp_trees = get_subparts(t)
         return sp_trees
         
     def get_node2species(self):
@@ -531,30 +604,6 @@ class PhyloNode(TreeNode):
             n2species[n] = set([_n.species for _n in content])
         return n2content, n2species
         
-    def get_node2content(self, store=None):
-        """ 
-        Returns a dictionary of node instances in which values
-        are the leaf content of each node.
-
-        .. versionadded: 2.x
-        
-        """
-        if store is None:
-            store = {}
-            
-        for ch in self.children:
-            ch.get_node2content(store=store)
-
-        if self.children:
-            val = set()
-            for ch in self.children:
-                val.update(store[ch])
-            store[self] = val
-        else:
-            store[self] = set([self])
-        return store
-       
-
 
 #: .. currentmodule:: ete_dev
 #
