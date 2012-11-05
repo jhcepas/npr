@@ -105,7 +105,7 @@ def top(waiting_time, dbfile):
 def update_top(a1, a2):
     short_date = lambda secs: time.strftime("%d %b %y, %H:%M", time.gmtime(secs))
     os.system("clear")
-    print "NPR execution:", color("magenta", args.runid), "started:", color("yellow", runid_date)
+    print "NPR execution ID:", color("magenta", args.runid), "started:", color("yellow", runid_date)
     print "Current time:", time.ctime()
     print "Showing %s-%s records" %(args.start_entry, args.start_entry + args.entries)
     report = db.report(args.runid, FILTERS.values())
@@ -132,7 +132,6 @@ def update_top(a1, a2):
         r[11] = short_date(r[11])
         r[12] = short_date(r[12])
 
-
         if r[4] == "E":
             r[4] = color("green", r[4])
         elif r[4] == "W":
@@ -146,29 +145,18 @@ def update_top(a1, a2):
 
     print_as_table(mod_report, fields=[0, 4, 5, 6, 7, 8, 9, 10, 11, 12], header=hd )
     return len(report)
-__DESCRIPTION__ = "Monitors NPR process execution."
+__DESCRIPTION__ = "Monitors a NPR process execution."
         
 if __name__ == "__main__":
     parser = ArgumentParser(description=__DESCRIPTION__, 
                             formatter_class=RawDescriptionHelpFormatter)
-    # name or flags - Either a name or a list of option strings, e.g. foo or -f, --foo.
-    # action - The basic type of action to be taken when this argument is encountered at the command line. (store, store_const, store_true, store_false, append, append_const, version)
-    # nargs - The number of command-line arguments that should be consumed. (N, ? (one or default), * (all 1 or more), + (more than 1) )
-    # const - A constant value required by some action and nargs selections. 
-    # default - The value produced if the argument is absent from the command line.
-    # type - The type to which the command-line argument should be converted.
-    # choices - A container of the allowable values for the argument.
-    # required - Whether or not the command-line option may be omitted (optionals only).
-    # help - A brief description of what the argument does.
-    # metavar - A name for the argument in usage messages.
-    # dest - The name of the attribute to be added to the object returned by parse_args().
    
     parser.add_argument("-t", "--schedule-time", dest="schedule_time", 
                         type=int, default=5,
-                        help="""Schedule time in seconds. """)
+                        help="""Refresh time in seconds. """)
   
     parser.add_argument('nprdir', metavar='npr_base_dir', type=str, nargs=1,
-                   help='path to an NPR execution directory')
+                   help='Path to an NPR execution directory')
 
     parser.add_argument("-C", dest="colors", 
                         action="store_false", 
@@ -180,15 +168,16 @@ if __name__ == "__main__":
 
     parser.add_argument("-s", dest="start_entry", 
                         type=int, default=0,
-                        help="""starting point to show DB entries.""")
+                        help="""starting entry.""")
 
     parser.add_argument("-f", dest="filter_states", 
                         type=set, default=set(),
-                        help="""Filter out entries whose state is in filter_state""")
+                        help="""Filter out entries whose state is in filter_states""")
     
     parser.add_argument("-i", dest="runid", 
                         type=str, 
-                        help="""RunID 2 show""")
+                        help="""Specifies what execution thread id to show. "
+                        "Last execution id is used by default.""")
   
     args = parser.parse_args()
     if not os.path.isdir(args.nprdir[0]):
