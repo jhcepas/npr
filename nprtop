@@ -109,33 +109,6 @@ def update_top(a1, a2):
     print "Current time:", time.ctime()
     print "Showing %s-%s records" %(args.start_entry, args.start_entry + args.entries)
     report = db.report(args.runid, FILTERS.values())
-    
-    treedict = lambda: Tree()
-    id2node = defaultdict(treedict)
-    for entry in report:
-        tid = entry[0]
-        nid = entry[1]
-        pid = entry[2]
-        if pid: 
-            parent_node = id2node[pid]
-        else:
-            parent_node = None
-        task_node = id2node[tid]
-        task_node.record = entry
-        task_node.name = tid
-        if parent_node and pid != tid:
-            parent_node.add_child(task_node)
-    for node in id2node.values():
-        if node.up is None:
-            indent = 0
-            for postorder, n in iter_prepostorder(node):
-                if not postorder:
-                    #print " "*indent + str(n.record[5:10])
-                    indent += 1
-                else:
-                    indent -= 1
-    #raw_input("Done")
-    
     hd = ["t.id", "st", "t.type", "t.subtype", "t.name", "size", "outs", "ex.time", "start", "end"]
     mod_report = []
    
@@ -216,7 +189,6 @@ if __name__ == "__main__":
     parser.add_argument("-i", dest="runid", 
                         type=str, 
                         help="""RunID 2 show""")
-   
   
     args = parser.parse_args()
     if not os.path.isdir(args.nprdir[0]):
@@ -227,7 +199,7 @@ if __name__ == "__main__":
     dbfile = os.path.join(os.path.realpath(args.nprdir[0]), "db.sqlite3")
     log = get_main_log(sys.stderr)
     if not args.runid:
-        args.runid, runid_date = open(os.path.join(os.path.realpath(args.nprdir[0]), "runid"), "rU").readlines()[0].split("\t")
+        args.runid, runid_date = open(os.path.join(os.path.realpath(args.nprdir[0]), "runid"), "rU").readlines()[-1].split("\t")
     if args.filter_states:
         FILTERS = {"status": "status IN (%s)" %",".join(map(lambda x: '"%s"'%x, args.filter_states))}
     else:
