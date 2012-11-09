@@ -30,6 +30,8 @@ extensions = ['sphinx.ext.autodoc', 'sphinx.ext.coverage', \
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['templates']
 
+
+
 # The suffix of source filenames.
 source_suffix = '.rst'
 
@@ -94,7 +96,7 @@ pygments_style = 'sphinx'
 
 # The theme to use for HTML and HTML Help pages.  Major themes that come with
 # Sphinx are currently 'default' and 'sphinxdoc'.
-html_theme = 'default'
+html_theme = 'nature'
 
 
 # Theme options are theme-specific and customize the look and feel of a theme
@@ -107,7 +109,7 @@ html_theme = 'default'
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
-html_title = "Documentation of the Nested Phylogenetic Reconstruction (NPR) program"
+html_title = "Documentation for the Nested Phylogenetic Reconstruction (NPR) program"
 
 # A shorter title for the navigation bar.  Default is the same as html_title.
 html_short_title = "NPR documentation"

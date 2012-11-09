@@ -16,6 +16,23 @@ from nprlib.utils import print_as_table, read_time_file, sec2time, Getch, Tree, 
 from nprlib.errors import DataError
 from nprlib.logger import get_main_log
 
+subtype2color = {
+    "tree": "green",
+    "treemerger": "cyan",
+    "alg": "red",
+    "acleaner": "yellow",
+    "concat_alg": "red", 
+    "mchooser": "orange",
+    "cog_selector": "blue", 
+    "msf": "blue"
+}
+status2color = {
+    "E": "green",
+    "W": "yellow",
+    "R": "orange",
+    "D": "blue"
+}
+
 def color(color, string):
     if not args.colors:
         return string
@@ -111,7 +128,8 @@ def update_top(a1, a2):
     report = db.report(args.runid, FILTERS.values())
     hd = ["t.id", "st", "t.type", "t.subtype", "t.name", "size", "outs", "ex.time", "start", "end"]
     mod_report = []
-   
+    report.sort(key=lambda x: x[8])
+
     for r in report[args.start_entry:args.start_entry + args.entries]:
         r = list(r)
         r[11] = 0 if r[11] == "None" else r[11]
@@ -132,20 +150,14 @@ def update_top(a1, a2):
         r[11] = short_date(r[11])
         r[12] = short_date(r[12])
 
-        if r[4] == "E":
-            r[4] = color("green", r[4])
-        elif r[4] == "W":
-            r[4] = color("yellow", r[4])
-        elif r[4] == "R":
-            r[4] = color("orange", r[4])
-        elif r[4] == "D":
-            r[4] = color("blue", r[4])
-                
+        r[4] = color(status2color.get(r[4],"white"), r[4])
+        r[6] = color(subtype2color.get(r[6],"white"), r[6])
+            
         mod_report.append(r)
 
     print_as_table(mod_report, fields=[0, 4, 5, 6, 7, 8, 9, 10, 11, 12], header=hd )
     return len(report)
-__DESCRIPTION__ = "Monitors a NPR process execution."
+__DESCRIPTION__ = "Display NPR tasks"
         
 if __name__ == "__main__":
     parser = ArgumentParser(description=__DESCRIPTION__, 
