@@ -1,14 +1,154 @@
 Overview
 ************
 
-ETE-NPR is a command line application to run phylogenetic
-analyses. 
+Nested Phylogenetic Reconstruction (NPR) is a novel methodology that
+addresses phylogenetic inference as an iterative process by which the
+resolution of internal nodes is gradually refined from root to leaves
+in an automatic way.
+
+The following documentation refers to the `npr` program, a command
+line application allowing to apply the NPR strategy on top of variety
+of predefined phylogenetic workflows.
+
+A single configuration file is used by ttrough's` program to define
+both NPR parameters and `workflow design`_.
+
+
+If you use this program for published work, please cite: 
+
+* Huerta-Cepas J and Gabaldón T. *ETE-NPR: a portable application for
+  nested phylogenetic reconstruction and workflow design.*
+
+* Huerta-Cepas J, Marcet-Houben M, and Gabaldón T. *Nested Phylogenetic
+  Reconstruction: Scalable resolution in a growing Tree of Life.*
+
+.. [workflow design] Workflow design 
+
+Workflow Design
+******************
+
+Workflows are defined in the `[sptree]` and `[genetree]` sections of
+the main config file. Every column within such sections will define
+the details of a precise workflow (i.e. software used) and the
+conditions under which such a workflow should be used. 
+
+In the following example, we define two possible workflows: 
+
+1) a faster approach to optimize partitions with 500 or more
+sequences, in which clustal-omega is used to reconstruct the alignment
+and fasttree to infer the tree (no model selection and no use of dna
+sequences.)
+
+2) a more complex pipeline is defined to optimize partitions with less
+than 500 sequences. A `meta-aligner` plus gap trimming approach is
+used to infer the alignment, prottest is used to select the best
+fitting model, and phyml to infer the final tree. Also, when the
+minimum sequence similarity is above 95%, DNA sequences will be used
+instead of amino-acid.
+
+.. code-block:: ini
+
+       [genetree]
+
+       # Workflow conditions        
+       max_seqs             =   500,             1000,          
+       max_seq_similarity   =   1.0,             1.0,           
+       switch_aa_similarity =   0.95,            0.95,          
+       min_branch_support   =   1.0,             1.0,           
+                                                                
+       # Workflow design                                        
+       aa_aligner           =   @meta_aligner,   @clustalo, 
+       aa_alg_cleaner       =   @trimal,         none,       
+       aa_model_tester      =   @prottest,       none,     
+       aa_tree_builder      =   @phyml,          @phyml,        
+                                                                
+       nt_aligner           =   @muscle,         none,       
+       nt_alg_cleaner       =   @trimal,         none,       
+       nt_model_tester      =   none,            none,          
+       nt_tree_builder      =   @phyml,          none,        
+                                                                
+       outgroup_size        =   4,               4,             
+       outgroup_dist        =   min,             min,           
+       outgroup_min_support =   0.99,            0.99,          
+       outgroup_topodist    =   False,           False,         
+       outgroup_policy      =   node,            node,          
+
+Configuring external software
+===================================
+
+The application required by a given workflow are actually referred in
+the config file by providing a code name starting with a "@"
+symbol. Each of such names point to its corresponding section in the
+same config file (i.e. `@raxml` will point to the `[raxml]`
+section). If two different uses of the same application are necessary
+within the same npr configuration, new application blocks could be
+created. In the following example, the `phyml` program is executed in
+two different ways, each referred in a different workflow.
+
+
+.. code-block:: ini
+
+    # Set of sequences larger than 500 will be analyzed using
+    # phyml_bionj mode, while full phyml will be used for smaller
+    # sets.
+
+    [genetree]
+       # Workflow conditions        
+       max_seqs             =   500,             1000,          
+       max_seq_similarity   =   1.0,             1.0,           
+       switch_aa_similarity =   0.95,            0.95,          
+       min_branch_support   =   1.0,             1.0,           
+                                                                
+       # Workflow design                                        
+       aa_aligner           =   @meta_aligner,   @clustalo, 
+       aa_alg_cleaner       =   @trimal,         @trimal,       
+       aa_model_tester      =   @prottest,       none,     
+       aa_tree_builder      =   @phyml_ml,       @phyml_bionj,     
+                                                                
+       nt_aligner           =   @muscle,         none,       
+       nt_alg_cleaner       =   @trimal,         none,       
+       nt_model_tester      =   none,            none,          
+       nt_tree_builder      =   @phyml,          none,        
+     
+     
+    [phyml_bionj]
+      _app = phyml
+      _class = Phyml
+      _aa_model = JTT # AA model used if no model selection is performed
+      _nt_model = GTR # Nt model used if no model selection is performed
+      -o = lr           # Only branch length 
+      --pinv = e        # Proportion of invariant sites.  Fixed value in the
+                        # [0,1] range or "e" for estimated
+      --alpha = e       # Gamma distribution shape parameter. fixed value or
+                        # "e" for "estimated"
+      --nclasses =  4   # Number of rate categories
+   
+      -f = m            # e: estiamte character frequencies.  m: character
+                        # frequencies from model
+      --bootstrap = -2  #  approximate likelihood ratio test returning
+                        #  Chi2-based parametric branch supports.
+     
+    [phyml_ml]
+      _app = phyml
+      _class = Phyml
+      _aa_model = JTT # AA model used if no model selection is performed
+      _nt_model = GTR # Nt model used if no model selection is performed
+      -o = tlr          # Tree optimization
+      --pinv = e        # Proportion of invariant sites.  Fixed value in the
+                        # [0,1] range or "e" for estimated
+      --alpha = e       # Gamma distribution shape parameter. fixed value or
+                        # "e" for "estimated"
+      --nclasses =  4   # Number of rate categories
+      -f = m            # e: estiamte character frequencies.  m: character
+                        # frequencies from model
+      --bootstrap = -2  #  approximate likelihood ratio test returning
+                        #  Chi2-based parametric branch supports.
 
 
 In situ versus Remote execution
 ****************************************
 
-NPR-ETE will act both as a pipeline director and application
+`npr` acts both as a pipeline director and as application
 launcher. All tasks belonging to the same workflow will be processed
 in a hierarchical way, thus meeting cross dependencies when necessary
 (i.e. Certain tasks will not start until other has successfully
@@ -113,15 +253,11 @@ Grid Engine
 Task execution hook function
 ----------------------------------
 
-
-
-
-
 .. code-block:: python
 
-   def task_execution_hook(command, config):
-       print commands
-   
+  def task_execution_hook(command, config):
+      print commands
+
 
 
 
@@ -167,8 +303,8 @@ which each line represents a pair.
 
    npr -m sptree -a AAseqs.fasta --ortho-pairs orthologs.tab -o genetree_results/ -c MyConfig.cfg -x 
       
-By default, underscore "_" is used as delimiter between gene and
-species names. However it can be changed through the
+By default, the underscore symbol ("_") will be used to separate gene
+and species names. However this can be changed through the
 `--spname-delimiter` option.
 
 Additionally, a fasta file containing the sequences of all sequences
@@ -177,10 +313,6 @@ options.
 
 Configuring a workflow 
 =========================
-
-
-
-
 
 
 
