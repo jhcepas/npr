@@ -87,9 +87,9 @@ def ask_path(string, default_path):
 #METAPKG_JAIL_PATH = "/home/jhuerta/_Devel/ete_metapackage/etepkg_CheckBeforeRm"
 #METAPKG_PATH = "/home/jhuerta/_Devel/ete_metapackage"
 
-CHROOT_32_PATH = "../debian32/"
+CHROOT_32_PATH = "../npr_pkg/debian32"
     
-RELEASES_BASE_PATH = "/tmp"
+RELEASES_BASE_PATH = "../npr_pkg"
 MODULE_NAME = "npr"
 MODULE_RELEASE = "1.0"
 REVISION = commands.getoutput("git log --pretty=format:'' | wc -l").strip()
@@ -188,9 +188,18 @@ if options.doc:
 
 if process_package:
     # Clean from internal files
-    _ex("rm %s/.git -r" %\
+    _ex("rm %s/.git -rf" %\
             (RELEASE_PATH))
     #_ex('rm %s/build/ -r' %(RELEASE_PATH))
-    _ex('rm %s/sdoc/ -r' %(RELEASE_PATH))
-    _ex('rm %s/___* -r' %(RELEASE_PATH))
+    _ex('rm %s/sdoc/ -rf' %(RELEASE_PATH))
+    _ex('rm %s/___* -rf' %(RELEASE_PATH))
 
+    _ex('cp -r %s/ext_apps/ %s' %(RELEASES_BASE_PATH, RELEASE_PATH))
+    _ex('cp %s/cde* %s' %(RELEASES_BASE_PATH, RELEASE_PATH))
+    
+    _ex('sudo rm -r %s/opt/%s' %(CHROOT_32_PATH, RELEASE_NAME))
+    _ex('sudo cp -r %s %s/opt/' %(RELEASE_PATH, CHROOT_32_PATH))
+
+
+        
+    
