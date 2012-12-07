@@ -20,6 +20,10 @@ parser.add_option("-d", "--doc", dest="doc", \
                       action="store_true", \
                       help="Process documentation files")
 
+parser.add_option("--a32", dest="a32", \
+                      action="store_true", \
+                      help="compile for 32 bits")
+
 parser.add_option("-D", "--doc-only", dest="doc_only", \
                       action="store_true", \
                       help="Process last modifications of the documentation files. No git commit necessary. Package is not uploaded to PyPI")
@@ -88,7 +92,8 @@ def ask_path(string, default_path):
 #METAPKG_PATH = "/home/jhuerta/_Devel/ete_metapackage"
 
 CHROOT_32_PATH = "../npr_pkg/debian32"
-    
+CHROOT_64_PATH = "../npr_pkg/debian64"
+
 RELEASES_BASE_PATH = "../npr_pkg"
 MODULE_NAME = "npr"
 MODULE_RELEASE = "1.0"
@@ -195,9 +200,14 @@ if process_package:
     _ex('rm %s/___* -rf' %(RELEASE_PATH))
 
     #_ex('cp -r %s/ext_apps/ %s' %(RELEASES_BASE_PATH, RELEASE_PATH))
-    CHROOT_PATH = CHROOT_32_PATH
+    if options.a32: 
+        CHROOT_PATH = CHROOT_32_PATH
+        ARCH = "32bits"
+    else: 
+        CHROOT_PATH = CHROOT_64_PATH
+        ARCH = "64bits"
+        
     RELEASE_CHROOT_PATH = '%s/opt/%s' %(CHROOT_PATH, RELEASE_NAME)
-    
     _ex('cp %s/cde* %s' %(RELEASES_BASE_PATH, RELEASE_PATH))
     open("%s/cde.options" %RELEASE_PATH, "a").write("\nredirect_prefix=/opt/%s\n\n" %RELEASE_NAME)
 
@@ -207,12 +217,24 @@ if process_package:
 
     _ex('sudo cp -r %s %s/opt/' %(RELEASE_PATH, CHROOT_PATH))
     _ex('sudo cp -r %s/opt/ext_apps/ %s' %(CHROOT_PATH, RELEASE_CHROOT_PATH))
+    #os.system('sudo chroot %s env -i HOME=/root TERM="$TERM" /opt/%s/cde_make_portable.sh' %(CHROOT_PATH, RELEASE_NAME))
     
-    _ex('sudo chroot %s env -i HOME=/root TERM="$TERM" /opt/%s/cde_make_portable.sh' %(CHROOT_PATH,
-                                                                                       RELEASE_NAME))
-    _ex("find")
-    
-
-
+    if ask("finshed?",["y","n"]) ==  "y":
+        PORTABLE_PATH =  "%s_portable_%s" %(RELEASE_PATH, ARCH)
+        if os.path.exists(PORTABLE_PATH):
+            print PORTABLE_PATH, "exists"
+            overwrite = ask("Overwrite?",["y","n"])
+            if overwrite=="y":
+                _ex("rm %s -rf" %PORTABLE_PATH)
+                
+        _ex('mkdir %s' %PORTABLE_PATH)
         
+        _ex('cp -r %s/tmp/portable_npr/ %s_portable_%s' %(CHROOT_PATH, RELEASE_PATH, ARCH))
+        for cmd in ["npr", "nprtop", "nprdump", "nprete"]:
+            script = open("%s/%s" %(PORTABLE_PATH, cmd), "w")
+            print >>script, "#!/bin/sh"
+            print >>script, 'DIR="$(dirname "$(readlink -f "${0}")")"'
+            print >>script, '$DIR/portable_npr/cde-exec /opt/%s/%s $@ \n' %(RELEASE_NAME, cmd)
+            script.close()
+            _ex("chmod +x %s/%s" %(PORTABLE_PATH, cmd))        
     
