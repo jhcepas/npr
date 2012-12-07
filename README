@@ -1,9 +1,15 @@
-For portable execution, please do not modify the directory structure
-or the location of files.  If you want to add "npr"" and "nprtop""
-commands to your path, add this directory to your PATH variable or
-use symbolic links. 
+    ETE-NPR: a portable application for Nested Phylogenetic
+             Reconstruction and worflow design. 
+=============================================================    
 
-For instance, you can add a line like the following to your .bashrc
-for make npr command permanently accesible:
+  NPR allows to reconstruct large phylogenies by means of an iterative
+  strategy that provides scalable resolution along the different
+  levels of a tree. At each iteration, internal nodes are re-evaluated
+  to optimize and fine tune the parameters of the phylogenetic
+  inference.
 
-$ export PATH=/my/path/to/npr:$PATH;
+  (Note that a list of the external programs used to complete the
+  necessary computations will be shown after each execution)
+
+  
+Contact: jhuerta [at] crg.es & tgabaldon [at] crg.es
