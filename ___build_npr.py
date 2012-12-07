@@ -115,7 +115,7 @@ print "================================="
 
 if os.path.exists(RELEASE_PATH):
     print RELEASE_PATH, "exists"
-    overwrite = ask("Overwrite?",["y","n"])
+    overwrite = ask("Overwrite current release path?",["y","n"])
     if overwrite=="y":
         _ex("rm %s -rf" %RELEASE_PATH)
     else:
@@ -133,16 +133,16 @@ else:
     _ex("git clone . %s" %RELEASE_PATH)
 
 # Set VERSION in all modules
-print "*** Setting VERSION in all python files"
+print "*** Setting VERSION in all python files..."
 _ex('find %s/ete_dev/ -name \'*.py\' |xargs sed \'1 i __VERSION__=\"%s\" \' -i' %\
               (RELEASE_PATH, RELEASE_NAME))
 
 # Generating VERSION file
-print "*** Generating VERSION file"
+print "*** Generating VERSION file..."
 _ex('echo %s > %s/VERSION' %\
               (VERSION, RELEASE_PATH))
 
-print "Cleaning doc dir:"
+print "Cleaning doc dir..."
 _ex("mv %s/doc %s/sdoc" %(RELEASE_PATH, RELEASE_PATH))
 _ex("mkdir %s/doc" %(RELEASE_PATH))
 
@@ -199,34 +199,35 @@ if process_package:
     _ex('rm %s/sdoc/ -rf' %(RELEASE_PATH))
     _ex('rm %s/___* -rf' %(RELEASE_PATH))
 
-    #_ex('cp -r %s/ext_apps/ %s' %(RELEASES_BASE_PATH, RELEASE_PATH))
-    if options.a32: 
-        CHROOT_PATH = CHROOT_32_PATH
-        ARCH = "32bits"
-    else: 
-        CHROOT_PATH = CHROOT_64_PATH
-        ARCH = "64bits"
-        
-    RELEASE_CHROOT_PATH = '%s/opt/%s' %(CHROOT_PATH, RELEASE_NAME)
-    _ex('cp %s/cde* %s' %(RELEASES_BASE_PATH, RELEASE_PATH))
-    open("%s/cde.options" %RELEASE_PATH, "a").write("\nredirect_prefix=/opt/%s\n\n" %RELEASE_NAME)
 
-    print "Now copying to chroot environment (need root permission):"
-    if os.path.exists(RELEASE_CHROOT_PATH):
-        _ex('sudo rm -r %s' %RELEASE_CHROOT_PATH)
-
-    _ex('sudo cp -r %s %s/opt/' %(RELEASE_PATH, CHROOT_PATH))
-    _ex('sudo cp -r %s/opt/ext_apps/ %s' %(CHROOT_PATH, RELEASE_CHROOT_PATH))
-    #os.system('sudo chroot %s env -i HOME=/root TERM="$TERM" /opt/%s/cde_make_portable.sh' %(CHROOT_PATH, RELEASE_NAME))
-    
-    if ask("finshed?",["y","n"]) ==  "y":
+    if ask("Cross compile within CHROOT?",["y","n"]) ==  "y":
+        if options.a32: 
+            CHROOT_PATH = CHROOT_32_PATH
+            ARCH = "32bits"
+        else: 
+            CHROOT_PATH = CHROOT_64_PATH
+            ARCH = "64bits"
+            
         PORTABLE_PATH =  "%s_portable_%s" %(RELEASE_PATH, ARCH)
+        RELEASE_CHROOT_PATH = '%s/opt/%s' %(CHROOT_PATH, RELEASE_NAME)
+        _ex('cp %s/cde* %s' %(RELEASES_BASE_PATH, RELEASE_PATH))
+        open("%s/cde.options" %RELEASE_PATH, "a").write("\nredirect_prefix=/opt/%s\n\n" %RELEASE_NAME)
+
+        print "Now copying to chroot environment (need root permission):"
+        if os.path.exists(RELEASE_CHROOT_PATH):
+            _ex('sudo rm -r %s' %RELEASE_CHROOT_PATH)
+
+        _ex('sudo cp -r %s %s/opt/' %(RELEASE_PATH, CHROOT_PATH))
+        _ex('sudo cp -r %s/opt/ext_apps/ %s' %(CHROOT_PATH, RELEASE_CHROOT_PATH))
+        os.system('sudo chroot %s env -i HOME=/root TERM="$TERM" /opt/%s/cde_make_portable.sh' %(CHROOT_PATH, RELEASE_NAME))
+    
+    if ask("Build portable package (will extract portable dir from chroot)?",["y","n"]) ==  "y":
         if os.path.exists(PORTABLE_PATH):
             print PORTABLE_PATH, "exists"
             overwrite = ask("Overwrite?",["y","n"])
             if overwrite=="y":
                 _ex("rm %s -rf" %PORTABLE_PATH)
-                
+
         _ex('mkdir %s' %PORTABLE_PATH)
         
         _ex('cp -r %s/tmp/portable_npr/ %s_portable_%s' %(CHROOT_PATH, RELEASE_PATH, ARCH))
