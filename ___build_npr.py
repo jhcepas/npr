@@ -12,28 +12,33 @@ import readline
 from optparse import OptionParser
 
 parser = OptionParser()
-parser.add_option("-e", "--examples", dest="test_examples", \
-                      action="store_true", \
+
+parser.add_option("-i", dest="source_dir",
+                      action="store_true", required = True, 
+                      help="Source directory containing a git NPR repository to package")
+
+parser.add_option("-e", "--examples", dest="test_examples", 
+                      action="store_true", 
                       help="Test tutorial examples before building package")
 
-parser.add_option("-d", "--doc", dest="doc", \
-                      action="store_true", \
+parser.add_option("-d", "--doc", dest="doc", 
+                      action="store_true", 
                       help="Process documentation files")
 
-parser.add_option("--a32", dest="a32", \
-                      action="store_true", \
+parser.add_option("--a32", dest="a32", 
+                      action="store_true", 
                       help="compile for 32 bits")
 
-parser.add_option("-D", "--doc-only", dest="doc_only", \
-                      action="store_true", \
+parser.add_option("-D", "--doc-only", dest="doc_only", 
+                      action="store_true", 
                       help="Process last modifications of the documentation files. No git commit necessary. Package is not uploaded to PyPI")
 
-parser.add_option("-v", "--verbose", dest="verbose", \
-                      action="store_true", \
+parser.add_option("-v", "--verbose", dest="verbose", 
+                      action="store_true", 
                       help="It shows the commands that are executed at every step.")
 
-parser.add_option("-s", "--simulate", dest="simulate", \
-                      action="store_true", \
+parser.add_option("-s", "--simulate", dest="simulate", 
+                      action="store_true", 
                       help="Do not actually do anything. ")
 
 (options, args) = parser.parse_args()
@@ -91,15 +96,16 @@ def ask_path(string, default_path):
 #METAPKG_JAIL_PATH = "/home/jhuerta/_Devel/ete_metapackage/etepkg_CheckBeforeRm"
 #METAPKG_PATH = "/home/jhuerta/_Devel/ete_metapackage"
 
-CHROOT_32_PATH = "../npr_pkg/debian32"
-CHROOT_64_PATH = "../npr_pkg/debian64"
+SOURCE_DIR = os.path.realpath(options.source_dir)
+CHROOT_32_PATH = "./debian32"
+CHROOT_64_PATH = "./debian64"
 
-RELEASES_BASE_PATH = "../npr_pkg"
+RELEASES_BASE_PATH = "./"
 MODULE_NAME = "npr"
 MODULE_RELEASE = "1.0"
-REVISION = commands.getoutput("git log --pretty=format:'' | wc -l").strip()
+REVISION = commands.getoutput("cd %s && git log --pretty=format:'' | wc -l" %SOURCE_DIR).strip()
 VERSION = MODULE_RELEASE+ "rev" + REVISION
-VERSION_LOG = commands.getoutput("git log --pretty=format:'%s' | head -n1").strip()
+VERSION_LOG = commands.getoutput("cd %s && git log --pretty=format:'%s' | head -n1" %SOURCE_DIR).strip()
 RELEASE_NAME = MODULE_NAME+"-"+VERSION
 RELEASE_PATH = os.path.join(RELEASES_BASE_PATH, RELEASE_NAME)
 RELEASE_MODULE_PATH = os.path.join(RELEASE_PATH, MODULE_NAME)
@@ -130,7 +136,7 @@ if options.doc_only:
 else:
     process_package = True
     print "Creating a repository clone in ", RELEASE_PATH
-    _ex("git clone . %s" %RELEASE_PATH)
+    _ex("cd %s && git clone . %s" %(SOURCE_DIR, RELEASE_PATH))
 
 # Set VERSION in all modules
 print "*** Setting VERSION in all python files..."
@@ -192,6 +198,15 @@ if options.doc:
         #        (RELEASE_PATH, SERVER+":"+SERVER_DOC_PATH))
 
 if process_package:
+    if options.a32: 
+        CHROOT_PATH = CHROOT_32_PATH
+        ARCH = "32bits"
+    else: 
+        CHROOT_PATH = CHROOT_64_PATH
+        ARCH = "64bits"
+    PORTABLE_PATH =  "%s_portable_%s" %(RELEASE_PATH, ARCH)
+    RELEASE_CHROOT_PATH = '%s/opt/%s' %(CHROOT_PATH, RELEASE_NAME)
+
     # Clean from internal files
     _ex("rm %s/.git -rf" %\
             (RELEASE_PATH))
@@ -199,17 +214,22 @@ if process_package:
     _ex('rm %s/sdoc/ -rf' %(RELEASE_PATH))
     _ex('rm %s/___* -rf' %(RELEASE_PATH))
 
-
-    if ask("Cross compile within CHROOT?",["y","n"]) ==  "y":
-        if options.a32: 
-            CHROOT_PATH = CHROOT_32_PATH
-            ARCH = "32bits"
-        else: 
-            CHROOT_PATH = CHROOT_64_PATH
-            ARCH = "64bits"
+    if ask("Cross compile external apps within CHROOT?",["y","n"]) ==  "y":
+        CHROOT_APPS_PATH = "%s/opt/ext_apps/" % CHROOT_PATH
+        if os.path.exists(CHROOT_APPS_PATH):
+            print CHROOT_APPS_PATH, "exists"
+            overwrite = ask("Overwrite?",["y","n"])
+            if overwrite=="y":
+                _ex("rm %s -rf" %CHROOT_APPS_PATH)
+            else:
+                sys.exit(1)
             
-        PORTABLE_PATH =  "%s_portable_%s" %(RELEASE_PATH, ARCH)
-        RELEASE_CHROOT_PATH = '%s/opt/%s' %(CHROOT_PATH, RELEASE_NAME)
+        _ex('sudo cp -r %s/ext_apps/ %s/opt/' %(RELEASE_CHROOT_PATH, CHROOT_PATH))
+        os.system('sudo chroot %s env -i HOME=/root" /opt/ext_apps/compile_all.sh' %(CHROOT_PATH, RELEASE_NAME))
+     
+    
+    if ask("Build CDE portable pkg within CHROOT?",["y","n"]) ==  "y":
+            
         _ex('cp %s/cde* %s' %(RELEASES_BASE_PATH, RELEASE_PATH))
         open("%s/cde.options" %RELEASE_PATH, "a").write("\nredirect_prefix=/opt/%s\n\n" %RELEASE_NAME)
 
@@ -219,15 +239,17 @@ if process_package:
 
         _ex('sudo cp -r %s %s/opt/' %(RELEASE_PATH, CHROOT_PATH))
         _ex('sudo cp -r %s/opt/ext_apps/ %s' %(CHROOT_PATH, RELEASE_CHROOT_PATH))
-        os.system('sudo chroot %s env -i HOME=/root TERM="$TERM" /opt/%s/cde_make_portable.sh' %(CHROOT_PATH, RELEASE_NAME))
+        os.system('sudo chroot %s env -i HOME=/root" /opt/%s/cde_make_portable.sh' %(CHROOT_PATH, RELEASE_NAME))
     
-    if ask("Build portable package (will extract portable dir from chroot)?",["y","n"]) ==  "y":
+    if ask("Create portable dir (will extract portable dir from chroot)?",["y","n"]) ==  "y":
         if os.path.exists(PORTABLE_PATH):
             print PORTABLE_PATH, "exists"
             overwrite = ask("Overwrite?",["y","n"])
             if overwrite=="y":
                 _ex("rm %s -rf" %PORTABLE_PATH)
-
+            else:
+                sys.exit(1)
+                
         _ex('mkdir %s' %PORTABLE_PATH)
         
         _ex('cp -r %s/tmp/portable_npr/ %s_portable_%s' %(CHROOT_PATH, RELEASE_PATH, ARCH))
