@@ -194,12 +194,16 @@ if process_package:
     _ex('rm %s/sdoc/ -rf' %(RELEASE_PATH))
     _ex('rm %s/___* -rf' %(RELEASE_PATH))
 
-    _ex('cp -r %s/ext_apps/ %s' %(RELEASES_BASE_PATH, RELEASE_PATH))
-    _ex('cp %s/cde* %s' %(RELEASES_BASE_PATH, RELEASE_PATH))
+    #_ex('cp -r %s/ext_apps/ %s' %(RELEASES_BASE_PATH, RELEASE_PATH))
+    CHROOT_PATH = CHROOT_32_PATH
+    RELEASE_CHROOT_PATH = '%s/opt/%s' %(CHROOT_PATH, RELEASE_NAME)
     
-    _ex('sudo rm -r %s/opt/%s' %(CHROOT_32_PATH, RELEASE_NAME))
-    _ex('sudo cp -r %s %s/opt/' %(RELEASE_PATH, CHROOT_32_PATH))
-
+    _ex('cp %s/cde* %s' %(RELEASES_BASE_PATH, RELEASE_PATH))
+    open("%s/cde.options" %RELEASE_PATH, "a").write("\nredirect_prefix=/opt/%s" %RELEASE_NAME)
+    if os.path.exists(RELEASE_CHROOT_PATH):
+        _ex('sudo rm -r %s' %RELEASE_CHROOT_PATH)
+    _ex('sudo cp -r %s %s/opt/' %(RELEASE_PATH, CHROOT_PATH))
+    _ex('sudo cp -r %s/opt/ext_apps/ %s' %(CHROOT_PATH, RELEASE_CHROOT_PATH))
 
         
     
