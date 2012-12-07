@@ -199,7 +199,7 @@ if process_package:
     RELEASE_CHROOT_PATH = '%s/opt/%s' %(CHROOT_PATH, RELEASE_NAME)
     
     _ex('cp %s/cde* %s' %(RELEASES_BASE_PATH, RELEASE_PATH))
-    open("%s/cde.options" %RELEASE_PATH, "a").write("\nredirect_prefix=/opt/%s" %RELEASE_NAME)
+    open("%s/cde.options" %RELEASE_PATH, "a").write("\nredirect_prefix=/opt/%s\n\n" %RELEASE_NAME)
 
     print "Now copying to chroot environment (need root permission):"
     if os.path.exists(RELEASE_CHROOT_PATH):
@@ -208,10 +208,11 @@ if process_package:
     _ex('sudo cp -r %s %s/opt/' %(RELEASE_PATH, CHROOT_PATH))
     _ex('sudo cp -r %s/opt/ext_apps/ %s' %(CHROOT_PATH, RELEASE_CHROOT_PATH))
     
-
-    _ex('sudo chroot debian32 env -i HOME=/root TERM="$TERM" %s/make_portable.sh' % RELEASE_CHROOT_PATH)
+    _ex('sudo chroot %s env -i HOME=/root TERM="$TERM" /opt/%s/cde_make_portable.sh' %(CHROOT_PATH,
+                                                                                       RELEASE_NAME))
+    _ex("find")
     
-    _ex('su root chroot')
+
 
         
     
