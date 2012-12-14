@@ -1,15 +1,21 @@
+
     ETE-NPR: a portable application for Nested Phylogenetic
              Reconstruction and worflow design. 
 =============================================================    
 
-  NPR allows to reconstruct large phylogenies by means of an iterative
-  strategy that provides scalable resolution along the different
-  levels of a tree. At each iteration, internal nodes are re-evaluated
-  to optimize and fine tune the parameters of the phylogenetic
-  inference.
+  Nested Phylogenetic Reconstruction is a methodology that allows to
+  reconstruct large phylogenies by means of an iterative strategy that
+  provides scalable resolution along the different levels of a
+  tree. 
 
-  (Note that a list of the external programs used to complete the
-  necessary computations will be shown after each execution)
 
+Install
+==================
+
+Given the ammount of depencies associated with the package, we
+recommend to use one of the portable version of the software,
+including pre-compiled versions of all the software required.
+
+etenpr.cgenomics.org
   
 Contact: jhuerta [at] crg.es & tgabaldon [at] crg.es
