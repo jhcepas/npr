@@ -16,3 +16,11 @@ $DN/../../nprdump -a /tmp/tmpresult/
 $DN/../../nprtop /tmp/tmpresult/
 $DN/../../nprview /tmp/tmpresult/final_tree.nw 
 $DN/../../npr -w genetree -c $DN/workflow.cfg -a $DN/Phy0007XAR_HUMAN.msf.aa -o /tmp/tmpresult -x -v4 -t1 --compress
+
+# Ensure this commands are also included
+tar
+bzip2
+ls
+cp
+ln 
+du
