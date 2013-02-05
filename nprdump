@@ -12,7 +12,7 @@ from nprlib.argparse import ArgumentParser, RawDescriptionHelpFormatter
 from nprlib import db
 from nprlib.errors import DataError
 from nprlib.logger import get_main_log
-from nprlib.utils import Tree
+from nprlib.utils import Tree, pjoin
 
 def iter_prepostorder(tree):
     finished_nodes = set()
@@ -38,7 +38,7 @@ def iter_prepostorder(tree):
 
 def walk(runid):
     log.info("Reading nodes from database...")
-    thread_fname =  os.path.join(args.outdir, "threads")
+    thread_fname =  pjoin(args.outdir, "threads")
     THREAD = open(thread_fname, "w")
     task_nodes = db.get_runid_nodes(runid)
     task_nodes.reverse()
@@ -85,7 +85,7 @@ def walk(runid):
             parent = node.up
             if hasattr(node, "orig_node"):
                 if new_thread:
-                    print >>THREAD, ','.join(map(lambda x: "%05d.nhx" %x, iter_string))
+                    print >>THREAD, ','.join(map(lambda x: "%05d.nwx" %x, iter_string))
                     THREAD.flush()
                     new_thread = False
                 log.info("Detaching cladeid %s", node.cladeid)
@@ -106,12 +106,12 @@ def dump(dumpiter, target, tree):
         leaf.add_features(safename=leaf.name)
         leaf.name = leaf.realname
 
-    base_fname = os.path.join(args.outdir, "%05d" %dumpiter)
+    base_fname = pjoin(args.outdir, "%05d" %dumpiter)
     OUT = open(base_fname+".info", "w")
     for k in sorted(target.features):
         print >>OUT, "\t".join([k, str(getattr(target, k))])
     OUT.close()
-    tree.write(features=[], outfile=base_fname+".nhx")
+    tree.write(features=[], outfile=base_fname+".nwx")
     tree.write(outfile=base_fname+".nw")
 
             
@@ -149,8 +149,7 @@ def assembly_tree(runid):
                 log.info("Skipping optimized node in a different branch (size: %d).", size)
                 continue
 
-
-        #print tree.dist
+        # print tree.dist
         # Restore original gene names
         for leaf in tree.iter_leaves():
             leaf.add_features(safename=leaf.name)
@@ -164,16 +163,36 @@ def assembly_tree(runid):
         else:
             main_tree = tree
 
-        base_fname = os.path.join(args.outdir, "%05d" %iternumber)
+        iter_name = "Iter_%04d_%dseqs" %(iternumber, size)
+        outdir = pjoin(args.outdir, iter_name)
+        try:
+            os.mkdir(outdir)
+        except OSError:
+            pass
+        
+        base_fname = pjoin(outdir, "%04d" %iternumber)
         tree.add_features(iternumber=iternumber)
         OUT = open(base_fname+".info", "w")
-        for k in sorted(tree.features):
-            print >>OUT, "\t".join([k, str(getattr(tree, k))])
+        for keyname in sorted(tree.features):
+            print >>OUT, "\t".join([keyname, str(getattr(tree, keyname))])
+            # create symlinks relevant data
+            if keyname.endswith("_path"):
+                try:
+                    os.remove(pjoin(outdir, keyname))
+                except OSError:
+                    pass
+                try: # This will not work on windows
+                    os.symlink(os.path.abspath(pjoin(BASE_DIR, getattr(tree, keyname))),
+                               pjoin(outdir, keyname))
+                except OSError:
+                    pass
+                  
+            
         OUT.close()
-        main_tree.write(features=[], outfile=base_fname+".nhx")
         main_tree.write(outfile=base_fname+".nw")
+        main_tree.write(features=[], outfile=base_fname+".nwx")
         if REF_TREE:
-            cmp_tree = main_tree.copy() # do not change main tree topology
+            cmp_tree = main_tree.copy("newick") # do not change main tree topology
             if len(REF_OUT) == 1:
                 cmp_tree.set_outgroup(REF_OUT[0])
             else:
@@ -237,14 +256,14 @@ if __name__ == "__main__":
         raise DataError("[%s] does not contain NPR data." %args.nprdir[0])
       
 
-    base_dir = os.path.realpath(args.nprdir[0])
-    dbfile = os.path.join(base_dir, "db.sqlite3")
+    BASE_DIR = os.path.abspath(args.nprdir[0])
+    dbfile = os.path.join(BASE_DIR, "db.sqlite3")
     db.connect(dbfile)
     if not args.runid:
-        lines = open(os.path.join(base_dir, "runid"), "rU").readlines()
+        lines = open(os.path.join(BASE_DIR, "runid"), "rU").readlines()
         selected_runid = lines[-1]
         print ''.join(lines)
-        print "**", selected_runid
+        print "** Selected **", selected_runid
         args.runid = selected_runid.split("\t")[0].strip()
 
     if args.cladeid: 
@@ -255,7 +274,7 @@ if __name__ == "__main__":
         file_label = "nprdump_branch_assembly_runid_%s" %args.runid[:8]
         
     if not args.outdir: 
-        args.outdir = os.path.join(base_dir, file_label)
+        args.outdir = os.path.join(BASE_DIR, file_label)
     else:
         args.outdir = os.path.join(args.outdir, file_label)
         
@@ -294,3 +313,4 @@ if __name__ == "__main__":
 
     elif args.branch_assembly:
         walk(args.runid)       
+    print "\nResults written in ", args.outdir
