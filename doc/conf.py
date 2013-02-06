@@ -43,7 +43,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'NPR'
-copyright = u'2012, Jaime Huerta-Cepas & Toni Gabaldón'
+copyright = u'2013, Jaime Huerta-Cepas & Toni Gabaldón'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -109,19 +109,19 @@ html_theme = 'nature'
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
-html_title = "Documentation for the Nested Phylogenetic Reconstruction (NPR) program"
+html_title = "ETE-NPR: a portable application for Nested Phylogenetic Reconstruction"
 
 # A shorter title for the navigation bar.  Default is the same as html_title.
 html_short_title = "NPR documentation"
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
-html_logo = ""
+html_logo = "etenpr_logo.png"
 
 # The name of an image file (within the static path) to use as favicon of the
 # docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
 # pixels large.
-html_favicon = ""
+html_favicon = "etenpr_logo.png"
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -151,7 +151,7 @@ html_additional_pages = {
 html_use_modindex = True
 
 # If false, no index is generated.
-#html_use_index = True
+html_use_index = True
 
 # If true, the index is split into individual pages for each letter.
 html_split_index = False
@@ -182,7 +182,7 @@ latex_font_size = '11pt'
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'NPR.tex', u'Tutorial: Nested Phylogenetic Reconstruction',
+  ('index', 'ETE-NPR.tex', u'Tutorial: Nested Phylogenetic Reconstruction',
    u'Jaime Huerta-Cepas', 'manual'),
 ]
 
