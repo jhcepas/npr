@@ -25,3 +25,4 @@ ls
 cp
 ln 
 du
+sqlite3 --version
