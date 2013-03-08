@@ -194,10 +194,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if not os.path.isdir(args.nprdir[0]):
         raise DataError("NPR dir [%s] not found." %args.nprdir[0])
-    if not os.path.exists(os.path.join(args.nprdir[0], "db.sqlite3")):
+    if not os.path.exists(os.path.join(args.nprdir[0], "npr.db")):
         raise DataError("[%s] does not contain NPR data." %args.nprdir[0])
         
-    dbfile = os.path.join(os.path.realpath(args.nprdir[0]), "db.sqlite3")
+    dbfile = os.path.join(os.path.realpath(args.nprdir[0]), "npr.db")
     log = get_main_log(sys.stderr)
     if not args.runid:
         args.runid, runid_date = open(os.path.join(os.path.realpath(args.nprdir[0]), "runid"), "rU").readlines()[-1].split("\t")
