@@ -225,15 +225,19 @@ if __name__ == "__main__":
                         type=str,
                         help="""Where iteration snapshots will be saved""")
 
-    parser.add_argument("--cladeid", dest="cladeid", 
+
+    dumptype = parser.add_mutually_exclusive_group()
+    dumptype.title = "How iterations should be assembled"
+    dumptype.required = True
+    dumptype.add_argument("--cladeid", dest="cladeid", 
                         type=str,
                         help="""Dump only iteration involving a given clade""")
-
-    parser.add_argument("-a",  dest="assembly", 
+    
+    dumptype.add_argument("-a",  dest="assembly", 
                         action="store_true",
                         help="""Assembly final tree node by node, from larger to smaller optimized partitions.""")
 
-    parser.add_argument("-b",  dest="branch_assembly", 
+    dumptype.add_argument("-b",  dest="branch_assembly", 
                         action="store_true",
                         help="""Per branch assembly of the tree. Note that optimized partitions of independent branches are not combined. """)
 
@@ -258,7 +262,7 @@ if __name__ == "__main__":
 
     BASE_DIR = os.path.abspath(args.nprdir[0])
     dbfile = os.path.join(BASE_DIR, "npr.db")
-    db.connect(dbfile)
+    db.connect_nprdb(dbfile)
     if not args.runid:
         lines = open(os.path.join(BASE_DIR, "runid"), "rU").readlines()
         selected_runid = lines[-1]
