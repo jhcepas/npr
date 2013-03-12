@@ -258,7 +258,6 @@ if __name__ == "__main__":
         raise DataError("NPR dir [%s] not found." %args.nprdir[0])
     if not os.path.exists(os.path.join(args.nprdir[0], "npr.db")):
         raise DataError("[%s] does not contain NPR data." %args.nprdir[0])
-      
 
     BASE_DIR = os.path.abspath(args.nprdir[0])
     dbfile = os.path.join(BASE_DIR, "npr.db")

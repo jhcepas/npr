@@ -82,7 +82,7 @@ def change_status():
 
 
 def top(waiting_time, dbfile):
-    db.connect(dbfile)
+    db.connect_nprdb(dbfile)
     signal.signal(signal.SIGALRM, update_top)
     max_entries = update_top(0, 0)
 
@@ -201,6 +201,8 @@ if __name__ == "__main__":
     log = get_main_log(sys.stderr)
     if not args.runid:
         args.runid, runid_date = open(os.path.join(os.path.realpath(args.nprdir[0]), "runid"), "rU").readlines()[-1].split("\t")
+    else:
+        runid_date = "?"
     if args.filter_states:
         FILTERS = {"status": "status IN (%s)" %",".join(map(lambda x: '"%s"'%x, args.filter_states))}
     else:
