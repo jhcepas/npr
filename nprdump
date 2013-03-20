@@ -10,9 +10,9 @@ sys.path.insert(0, NPRPATH)
 
 from nprlib.argparse import ArgumentParser, RawDescriptionHelpFormatter
 from nprlib import db
-from nprlib.errors import DataError
+from nprlib.errors import DataError, ConfigError
 from nprlib.logger import get_main_log
-from nprlib.utils import Tree, pjoin
+from nprlib.utils import Tree, pjoin, generate_id
 
 def iter_prepostorder(tree):
     finished_nodes = set()
@@ -36,9 +36,9 @@ def iter_prepostorder(tree):
             node = node.up
            
 
-def walk(runid):
+def walk(runid, outdir):
     log.info("Reading nodes from database...")
-    thread_fname =  pjoin(args.outdir, "threads")
+    thread_fname =  pjoin(outdir, "threads")
     THREAD = open(thread_fname, "w")
     task_nodes = db.get_runid_nodes(runid)
     task_nodes.reverse()
@@ -51,7 +51,7 @@ def walk(runid):
     visited_nodes = set()
     dumpiter = 0
     main_tree.add_features(dumpiter=dumpiter)
-    dump(dumpiter, main_tree, main_tree)
+    dump(dumpiter, main_tree, main_tree, outdir)
     #print main_tree.get_ascii(attributes=["dumpiter", "name"])
     iter_string = [0]
     while node:
@@ -76,7 +76,7 @@ def walk(runid):
                 task_tree.orig_node = orig_node
                 child_node = task_tree
                 child_node.add_features(dumpiter=dumpiter)
-                dump(dumpiter, child_node, main_tree)
+                dump(dumpiter, child_node, main_tree, outdir)
 
                 #print main_tree.get_ascii(attributes=["dumpiter", "name"])
                 #raw_input()
@@ -100,13 +100,13 @@ def walk(runid):
     THREAD.close()
     log.info("Threads written in %s", thread_fname)
 
-def dump(dumpiter, target, tree):
+def dump(dumpiter, target, tree, outdir):
     # Restore original gene names
     for leaf in tree.iter_leaves():
         leaf.add_features(safename=leaf.name)
         leaf.name = leaf.realname
 
-    base_fname = pjoin(args.outdir, "%05d" %dumpiter)
+    base_fname = pjoin(outdir, "%05d" %dumpiter)
     OUT = open(base_fname+".info", "w")
     for k in sorted(target.features):
         print >>OUT, "\t".join([k, str(getattr(target, k))])
@@ -115,7 +115,7 @@ def dump(dumpiter, target, tree):
     tree.write(outfile=base_fname+".nw")
 
             
-def assembly_tree(runid):
+def assembly_tree(runid, outdir):
     log.info("Reading nodes from database...")
     task_nodes = db.get_runid_nodes(runid)
     task_nodes.reverse()
@@ -141,9 +141,9 @@ def assembly_tree(runid):
         elif packtree:
             tree = db.decode(packtree)
         else:
-            iternumber += 1
+            print "No tree?", cladeid
             continue
-            
+                    
         if clade_content:
             if not (clade_content & set(tree.get_leaf_names())):
                 log.info("Skipping optimized node in a different branch (size: %d).", size)
@@ -160,17 +160,27 @@ def assembly_tree(runid):
             target_node = main_tree.search_nodes(cladeid=cladeid)[0]
             target_node.up.add_child(tree)
             target_node.detach()
+            if len(target_node)!= len(tree):
+                print "cladeids"
+                print "searched", cladeid
+                print "recomputed", len(target_node), generate_id(target_node.get_leaf_names())
+
+                print iternumber, len(main_tree), "expected size", len(tree), "observed", len(target_node)
+                __targets, __outs = db.print_node_by_clade(runid, cladeid)
+                print "recomputed from DB", len(__targets), generate_id(__targets)
+                raw_input()
+
         else:
             main_tree = tree
 
         iter_name = "Iter_%04d_%dseqs" %(iternumber, size)
-        outdir = pjoin(args.outdir, iter_name)
+        iter_outdir = pjoin(outdir, iter_name)
         try:
-            os.mkdir(outdir)
+            os.mkdir(iter_outdir)
         except OSError:
             pass
         
-        base_fname = pjoin(outdir, "%04d" %iternumber)
+        base_fname = pjoin(iter_outdir, "%04d" %iternumber)
         tree.add_features(iternumber=iternumber)
         OUT = open(base_fname+".info", "w")
         for keyname in sorted(tree.features):
@@ -178,12 +188,12 @@ def assembly_tree(runid):
             # create symlinks relevant data
             if keyname.endswith("_path"):
                 try:
-                    os.remove(pjoin(outdir, keyname))
+                    os.remove(pjoin(iter_outdir, keyname))
                 except OSError:
                     pass
                 try: # This will not work on windows
                     os.symlink(os.path.abspath(pjoin(BASE_DIR, getattr(tree, keyname))),
-                               pjoin(outdir, keyname))
+                               pjoin(iter_outdir, keyname))
                 except OSError:
                     pass
                   
@@ -204,7 +214,10 @@ def assembly_tree(runid):
             log.info("Dumped iteration %s, size of optimized node: %d", iternumber, size)            
         iternumber += 1
 
-    return main_tree
+    os.symlink(base_fname+".nw", pjoin(outdir, "last_iter.nw"))
+    os.symlink(base_fname+".nwx", pjoin(outdir, "last_iter.nwx"))
+    os.symlink(base_fname+".info", pjoin(outdir, "last_iter.info"))
+
    
 __DESCRIPTION__ = "Dump each iteration (tree and info) of a NPR execution."
        
@@ -247,6 +260,10 @@ if __name__ == "__main__":
                         "to common ancestor nodes by providing several " 
                         "species names: i.e. --root human,mouse ")
 
+    parser.add_argument("-c",  dest="config_name", 
+                        type=str,
+                        help="""computes only for this thread name""")
+   
     parser.add_argument("--ref", dest="reftree", type=str,
                         help="Compare topology of iteration trees with"
                         " a reference topology")
@@ -254,66 +271,81 @@ if __name__ == "__main__":
     args = parser.parse_args()
         
     args = parser.parse_args()
-    if not os.path.isdir(args.nprdir[0]):
-        raise DataError("NPR dir [%s] not found." %args.nprdir[0])
-    if not os.path.exists(os.path.join(args.nprdir[0], "npr.db")):
-        raise DataError("[%s] does not contain NPR data." %args.nprdir[0])
-
     BASE_DIR = os.path.abspath(args.nprdir[0])
-    dbfile = os.path.join(BASE_DIR, "npr.db")
-    db.connect_nprdb(dbfile)
-    if not args.runid:
-        lines = open(os.path.join(BASE_DIR, "runid"), "rU").readlines()
-        selected_runid = lines[-1]
-        print ''.join(lines)
-        print "** Selected **", selected_runid
-        args.runid = selected_runid.split("\t")[0].strip()
+    DB_FILE = pjoin(BASE_DIR, "npr.db.top")
+    if not os.path.isdir(BASE_DIR):
+        raise ConfigError("NPR dir [%s] not found." %BASE_DIR)
+    if not os.path.exists(DB_FILE):
+        raise ConfigError("[%s] does not contain NPR data." %DB_FILE)
 
-    if args.cladeid: 
-        file_label = "nprdump_cid_%s_runid_%s" %(args.cladeid, args.runid[:8])
-    elif args.assembly:
-        file_label = "nprdump_assembly_runid_%s" %args.runid[:8]
-    elif args.branch_assembly:
-        file_label = "nprdump_branch_assembly_runid_%s" %args.runid[:8]
-        
-    if not args.outdir: 
-        args.outdir = os.path.join(BASE_DIR, file_label)
-    else:
-        args.outdir = os.path.join(args.outdir, file_label)
-        
-    log.info("Dump directory: %s", args.outdir)
-    try:
-        os.mkdir(args.outdir)
-    except OSError, e:
-        log.warning(e)
+    if not args.runid:
+        RUNID_NAME = {}
+        if not args.runid:
+            for fname in os.listdir(BASE_DIR):
+                if args.config_name and fname != args.config_name:
+                    continue
+                runid_file = pjoin(BASE_DIR, fname, "runid")
+                if os.path.exists(runid_file):
+                    runid, runid_date = open(runid_file, "rU").readlines()[-1].split("\t")
+                    RUNID_NAME[runid] = fname
+
+        else:
+            RUNID_NAME[args.runid] = "User_selected"
+            runid_date = "?"
+        #lines = open(os.path.join(BASE_DIR, "runid"), "rU").readlines()
+        #selected_runid = lines[-1]
+        #print ''.join(lines)
+        #print "** Selected **", selected_runid
+        #args.runid = selected_runid.split("\t")[0].strip()
+
 
     if args.root:
         REF_OUT = args.root.split(",")
-                      
-    if args.assembly:
-        final_tree_path = os.path.join(os.path.realpath(args.nprdir[0]), "final_tree.nw")
-        if not args.reftree and os.path.exists(final_tree_path):
-            REF_TREE = Tree(final_tree_path)
-            if not args.root: 
-                REF_OUT = [REF_TREE.get_leaf_names()[0]]
-            if len(REF_OUT) == 1:
-                REF_TREE.set_outgroup(REF_OUT[0])
-            else:
-                common = REF_TREE.get_common_ancestor(REF_OUT)
-                REF_TREE.set_outgroup(common)
-        elif args.reftree:
-            REF_TREE = Tree(args.reftree)
-            if not args.root: 
-                REF_OUT = [REF_TREE.get_leaf_names()[0]]
-            if len(REF_OUT) == 1:
-                REF_TREE.set_outgroup(REF_OUT[0])
-            else:
-                common = REF_TREE.get_common_ancestor(REF_OUT)
-                REF_TREE.set_outgroup(common)
-        else:
-            REF_TREE = None
-        main_tree = assembly_tree(args.runid)
 
-    elif args.branch_assembly:
-        walk(args.runid)       
-    print "\nResults written in ", args.outdir
+    db.connect_nprdb(DB_FILE)
+    for runid, runname in RUNID_NAME.iteritems():
+        if args.cladeid: 
+            file_label = "nprdump_clusterid_%s_runid_%s_%s" %(args.cladeid, runid[:8], runname)
+        elif args.assembly:
+            file_label = "nprdump_assembly_runid_%s_%s" %(runid[:8], runname)
+        elif args.branch_assembly:
+            file_label = "nprdump_branch_assembly_runid_%s_%s" %(runid[:8], runname)
+
+        if not args.outdir: 
+            outdir = os.path.join(BASE_DIR, runname, file_label)
+        else:
+            outdir = os.path.join(args.outdir, runname, file_label)
+
+        log.info("Output directory: %s", outdir)
+        try:
+            os.mkdir(outdir)
+        except OSError, e:
+            log.warning(e)
+        
+        if args.assembly:
+            final_tree_path = pjoin(BASE_DIR, runname, "final_tree.nw")
+            if not args.reftree and os.path.exists(final_tree_path):
+                REF_TREE = Tree(final_tree_path)
+                if not args.root: 
+                    REF_OUT = [REF_TREE.get_leaf_names()[0]]
+                if len(REF_OUT) == 1:
+                    REF_TREE.set_outgroup(REF_OUT[0])
+                else:
+                    common = REF_TREE.get_common_ancestor(REF_OUT)
+                    REF_TREE.set_outgroup(common)
+            elif args.reftree:
+                REF_TREE = Tree(args.reftree)
+                if not args.root: 
+                    REF_OUT = [REF_TREE.get_leaf_names()[0]]
+                if len(REF_OUT) == 1:
+                    REF_TREE.set_outgroup(REF_OUT[0])
+                else:
+                    common = REF_TREE.get_common_ancestor(REF_OUT)
+                    REF_TREE.set_outgroup(common)
+            else:
+                REF_TREE = None
+            assembly_tree(runid, outdir)
+
+        elif args.branch_assembly:
+            walk(runid, outdir)       
+        print "\nResults written in ", outdir
