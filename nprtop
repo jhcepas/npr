@@ -204,7 +204,7 @@ if __name__ == "__main__":
     if not os.path.exists(os.path.join(args.nprdir[0], "npr.db")):
         raise DataError("[%s] does not contain NPR data." %args.nprdir[0])
         
-    dbfile = os.path.join(os.path.realpath(args.nprdir[0]), "npr.db")
+    dbfile = os.path.join(os.path.realpath(args.nprdir[0]), "npr.db.top")
     log = get_main_log(sys.stderr)
     nprdir = pjoin(os.path.realpath(args.nprdir[0]))
     RUNID_NAME = {}
