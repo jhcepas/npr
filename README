@@ -1,4 +1,7 @@
-** Current software status: ALPHA-version **
+**************************************************************************
+** Please note that current software status is ALPHA, meaning that many **
+** errors and issues are expected.                                      **
+**************************************************************************
 
     ETE-NPR: a portable application for Nested Phylogenetic
              Reconstruction and worflow design. 
@@ -16,7 +19,5 @@ the execution of a complete phylogenetic pipeline into a single
 configuration file, thus providing full reproducibility of
 phylogenetic analyses.
 
-
-http://npr.cgenomics.org
   
 Contact: jhuerta [at] crg.es & tgabaldon [at] crg.es
