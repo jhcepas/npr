@@ -141,7 +141,7 @@ def assembly_tree(runid, outdir):
         elif packtree:
             tree = db.decode(packtree)
         else:
-            print "No tree?", cladeid
+            #print "No tree?", cladeid
             continue
                     
         if clade_content:
@@ -209,20 +209,24 @@ def assembly_tree(runid, outdir):
                 common = cmp_tree.get_common_ancestor(REF_OUT)
                 cmp_tree.set_outgroup(common)
             dist = REF_TREE.robinson_foulds(cmp_tree)[:2]
+            print '\t'.join(map(str, ["TAB", runname, size, iternumber, dist[0], dist[1]]))
             log.info("Dumped iteration % 3d, size of optimized node: % 4d (dist to final tree=%s)", iternumber, size, dist)
         else: 
             log.info("Dumped iteration %s, size of optimized node: %d", iternumber, size)            
         iternumber += 1
-
-    os.symlink(base_fname+".nw", pjoin(outdir, "last_iter.nw"))
-    os.symlink(base_fname+".nwx", pjoin(outdir, "last_iter.nwx"))
-    os.symlink(base_fname+".info", pjoin(outdir, "last_iter.info"))
+    try:
+        os.symlink(base_fname+".nw", pjoin(outdir, "last_iter.nw"))
+        os.symlink(base_fname+".nwx", pjoin(outdir, "last_iter.nwx"))
+        os.symlink(base_fname+".info", pjoin(outdir, "last_iter.info"))
+    except OSError:
+        pass
+    
 
    
 __DESCRIPTION__ = "Dump each iteration (tree and info) of a NPR execution."
        
 if __name__ == "__main__":
-    log = get_main_log(sys.stderr)
+    log = get_main_log(sys.stdout)
     
     parser = ArgumentParser(description=__DESCRIPTION__, 
                             formatter_class=RawDescriptionHelpFormatter)
@@ -337,11 +341,12 @@ if __name__ == "__main__":
                 REF_TREE = Tree(args.reftree)
                 if not args.root: 
                     REF_OUT = [REF_TREE.get_leaf_names()[0]]
-                if len(REF_OUT) == 1:
-                    REF_TREE.set_outgroup(REF_OUT[0])
-                else:
-                    common = REF_TREE.get_common_ancestor(REF_OUT)
-                    REF_TREE.set_outgroup(common)
+                    
+                    if len(REF_OUT) == 1:
+                        REF_TREE.set_outgroup(REF_OUT[0])
+                    else:
+                        common = REF_TREE.get_common_ancestor(REF_OUT)
+                        REF_TREE.set_outgroup(common)
             else:
                 REF_TREE = None
             assembly_tree(runid, outdir)
