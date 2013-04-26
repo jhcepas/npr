@@ -215,9 +215,10 @@ def assembly_tree(runid, outdir):
             log.info("Dumped iteration %s, size of optimized node: %d", iternumber, size)            
         iternumber += 1
     try:
-        os.symlink(base_fname+".nw", pjoin(outdir, "last_iter.nw"))
-        os.symlink(base_fname+".nwx", pjoin(outdir, "last_iter.nwx"))
-        os.symlink(base_fname+".info", pjoin(outdir, "last_iter.info"))
+        rel_path = base_fname.split("/")[0]
+        os.symlink(rel_path+".nw", pjoin(outdir, "last_iter.nw"))
+        os.symlink(rel_path+".nwx", pjoin(outdir, "last_iter.nwx"))
+        os.symlink(rel_path+".info", pjoin(outdir, "last_iter.info"))
     except OSError:
         pass
     

@@ -2,6 +2,7 @@
 import sys
 import os
 import time
+from string import strip
 
 # This avoids installing nprlib module. npr script will find it in the
 # same directory in which it is
@@ -59,8 +60,8 @@ def get_report(runid):
     cmd = """
       SELECT task.taskid, task.nodeid, task.parentid, task.status,
              type, subtype, name, tm_end-tm_start, tm_start, tm_end
-             FROM task WHERE task.runid = "%s"
-      """ %runid
+             FROM task 
+      """ 
     print cmd
     
     #ORDER BY task.status ASC,target_size DESC;
@@ -124,9 +125,7 @@ def update_top():
     for nodeid, parentid in n2parent.iteritems():
         print nodeid, parentid
         name2node[parentid].add_child(name2node[nodeid])
-
-
-        
+       
     for node in roots[0].traverse():
         if node.children:
             node.children.sort(lambda a,b: cmp(a.npr["tm_start"], b.npr["tm_start"]))
@@ -174,10 +173,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if not os.path.isdir(args.nprdir[0]):
         raise DataError("NPR dir [%s] not found." %args.nprdir[0])
-    if not os.path.exists(os.path.join(args.nprdir[0], "npr.db")):
-        raise DataError("[%s] does not contain NPR data." %args.nprdir[0])
+    #if not os.path.exists(os.path.join(args.nprdir[0], "npr.db")):
+    #    raise DataError("[%s] does not contain NPR data." %args.nprdir[0])
         
-    dbfile = os.path.join(os.path.realpath(args.nprdir[0]), "npr.db")
+    #dbfile = os.path.join(os.path.realpath(args.nprdir[0]), "npr.db")
     log = get_main_log(sys.stderr)
     nprdir = pjoin(os.path.realpath(args.nprdir[0]))
     RUNID_NAME = {}
@@ -186,19 +185,18 @@ if __name__ == "__main__":
         for fname in os.listdir(nprdir):
             runid_file = pjoin(nprdir, fname, "runid")
             if os.path.exists(runid_file):
-                runid, runid_date = open(runid_file, "rU").readlines()[-1].split("\t")
+                runid, dbfile = open(runid_file, "rU").readlines()[-1].split("\t")
+                runid, dbfile = map(strip, [runid, dbfile])
                 RUNIDS.add(runid)
                 RUNID_NAME[runid] = fname
+        runid_date = dbfile
     else:
         RUNIDS = set(args.runid)
         runid_date = "?"
 
     RUNIDS = list(RUNIDS)
     CURRENT_RUNID = 0
-       
-   
     conn = sqlite3.connect(dbfile)
     conn.row_factory = sqlite3.Row
     CURSOR = conn.cursor()
-    
     update_top()
