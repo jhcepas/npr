@@ -2,6 +2,7 @@
 import sys
 import os
 import cPickle
+import shutil
 
 # This avoids installing nprlib module. npr script will find it in the
 # same directory in which it is
@@ -12,7 +13,7 @@ from nprlib.argparse import ArgumentParser, RawDescriptionHelpFormatter
 from nprlib import db
 from nprlib.errors import DataError, ConfigError
 from nprlib.logger import get_main_log
-from nprlib.utils import Tree, pjoin, generate_id
+from nprlib.utils import Tree, pjoin, generate_id, get_latest_nprdp
 
 def iter_prepostorder(tree):
     finished_nodes = set()
@@ -156,10 +157,12 @@ def assembly_tree(runid, outdir):
             leaf.name = leaf.realname
             
         if main_tree:
+            prev_tree = main_tree.copy()
             # substitute node in main tree by the optimized one
             target_node = main_tree.search_nodes(cladeid=cladeid)[0]
             target_node.up.add_child(tree)
             target_node.detach()
+            print main_tree.robinson_foulds(prev_tree)[:2]
             if len(target_node)!= len(tree):
                 print "cladeids"
                 print "searched", cladeid
@@ -169,7 +172,6 @@ def assembly_tree(runid, outdir):
                 __targets, __outs = db.print_node_by_clade(runid, cladeid)
                 print "recomputed from DB", len(__targets), generate_id(__targets)
                 raw_input()
-
         else:
             main_tree = tree
 
@@ -277,11 +279,16 @@ if __name__ == "__main__":
         
     args = parser.parse_args()
     BASE_DIR = os.path.abspath(args.nprdir[0])
-    DB_FILE = pjoin(BASE_DIR, "npr.db.top")
     if not os.path.isdir(BASE_DIR):
         raise ConfigError("NPR dir [%s] not found." %BASE_DIR)
-    if not os.path.exists(DB_FILE):
-        raise ConfigError("[%s] does not contain NPR data." %DB_FILE)
+    
+    last_db = get_latest_nprdp(BASE_DIR)
+    # make a temporal copy of DB to avoid interferences with running
+    # jobs
+    if not last_db or not os.path.exists(last_db):
+        raise ConfigError("[%s] does not contain NPR data." %last_db)
+    shutil.copy(last_db, last_db+".nprdump.tmp")
+    DB_FILE = pjoin(BASE_DIR, last_db+".nprdump.tmp")
 
     if not args.runid:
         RUNID_NAME = {}
