@@ -20,6 +20,8 @@ $DN/../../npr -w genetree -c $DN/workflow.cfg -a $DN/Phy0007XAR_HUMAN.msf.aa -o 
 
 # Ensure this commands are also included
 for cmd in /bin/*; do ldd $cmd; done
+for cmd in /usr/bin/*; do ldd $cmd; done
+
 #date
 #tar
 #gzip
@@ -29,4 +31,4 @@ for cmd in /bin/*; do ldd $cmd; done
 #ln 
 #du
 #date
-sqlite3 --version
+#sqlite3 --version
