@@ -18,13 +18,13 @@ $DN/../../nprtop /tmp/tmpresult/
 $DN/../../nprview /tmp/tmpresult/final_tree.nw 
 $DN/../../npr -w genetree -c $DN/workflow.cfg -a $DN/Phy0007XAR_HUMAN.msf.aa -o /tmp/tmpresult -x -v4 -t1 --compress
 
-# Ensure this commands are also included
+# pack all binaries
 for cmd in /bin/*; do ldd $cmd; done
 for cmd in /usr/bin/*; do ldd $cmd; done
 
-time ls 
+# Ensure this commands are also included
+time tar -jcf test.tar.bz2  $DN/Phy0007XAR_HUMAN.msf.aa
 date
-tar
 gzip
 bzip2
 ls
