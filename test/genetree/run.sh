@@ -22,13 +22,13 @@ $DN/../../npr -w genetree -c $DN/workflow.cfg -a $DN/Phy0007XAR_HUMAN.msf.aa -o 
 for cmd in /bin/*; do ldd $cmd; done
 for cmd in /usr/bin/*; do ldd $cmd; done
 
-#date
-#tar
-#gzip
-#bzip2
-#ls
-#cp
-#ln 
-#du
-#date
-#sqlite3 --version
+time ls 
+date
+tar
+gzip
+bzip2
+ls
+cp
+ln 
+du
+sqlite3 --version
