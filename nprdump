@@ -162,7 +162,7 @@ def assembly_tree(runid, outdir):
             target_node = main_tree.search_nodes(cladeid=cladeid)[0]
             target_node.up.add_child(tree)
             target_node.detach()
-            print main_tree.robinson_foulds(prev_tree)[:2]
+            print "RF with prev tree:", main_tree.robinson_foulds(prev_tree)[:2], len(tree)
             if len(target_node)!= len(tree):
                 print "cladeids"
                 print "searched", cladeid
