@@ -213,12 +213,9 @@ def _read_newick_from_string(nw, root_node, format):
         raise NewickError, 'Parentheses do not match. Broken tree structure'
 
     # white spaces and separators are removed
-    nw = re.sub("\n", "", nw)
-    nw = re.sub("\r", "", nw)
-    nw = re.sub("\t", "", nw)
+    nw = re.sub("[\n\r\t]+", "", nw)
 
     current_parent = None
-
 
     # Ok, this is my own way of reading newick structures. I find it
     # more flexible and elegant than other docummented methods. Don't
@@ -371,20 +368,20 @@ def _read_node_data(subnw, current_node, node_type, format):
 #         newick += ";"
 #     return newick
 
-def write_newick(node, features=None, format=1, format_root_node=True,
+def write_newick(rootnode, features=None, format=1, format_root_node=True,
                  is_leaf_fn=None):
     """ Iteratively export a tree structure and returns its NHX
     representation. """
     newick = []
     leaf = is_leaf_fn if is_leaf_fn else lambda n: not bool(n.children)
-    for postorder, node in node._iter_prepostorder(is_leaf_fn=is_leaf_fn):
+    for postorder, node in rootnode.iter_prepostorder(is_leaf_fn=is_leaf_fn):
         if postorder:
             newick.append(")")
             if node.up is not None or format_root_node:
                 newick.append(format_node(node, "internal", format))
                 newick.append(_get_features_string(node, features))
         else:
-            if node.up and leaf(node) and node != node.up.children[0]:
+            if node is not rootnode and node != node.up.children[0]:
                 newick.append(",")
                 
             if leaf(node):

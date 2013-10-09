@@ -13,7 +13,7 @@ from nprlib.argparse import ArgumentParser, RawDescriptionHelpFormatter
 from nprlib import db
 from nprlib.errors import DataError, ConfigError
 from nprlib.logger import get_main_log
-from nprlib.utils import Tree, pjoin, generate_id, get_latest_nprdp
+from nprlib.utils import Tree, pjoin, generate_id, get_latest_nprdp, symlink
 
 def iter_prepostorder(tree):
     finished_nodes = set()
@@ -198,8 +198,7 @@ def assembly_tree(runid, outdir):
                                pjoin(iter_outdir, keyname))
                 except OSError:
                     pass
-                  
-            
+                              
         OUT.close()
         main_tree.write(outfile=base_fname+".nw")
         main_tree.write(features=[], outfile=base_fname+".nwx")
@@ -216,15 +215,12 @@ def assembly_tree(runid, outdir):
         else: 
             log.info("Dumped iteration %s, size of optimized node: %d", iternumber, size)            
         iternumber += 1
-    try:
-        rel_path = base_fname.split("/")[0]
-        os.symlink(rel_path+".nw", pjoin(outdir, "last_iter.nw"))
-        os.symlink(rel_path+".nwx", pjoin(outdir, "last_iter.nwx"))
-        os.symlink(rel_path+".info", pjoin(outdir, "last_iter.info"))
-    except OSError:
-        pass
+    rel_path = base_fname.replace(outdir, "")
+    rel_path = "./" + rel_path.lstrip("/")
+    symlink(rel_path+".nw", pjoin(outdir, "last_iter.nw"))
+    symlink(rel_path+".nwx", pjoin(outdir, "last_iter.nwx"))
+    symlink(rel_path+".info", pjoin(outdir, "last_iter.info"))
     
-
    
 __DESCRIPTION__ = "Dump each iteration (tree and info) of a NPR execution."
        
@@ -300,16 +296,14 @@ if __name__ == "__main__":
                 if os.path.exists(runid_file):
                     runid, runid_date = open(runid_file, "rU").readlines()[-1].split("\t")
                     RUNID_NAME[runid] = fname
-
         else:
             RUNID_NAME[args.runid] = "User_selected"
             runid_date = "?"
-        #lines = open(os.path.join(BASE_DIR, "runid"), "rU").readlines()
-        #selected_runid = lines[-1]
-        #print ''.join(lines)
-        #print "** Selected **", selected_runid
-        #args.runid = selected_runid.split("\t")[0].strip()
-
+        # lines = open(os.path.join(BASE_DIR, "runid"), "rU").readlines()
+        # selected_runid = lines[-1]
+        # print ''.join(lines)
+        # print "** Selected **", selected_runid
+        # args.runid = selected_runid.split("\t")[0].strip()
 
     if args.root:
         REF_OUT = args.root.split(",")
