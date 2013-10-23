@@ -278,7 +278,8 @@ if __name__ == "__main__":
     if not os.path.isdir(BASE_DIR):
         raise ConfigError("NPR dir [%s] not found." %BASE_DIR)
     
-    last_db = get_latest_nprdp(BASE_DIR)
+    #last_db = get_latest_nprdp(BASE_DIR)
+    last_db = os.path.join(BASE_DIR, "npr.db")
     # make a temporal copy of DB to avoid interferences with running
     # jobs
     if not last_db or not os.path.exists(last_db):
