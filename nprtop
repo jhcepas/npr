@@ -15,7 +15,7 @@ from nprlib.argparse import ArgumentParser, RawDescriptionHelpFormatter
 from nprlib import db
 from nprlib.utils import (print_as_table, read_time_file, sec2time, Getch,
                           Tree, iter_prepostorder, pjoin, get_latest_nprdp)
-from nprlib.errors import DataError
+from nprlib.errors import DataError, ConfigError
 from nprlib.logger import get_main_log
 
 subtype2color = {
@@ -205,7 +205,8 @@ if __name__ == "__main__":
         raise DataError("NPR dir [%s] not found." %args.nprdir[0])
     
     nprdir = pjoin(os.path.realpath(args.nprdir[0]))
-    last_db = get_latest_nprdp(nprdir)
+    #last_db = get_latest_nprdp(nprdir)
+    last_db = os.path.join(BASE_DIR, "npr.db")
     if not last_db or not os.path.exists(last_db):
         raise ConfigError("[%s] does not contain NPR data." %last_db)
     shutil.copy(last_db, last_db+".nprtop.tmp")
