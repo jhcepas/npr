@@ -1,17 +1,13 @@
 Workflow Design
 ******************
 
-The workflow config table
-===========================
+A single configuration file is used to define both NPR parameters and workflow
+design. Workflows are defined in the `[sptree]` and `[genetree]` sections of the
+main config file. Every column within such sections will define the details of a
+different workflows (i.e. software and parameters used) and the conditions under
+which such a workflow should be used.
 
-A single configuration file is used to define both NPR parameters and
-workflow design. Workflows are defined in the `[sptree]` and
-`[genetree]` sections of the main config file. Every column within
-such sections will define the details of a precise workflow
-(i.e. software and parameters used) and the conditions under which
-such a workflow should be used.
-
-In the following example, we define two possible workflows: 
+In the following example, two genetree workflows are defined: 
 
 1) a faster approach to optimize partitions with 500 or more
 sequences, in which clustal-omega is used to reconstruct the alignment
@@ -40,7 +36,7 @@ instead of amino-acid.
        aa_aligner           =   @meta_aligner,   @clustalo, 
        aa_alg_cleaner       =   @trimal,         none,       
        aa_model_tester      =   @prottest,       none,     
-       aa_tree_builder      =   @phyml2,          @phyml1,        
+       aa_tree_builder      =   @phyml2,         @phyml1,        
                                                                 
        nt_aligner           =   @muscle,         none,       
        nt_alg_cleaner       =   @trimal,         none,       
@@ -49,11 +45,10 @@ instead of amino-acid.
 
        tree_splitter        =   @splitter,       @splitter
 
-Values starting with `@` refer to extended regions in the config
-file. Thus, `@phyml2` will be translated into a phyml execution using
-the parameters defined in the `[phyml2]` config block. This allows to
-adjust the details of the phylogenetic workflow to different
-scenarios.
+Values starting with `@` refer to specific blocks in the config file. Thus,
+`@phyml2` will be translated into a phyml execution using the parameters defined
+in the `[phyml2]` config block. This allows to adjust the details of the
+phylogenetic workflow to different scenarios.
 
 Configuring external software
 ===================================
@@ -72,17 +67,17 @@ should be considered:
   1. Every application config block should contain an `_app` keyword,
      establishing the associated software.
 
-  2. Some extra internal parameters may be available for certain
-     software and they are always preceded by an underscore symbol
-     (i.e. _aa_model). Check the comments in example config file
-     provided along with this package to understand the meaning of
-     every argument.
+  2. Some extra internal parameters may be available for certain software and
+     they are always preceded by an underscore symbol "_"
+     (i.e. _aa_model). Please refer to the comments in example config file
+     provided along with this package to understand the meaning of every
+     argument.
 
-  3. Any other line in the configuration block will be taken as a
-     program argument and it will be passed verbatim to the external
-     software. Program options and argument must be specified in the
-     `argument = value` format. In the case of *flag-based* arguments, just
-     use an empty value (i.e. --no-memory-check = "").
+  3. Any other line in the configuration block will be taken as a program
+     argument and it will be passed verbatim to the external software. Program
+     options and argument must be specified in the `argument = value` format. In
+     the case of *flag-based* arguments, just use an empty value
+     (i.e. --no-memory-check = "").
 
 In the following example, the `phyml` program is executed in two
 different ways, each referred in a different workflow column:
@@ -120,6 +115,8 @@ different ways, each referred in a different workflow column:
       _app = phyml
       _aa_model = JTT # AA model used if no model selection is performed
       _nt_model = GTR # Nt model used if no model selection is performed
+
+      # The following options are passed to the phyml program
       -o = lr           # Only branch length 
       --pinv = e        # Proportion of invariant sites.  Fixed value in the
                         # [0,1] range or "e" for estimated
@@ -136,6 +133,8 @@ different ways, each referred in a different workflow column:
       _app = phyml
       _aa_model = JTT # AA model used if no model selection is performed
       _nt_model = GTR # Nt model used if no model selection is performed
+
+      # The following options are passed to the phyml program
       -o = tlr          # Tree optimization
       --pinv = e        # Proportion of invariant sites.  Fixed value in the
                         # [0,1] range or "e" for estimated
