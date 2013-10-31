@@ -13,10 +13,12 @@ log = logging.getLogger("main")
 from nprlib.logger import set_logindent, logindent, get_logindent
 from nprlib.utils import (generate_id, PhyloTree, NodeStyle, Tree,
                           DEBUG, NPR_TREE_STYLE, faces, GLOBALS,
-                          basename, pjoin, ask)
+                          basename, pjoin, ask, send_mail, pid_up)
 from nprlib.errors import ConfigError, TaskError
 from nprlib import db, sge
 from nprlib.master_task import (isjob, update_task_states_recursively,
+                                store_task_data_recursively,
+                                remove_task_dir_recursively,
                                 update_job_status)
 from nprlib.template.common import assembly_tree
 
@@ -27,7 +29,7 @@ def debug(_signal, _frame):
 def signal_handler(_signal, _frame):
     if "_background_scheduler" in GLOBALS:
         GLOBALS["_background_scheduler"].terminate()
-
+        
     signal.signal(signal.SIGINT, lambda s,f: None)
     db.commit()
     ver = {28: "0", 26: "1", 24: "2", 22: "3", 20: "4", 10: "5"}
@@ -101,23 +103,24 @@ def schedule(workflow_task_processor, pending_tasks, schedule_time, execution, r
     ## ===================================
 
     cores_total = GLOBALS["_max_cores"]
-    if cores_total > 2:
+    if cores_total > 0:
         job_queue = Queue()
         back_launcher = Process(target=background_job_launcher,
                                 args=(job_queue, run_detached,
-                                      schedule_time, cores_total-2))
+                                      GLOBALS["launch_time"], cores_total))
         GLOBALS["_background_scheduler"] = back_launcher
         back_launcher.start()
     else:
         back_launcher = None
 
     # Captures Ctrl-C
-    signal.signal(signal.SIGINT, signal_handler)
-
+    #signal.signal(signal.SIGINT, signal_handler)
+    last_report_time = None
+    
     BUG = set()
     # Enters into task scheduling
     while pending_tasks:
-        wtime = schedule_time/2.0
+        wtime = schedule_time
 
         # ask SGE for running jobs
         if execution == "sge":
@@ -132,9 +135,20 @@ def schedule(workflow_task_processor, pending_tasks, schedule_time, execution, r
             thread2tasks[task.configid].append(task)
         set_logindent(0)
         log.log(28, "@@13: Updating tasks status:@@1: (%s)" % (ctime()))
+        info_lines = []
         for tid, tlist in thread2tasks.iteritems():
             threadname = GLOBALS[tid]["_name"]
-            log.log(28, "  Thread @@13:%s@@1:: pending tasks: @@8:%s@@1:" %(threadname, len(tlist)))
+            sizelist = ["%s" %getattr(_ts, "size", "?") for _ts in tlist]
+            info = "  Thread @@13:%s@@1:: pending tasks: @@8:%s@@1: of sizes: %s" %(
+                threadname, len(tlist), ', '.join(sizelist))
+            info_lines.append(info)
+            
+        for line in info_lines:
+            log.log(28, line)
+
+        if GLOBALS["email"]  and last_report_time is None:
+            last_report_time = time()
+            send_mail(GLOBALS["email"], "Your NPR process has started", '\n'.join(info_lines))
             
         ## ================================
         ## CHECK AND UPDATE CURRENT TASKS
@@ -166,11 +180,30 @@ def schedule(workflow_task_processor, pending_tasks, schedule_time, execution, r
                 try:
                     show_task_info(task)
                     task.status = task.get_status(qstat_jobs)
-                    if back_launcher:
+                    db.dataconn.commit()
+                    if back_launcher and task.status not in set("DE"):
                         for j, cmd in task.iter_waiting_jobs():
                             j.status = "Q"
                             GLOBALS["cached_status"][j.jobid] = "Q"
                             if j.jobid not in BUG:
+                                if not os.path.exists(j.jobdir):
+                                    os.makedirs(j.jobdir)
+                                for ifile, outpath in j.input_files.iteritems():
+                                    try:
+                                        _tid, _did = ifile.split(".")
+                                        _did = int(_did)
+                                    except (IndexError, ValueError): 
+                                        dataid = ifile
+                                    else:
+                                        dataid = db.get_dataid(_tid, _did)
+                                    if not outpath:
+                                        outfile = pjoin(GLOBALS["input_dir"], ifile)
+                                    else:
+                                        outfile = pjoin(outpath, ifile)
+                                           
+                                    if not os.path.exists(outfile): 
+                                        open(outfile, "w").write(db.get_data(dataid))
+                                        
                                 log.log(24, "  @@8:Queueing @@1: %s from %s" %(j, task))
                                 job_queue.put([j.jobid, j.cores, cmd, j.status_file])
                             BUG.add(j.jobid)
@@ -180,6 +213,12 @@ def schedule(workflow_task_processor, pending_tasks, schedule_time, execution, r
                     checked_tasks.add(task.taskid)
                 except TaskError, e:
                     log.error("Errors found in %s" %task)
+                    import traceback
+                    traceback.print_exc()
+                    if GLOBALS["email"]:
+                        threadname = GLOBALS[task.configid]["_name"]
+                        send_mail(GLOBALS["email"], "Errors found in %s!" %threadname,
+                                  '\n'.join(map(str, [task, e.value, e.msg])))
                     pending_tasks.discard(task)
                     thread_errors[task.configid].append([task, e.value, e.msg])
                     continue
@@ -191,7 +230,7 @@ def schedule(workflow_task_processor, pending_tasks, schedule_time, execution, r
                     show_task_info(task)
 
             if task.status == "D":
-                #db.commit()                
+                #db.commit()
                 show_task_info(task)
                 logindent(3)
                 try:
@@ -203,8 +242,10 @@ def schedule(workflow_task_processor, pending_tasks, schedule_time, execution, r
                     continue
                 else: 
                     logindent(-3)
+                    
                     to_add_tasks.update(create_tasks)
                     pending_tasks.discard(task)
+                    
             elif task.status == "E":
                 #db.commit()
                 log.error("task contains errors: %s " %task)
@@ -241,47 +282,76 @@ def schedule(workflow_task_processor, pending_tasks, schedule_time, execution, r
             sleep(schedule_time)
 
         # Dump / show ended threads
+        error_lines = []
         for configid, etasks in thread_errors.iteritems(): 
-            log.log(28, "Thread @@10:%s@@1: contains errors:" %\
+            error_lines.append("Thread @@10:%s@@1: contains errors:" %\
                         (GLOBALS[configid]["_name"]))
             for error in etasks:
-                log.error(" ** %s" %error[0])
-               
+                error_lines.append(" ** %s" %error[0])
                 e_obj = error[1] if error[1] else error[0]
-                error_path = e_obj.jobdir if isjob(e_obj) else e_obj.taskdir
+                error_path = e_obj.jobdir if isjob(e_obj) else e_obj.taskid
                 if e_obj is not error[0]: 
-                    log.error("      -> %s" %e_obj)
-                log.error("      -> %s" %error_path)
-                log.error("        -> %s" %error[2])
-            
+                    error_lines.append("      -> %s" %e_obj)
+                error_lines.append("      -> %s" %error_path)
+                error_lines.append("        -> %s" %error[2])
+        for eline in error_lines:
+            log.error(eline)
+        
         pending_threads = set([ts.configid for ts in pending_tasks])
         finished_threads = expected_threads - (pending_threads | set(thread_errors.keys()))
+        just_finished_lines = []
+        finished_lines = []
         for configid in finished_threads:
             # configid is the the same as threadid in master tasks
             final_tree_file = pjoin(GLOBALS[configid]["_outpath"],
                                     GLOBALS["inputname"] + ".final_tree")
             threadname = GLOBALS[configid]["_name"]
+
             if configid in past_threads:
                 log.log(28, "Done thread @@12:%s@@1: in %d iterations",
                         threadname, past_threads[configid])
+                finished_lines.append("Finished %s in %d iterations" %(
+                        threadname, past_threads[configid]))
             else:
                 log.log(28, "Assembling final tree...")
                 main_tree, treeiters =  assembly_tree(configid)
                 past_threads[configid] = treeiters - 1
-                log.log(28, "Writing final tree for @@13:%s@@1: %s",
-                        threadname, final_tree_file+".nwx")
+                log.log(28, "Writing final tree for @@13:%s@@1:\n   %s\n   %s",
+                        threadname, final_tree_file+".nw",
+                        final_tree_file+".nwx (newick extended)")
                 main_tree.write(outfile=final_tree_file+".nw")
                 main_tree.write(outfile=final_tree_file+".nwx", features=[])
                 log.log(28, "Done thread @@12:%s@@1: in %d iterations",
                         threadname, past_threads[configid])
-                
+                just_finished_lines.append("Finished %s in %d iterations" %(
+                        threadname, past_threads[configid]))
+        if GLOBALS["email"]:
+            if not pending_tasks:
+                all_lines = finished_lines + just_finished_lines + error_lines
+                send_mail(GLOBALS["email"], "Your NPR process has ended", '\n'.join(all_lines))
+            
+            elif GLOBALS["email_report_time"] and time() - last_report_time >= \
+                    GLOBALS["email_report_time"]:
+                all_lines = info_lines + error_lines + just_finished_lines
+                send_mail(GLOBALS["email"], "Your NPR report", '\n'.join(all_lines))
+                last_report_time = time()
+
+            elif just_finished_lines:
+                send_mail(GLOBALS["email"], "Finished threads!",
+                          '\n'.join(just_finished_lines))
+               
+            
         log.log(26, "")
     if back_launcher:
         back_launcher.terminate()
-        
-    log.log(28, "Done")
-    GLOBALS["citator"].show()
+    if thread_errors:
+        log.error("Done with ERRORS")
+    else:
+        log.log(28, "Done")
 
+    return thread_errors
+
+    
 def background_job_launcher(job_queue, run_detached, schedule_time, max_cores):
     running_jobs = {}
     visited_ids = set()
@@ -295,15 +365,23 @@ def background_job_launcher(job_queue, run_detached, schedule_time, max_cores):
         launched = 0
         done_jobs = set()
         cores_used = 0
-        for jid, (cores, cmd, st_file) in running_jobs.iteritems():
+        for jid, (cores, cmd, st_file, pid) in running_jobs.iteritems():
+            process_done = pid.poll() if pid else None
             try:
                 st = open(st_file).read(1)
             except IOError:
                 st = "?"
+            #print pid.poll(), pid.pid, st
             if st in finished_states:
                  done_jobs.add(jid)
+            elif process_done is not None and st == "R":
+                # check if a running job is actually running
+                print "LOST PROCESS", pid, jid
+                ST=open(st_file, "w"); ST.write("E"); ST.flush(); ST.close()
+                done_jobs.add(jid)
             else:
                 cores_used += cores
+                    
         for d in done_jobs:
             del running_jobs[d]
             
@@ -332,6 +410,7 @@ def background_job_launcher(job_queue, run_detached, schedule_time, max_cores):
             try:
                 if run_detached:
                     cmd += " &"
+                    running_proc = None
                     subprocess.call(cmd, shell=True)
                 else:
                     running_proc = subprocess.Popen(cmd, shell=True)
@@ -340,14 +419,14 @@ def background_job_launcher(job_queue, run_detached, schedule_time, max_cores):
                 ST=open(st_file, "w"); ST.write("E"); ST.flush(); ST.close()
             else:
                 launched += 1
-                running_jobs[jid] = [cores, cmd, st_file]
+                running_jobs[jid] = [cores, cmd, st_file, running_proc]
                 cores_avail -= cores
                 cores_used += cores
                 visited_ids.add(jid)
                 
         waiting_jobs = job_queue.qsize() + len(pending_jobs)
-        log.log(28, "@@8:Launched@@1: %s jobs. Waiting %s jobs. Cores usage: %s/%s",
-                launched, waiting_jobs, cores_used, max_cores)
+        log.log(28, "@@8:Launched@@1: %s jobs. %d(R), %s(W). Cores usage: %s/%s",
+                launched, len(running_jobs), waiting_jobs, cores_used, max_cores)
         for _d in dups:
             print "duplicate bug", _d
         
@@ -415,7 +494,6 @@ def launch_jobs(pending_tasks, execution, run_detached):
                         else:
                             running_proc = subprocess.Popen(cmd, shell=True)
                     except Exception:
-                        task.save_status("E")
                         task.status = "E"
                         raise
                     else:
@@ -471,7 +549,7 @@ def show_task_info(task):
     st_info = ', '.join(["%d(%s)" % (v, k) for k, v in
                          task.job_status.iteritems()])
     log.log(26, "%d jobs: %s" %(len(task.jobs), st_info))
-    tdir = task.taskdir.replace(GLOBALS["basedir"], "")
+    tdir = task.taskid
     tdir = tdir.lstrip("/")
     log.log(20, "TaskDir: %s" %tdir)
     if task.status == "L":

@@ -2,6 +2,7 @@
 import sys
 import os
 import cPickle
+import shutil
 
 # This avoids installing nprlib module. npr script will find it in the
 # same directory in which it is
@@ -12,7 +13,7 @@ from nprlib.argparse import ArgumentParser, RawDescriptionHelpFormatter
 from nprlib import db
 from nprlib.errors import DataError, ConfigError
 from nprlib.logger import get_main_log
-from nprlib.utils import Tree, pjoin, generate_id
+from nprlib.utils import Tree, pjoin, generate_id, get_latest_nprdp, symlink
 
 def iter_prepostorder(tree):
     finished_nodes = set()
@@ -156,10 +157,12 @@ def assembly_tree(runid, outdir):
             leaf.name = leaf.realname
             
         if main_tree:
+            prev_tree = main_tree.copy()
             # substitute node in main tree by the optimized one
             target_node = main_tree.search_nodes(cladeid=cladeid)[0]
             target_node.up.add_child(tree)
             target_node.detach()
+            print "RF with prev tree:", main_tree.robinson_foulds(prev_tree)[:2], len(tree)
             if len(target_node)!= len(tree):
                 print "cladeids"
                 print "searched", cladeid
@@ -169,7 +172,6 @@ def assembly_tree(runid, outdir):
                 __targets, __outs = db.print_node_by_clade(runid, cladeid)
                 print "recomputed from DB", len(__targets), generate_id(__targets)
                 raw_input()
-
         else:
             main_tree = tree
 
@@ -196,8 +198,7 @@ def assembly_tree(runid, outdir):
                                pjoin(iter_outdir, keyname))
                 except OSError:
                     pass
-                  
-            
+                              
         OUT.close()
         main_tree.write(outfile=base_fname+".nw")
         main_tree.write(features=[], outfile=base_fname+".nwx")
@@ -214,14 +215,12 @@ def assembly_tree(runid, outdir):
         else: 
             log.info("Dumped iteration %s, size of optimized node: %d", iternumber, size)            
         iternumber += 1
-    try:
-        os.symlink(base_fname+".nw", pjoin(outdir, "last_iter.nw"))
-        os.symlink(base_fname+".nwx", pjoin(outdir, "last_iter.nwx"))
-        os.symlink(base_fname+".info", pjoin(outdir, "last_iter.info"))
-    except OSError:
-        pass
+    rel_path = base_fname.replace(outdir, "")
+    rel_path = "./" + rel_path.lstrip("/")
+    symlink(rel_path+".nw", pjoin(outdir, "last_iter.nw"))
+    symlink(rel_path+".nwx", pjoin(outdir, "last_iter.nwx"))
+    symlink(rel_path+".info", pjoin(outdir, "last_iter.info"))
     
-
    
 __DESCRIPTION__ = "Dump each iteration (tree and info) of a NPR execution."
        
@@ -276,11 +275,17 @@ if __name__ == "__main__":
         
     args = parser.parse_args()
     BASE_DIR = os.path.abspath(args.nprdir[0])
-    DB_FILE = pjoin(BASE_DIR, "npr.db.top")
     if not os.path.isdir(BASE_DIR):
         raise ConfigError("NPR dir [%s] not found." %BASE_DIR)
-    if not os.path.exists(DB_FILE):
-        raise ConfigError("[%s] does not contain NPR data." %DB_FILE)
+    
+    #last_db = get_latest_nprdp(BASE_DIR)
+    last_db = os.path.join(BASE_DIR, "npr.db")
+    # make a temporal copy of DB to avoid interferences with running
+    # jobs
+    if not last_db or not os.path.exists(last_db):
+        raise ConfigError("[%s] does not contain NPR data." %last_db)
+    shutil.copy(last_db, last_db+".nprdump.tmp")
+    DB_FILE = pjoin(BASE_DIR, last_db+".nprdump.tmp")
 
     if not args.runid:
         RUNID_NAME = {}
@@ -292,16 +297,14 @@ if __name__ == "__main__":
                 if os.path.exists(runid_file):
                     runid, runid_date = open(runid_file, "rU").readlines()[-1].split("\t")
                     RUNID_NAME[runid] = fname
-
         else:
             RUNID_NAME[args.runid] = "User_selected"
             runid_date = "?"
-        #lines = open(os.path.join(BASE_DIR, "runid"), "rU").readlines()
-        #selected_runid = lines[-1]
-        #print ''.join(lines)
-        #print "** Selected **", selected_runid
-        #args.runid = selected_runid.split("\t")[0].strip()
-
+        # lines = open(os.path.join(BASE_DIR, "runid"), "rU").readlines()
+        # selected_runid = lines[-1]
+        # print ''.join(lines)
+        # print "** Selected **", selected_runid
+        # args.runid = selected_runid.split("\t")[0].strip()
 
     if args.root:
         REF_OUT = args.root.split(",")

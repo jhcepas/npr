@@ -16,6 +16,8 @@ import logging
 import time
 import datetime
 import re
+import shutil
+from glob import glob
 log = logging.getLogger("main")
 DEBUG = lambda: log.level <= 10
 hascontent = lambda f: pexist(f) and os.path.getsize(f) > 0
@@ -24,6 +26,32 @@ GLOBALS = {
     "cached_status": {}, # Saves job and task statuses by id to be
                          # used them within the same get_status cycle
 }
+
+class _DataTypes(object):
+    def __init__(self):
+        self.msf = 100
+        self.alg_fasta = 200
+        self.alg_phylip = 201
+        self.clean_alg_fasta = 225
+        self.clean_alg_phylip = 226
+        self.kept_alg_columns = 230
+        self.concat_alg_fasta = 250
+        self.concat_alg_phylip = 251
+        self.alg_list = 290
+        self.best_model = 300
+        self.model_ranking = 305
+        self.model_partitions = 325
+        self.tree = 400
+        self.tree_stats = 410
+        self.constrain_tree = 425
+        self.constrain_alg = 426
+        self.cogs = 500
+        self.cog_analysis = 550
+        
+        self.job = 1
+        self.task = 2
+        
+DATATYPES = _DataTypes()
 
 APP2CLASS = {
     "muscle"         : "Muscle",
@@ -41,7 +69,7 @@ APP2CLASS = {
     "jmodeltest"     : "JModeltest",
     "treesplitter"   : "TreeMerger",
     "concatalg"      : "ConcatAlg",
-    "cogselector"    : "BrhCogSelector",
+    "cogselector"    : "CogSelector",
     }
 
 CLASS2MODULE = {
@@ -113,11 +141,10 @@ tree.DEFAULT_DIST = 1.0
 #from ete_dev.treeview import drawer
 #drawer.GUI_TIMEOUT = 1
 
-
 TIME_FORMAT = '%a %b %d %H:%M:%S %Y'
 
-AA = set("ABCDEFGHIJKLMNPOQRSUTVWXYZ*") | set("abcdefghijklmnpoqrsutvwxyz") 
-NT = set("ACGTURYKMSWBDHVN") | set("acgturykmswbdhvn")
+AA = set('ACEDGFIHKMLNQPSRTWVY*-.UOBZJX') | set('acedgfihkmlnqpsrtwvyuobzjx') 
+NT = set("ACGT*-.URYKMSWBDHVN") | set("acgturykmswbdhvn")
 
 GENCODE = {
     'ATA':'I', 'ATC':'I', 'ATT':'I', 'ATG':'M',
@@ -245,7 +272,25 @@ def read_time_file(fname):
         
     INFO_TIME.close()
     return start, end
-    
+
+
+def dict_string(dictionary, ident = '', braces=1):
+    """ Recursively prints nested dictionaries."""
+    text = []
+    for key in sorted(dictionary.keys()):
+        value = dictionary[key]
+        if isinstance(value, dict):
+            text.append('%s%s%s%s' %(ident,braces*'[',key,braces*']'))
+            text.append('\n')
+            text.append(dict_string(value, ident+'  ', braces+1))
+        else:
+            if isinstance(value, set) or isinstance(value, frozenset):
+                value = sorted(value)
+            text.append(ident+'%s = %s' %(key, value))
+            text.append('\n')
+    return ''.join(text)
+
+
 def checksum(*fnames):
     block_size=2**20
     hash = hashlib.md5()
@@ -268,7 +313,32 @@ def pid_up(pid):
     else:
         return True
 
+def clear_tempdir():
+    base_dir = GLOBALS.get("basedir", None)
+    out_dir = GLOBALS["output_dir"]
+    scratch_dir = GLOBALS.get("scratch_dir", GLOBALS.get("dbdir", base_dir))
+    if base_dir and base_dir != out_dir:
+        try:
+            log.log(20, "Copying new db files to output directory %s..." %out_dir)
+            if not pexist(out_dir):
+                os.makedirs(out_dir)
+            if os.system("cp -a %s/* %s/" %(scratch_dir, out_dir)):
+                log.error("Could not copy data from scratch directory!")
+            log.log(20, "Deleting temp directory %s..." %scratch_dir)
+        except Exception, e:
+            print e
+            log.error("Could not copy data from scratch directory!")
+            pass
+        # By all means, try to remove temp data
+        try: shutil.rmtree(scratch_dir)
+        except OSError: pass
+          
 
+def terminate_job_launcher():
+    back_launcher = GLOBALS.get("_background_scheduler", None)
+    if back_launcher:
+        back_launcher.terminate()
+        
 def print_as_table(rows, header=None, fields=None, print_header=True, stdout=sys.stdout):
     """ Print >>Stdout, a list matrix as a formated table. row must be a list of
     dicts or lists."""
@@ -347,8 +417,7 @@ def print_as_table(rows, header=None, fields=None, print_header=True, stdout=sys
                 print >>stdout, _safe_rjust(_str(p.get(ppt,""), lengths[ppt]))+" | ",
             print >>stdout, ""
             page_counter +=1
-        
-            
+                    
 def get_node2content(node, store=None):
     if not store: store = {}
     for ch in node.children:
@@ -387,7 +456,66 @@ def iter_prepostorder(tree, is_leaf_fn=None):
                 #POSTORDER ACTIONS
                 yield (True, node)
 
-    
+def send_mail_smtp(toaddrs, subject, msg): 
+    import smtplib
+  
+    fromaddr = "no-reply@yournprprocess.local" 
+    # The actual mail send
+    client = smtplib.SMTP('localhost', 1025)
+    client.sendmail(fromaddr, toaddrs, msg)
+    client.quit()
+    print "Mail sent to", toaddrs
+
+def send_mail(toaddrs, subject, text):
+    try:
+        from email.mime.text import MIMEText
+        from subprocess import Popen, PIPE
+
+        msg = MIMEText(text)
+        msg["From"] = 'YourNPRprocess@hostname'
+        msg["To"] = toaddrs
+        msg["Subject"] = subject
+        p = Popen(["/usr/sbin/sendmail", "-t"], stdin=PIPE)
+        p.communicate(msg.as_string())
+    except Exception, e:
+        print e
+
+def symlink(target, link_name):
+    try:
+        os.remove(link_name)
+    except OSError:
+        pass
+    os.symlink(target, link_name)
+        
+def get_latest_nprdp(basedir):
+    avail_dbs = []
+    for fname in glob(os.path.join(basedir, "*.db")):
+        m = re.search("npr\.([\d\.]+)\.db", fname)
+        if m:
+            avail_dbs.append([float(m.groups()[0]), fname])
+
+    if avail_dbs:
+        avail_dbs.sort()
+        print avail_dbs
+        if avail_dbs:
+            last_db = avail_dbs[-1][1]
+            print "Using latest db file available:", os.path.basename(last_db)
+            return last_db
+    else:
+        #tries compressed data
+        compressed_path = pjoin(basedir, "nprdata.tar.gz")
+        if pexist(compressed_path):
+            import tarfile
+            tar = tarfile.open(compressed_path)
+            for member in tar:
+                print member.name
+                m = re.search("npr\.([\d\.]+)\.db", member.name)
+                if m:
+                    print member
+                    avail_dbs.append([float(m.groups()[0]), member])
+        
+    return None
+
 def npr_layout(node):
     if node.is_leaf():
         name = faces.AttrFace("name", fsize=12)

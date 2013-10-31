@@ -3,6 +3,7 @@ import os
 import time
 import cgi
 from hashlib import md5
+import cPickle
 
 ALL = ["WebTreeApplication"]
 
@@ -30,6 +31,7 @@ class WebTreeApplication(object):
         self._treeid2layout = {}
         self._external_app_handler = None
         self._treeid2tree = {}
+        self._treeid2cache = {}
         self._treeid2index = {}
         self.queries = {}
         self.CONFIG = {
@@ -82,38 +84,57 @@ class WebTreeApplication(object):
                     nid2actions.setdefault(int(n._nid), []).append(aindex)
                 elif target == "face" and (not checker or checker(n)):
                     nid2face_actions.setdefault(int(n._nid), []).append(aindex)
-
-        html_map = '<MAP NAME="%s" class="ete_tree_img">' %(mapid)
+                    
+        html_map = '<MAP NAME="%s"  class="ete_tree_img">' %(mapid)
         if img_map["nodes"]:
             for x1, y1, x2, y2, nodeid, text in img_map["nodes"]:
-                html_map += """ <AREA SHAPE="rect" COORDS="%s,%s,%s,%s" onClick='show_context_menu("%s", "%s", "%s");' href="javascript:void('%s');">""" %\
-                    (int(x1), int(y1), int(x2), int(y2), treeid, nodeid, ','.join(map(str, nid2actions.get(nodeid,[]))), str(nodeid) )
+                text = "" if not text else text
+                area = img_map["node_areas"].get(int(nodeid), [0,0,0,0])
+                html_map += """ <AREA SHAPE="rect" COORDS="%s,%s,%s,%s" onMouseOut='unhighlight_node();' onMouseOver='highlight_node("#%s", "%s", %s, %s, %s, %s);' onClick='show_context_menu("%s", "%s", "%s");' href="javascript:void('%s');">""" %\
+                    (int(x1), int(y1), int(x2), int(y2),
+                     treeid, text, area[0], area[1], area[2]-area[0], area[3]-area[1],
+                     treeid, nodeid, ','.join(map(str, nid2actions.get(nodeid,[]))), str(nodeid) )
+                    
         if img_map["faces"]:
             for x1, y1, x2, y2, nodeid, text in img_map["faces"]:
-                html_map += """ <AREA SHAPE="rect" COORDS="%s,%s,%s,%s" onClick='show_context_menu("%s", "%s", "%s", "%s");' href="javascript:void('%s');">""" %\
-                    (int(x1),int(y1),int(x2),int(y2), treeid, nodeid, ','.join(map(str, nid2actions.get(nodeid,[])+nid2face_actions.get(nodeid,[])  )), text, text)
+                text = "" if not text else text
+                area = img_map["node_areas"].get(int(nodeid), [0,0,0,0])
+                html_map += """ <AREA SHAPE="rect" COORDS="%s,%s,%s,%s" onMouseOut='unhighlight_node(); hide_face_popup();' onMouseOver='highlight_node("#%s", "%s", %s, %s, %s, %s); show_face_popup("%s", "%s", "%s", "%s");' onClick='show_context_menu("%s", "%s", "%s", "%s");' href="javascript:void('%s');">""" %\
+                    (int(x1),int(y1),int(x2),int(y2),
+                     treeid, text, area[0], area[1], area[2]-area[0], area[3]-area[1],
+                     treeid, nodeid, ','.join(map(str, nid2actions.get(nodeid,[])+nid2face_actions.get(nodeid,[])  )), text, 
+                     treeid, nodeid, ','.join(map(str, nid2actions.get(nodeid,[])+nid2face_actions.get(nodeid,[])  )), text,
+                     text,
+                     )
+                    
         html_map += '</MAP>'
         return html_map
 
-    def _load_tree(self, treeid, tree=None):
+    def _load_tree(self, treeid, tree=None, cache_file=None):
         # if a tree is given, it overwrites previous versions
-        if tree:
-            t = self._tree(tree)
-            self._treeid2tree[treeid] = t
+        if tree and isinstance(tree, str):
+            tree = self._tree(tree)
+            self._treeid2tree[treeid] = tree
             self._load_tree_index(treeid)
-
+        elif tree:
+            self._treeid2tree[treeid] = tree
+            self._load_tree_index(treeid)
+            
+        self._treeid2cache[treeid] = cache_file if cache_file else "%s.pkl" %treeid
+            
         # if no tree is given, and not in memmory, it tries to loaded
         # from previous sessions
         if treeid not in self._treeid2tree:
-            self._load_tree_from_path(treeid)
+            self._load_tree_from_path(self._treeid2cache[treeid])
 
         # Returns True if tree and indexes are loaded
         return (treeid in self._treeid2tree) and (treeid in self._treeid2index)
 
-    def _load_tree_from_path(self, treeid):
-        tree_path = os.path.join(self.CONFIG["temp_dir"], treeid+".nw")
+    def _load_tree_from_path(self, pkl_path):
+        tree_path = os.path.join(self.CONFIG["temp_dir"], pkl_path)
         if os.path.exists(tree_path):
-            t = self._treeid2tree[treeid] = self._tree(tree_path)
+            print cPickle.load(open(tree_path))
+            t = self._treeid2tree[treeid] = cPickle.load(open(tree_path))
             self._load_tree_index(treeid)
             return True
         else:
@@ -131,8 +152,9 @@ class WebTreeApplication(object):
             return False
 
     def _dump_tree_to_file(self, t, treeid):
-        tree_path = os.path.join(self.CONFIG["temp_dir"], treeid+".nw")
-        open(tree_path, "w").write(t.write(features=[]))
+        tree_path = os.path.join(self.CONFIG["temp_dir"], treeid+".pkl")
+        cPickle.dump(t, open(tree_path, "w"))
+        #open(tree_path, "w").write(t.write(features=[]))
 
     def _get_tree_img(self, treeid, pre_drawing_action=None):
         img_url = os.path.join(self.CONFIG["temp_url"], treeid+".png?"+str(time.time()))
@@ -182,8 +204,8 @@ class WebTreeApplication(object):
 
         ete_publi = '<div style="margin:0px;padding:0px;text-align:left;"><a href="http://ete.cgenomics.org" style="font-size:7pt;" target="_blank" >%s</a></div>' %\
             (version_tag)
-        img_html = """<img class="ete_tree_img" src="%s" USEMAP="#%s" onLoad='javascript:bind_popup();' onclick='javascript:show_context_menu("%s", "", "%s");' >""" %\
-            (img_url, mapid, treeid, ','.join(map(str, tree_actions)))
+        img_html = """<img id="%s" class="ete_tree_img" src="%s" USEMAP="#%s" onLoad='javascript:bind_popup();' onclick='javascript:show_context_menu("%s", "", "%s");' >""" %\
+            (treeid, img_url, mapid, treeid, ','.join(map(str, tree_actions)))
 
         tree_div_id = "ETE_tree_"+str(treeid)
         return html_map+ '<div id="%s" >'%tree_div_id + img_html + ete_publi + "</div>"
@@ -248,7 +270,7 @@ class WebTreeApplication(object):
                 if html_generator: 
                     html += html_generator(i, treeid, nodeid, textface, node)
                 else:
-                    html += """<li><a  href='javascript:void(0)' onClick='run_action("%s", "%s", "%s");'> %s </a></li> """ %\
+                    html += """<li><a  href='javascript:void(0);' onClick='hide_popup(); run_action("%s", "%s", "%s");'> %s </a></li> """ %\
                         (treeid, nodeid, i, aname)
             html += '</ul>'
             return html

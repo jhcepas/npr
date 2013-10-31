@@ -1,6 +1,7 @@
 import sys
 import os
 import re
+import time
 from StringIO import StringIO
 from signal import signal, SIGWINCH, SIGKILL, SIGTERM
 from collections import deque
@@ -10,7 +11,7 @@ import Queue
 import threading
 
 from nprlib.logger import get_main_log
-from nprlib.utils import GLOBALS
+from nprlib.utils import GLOBALS, clear_tempdir, terminate_job_launcher, pjoin, pexist
 from nprlib.errors import *
 
 try:
@@ -25,7 +26,7 @@ SHELL_COLORS = {
     "10": '\033[1;37;41m', # white on red
     "11": '\033[1;37;43m', # white on orange
     "12": '\033[1;37;45m', # white on magenta
-    "16": '\033[1;30;46m', # white on blue
+    "16": '\033[1;37;46m', # white on blue
     "13": '\033[1;37;40m', # black on white
     "06": '\033[1;34m', # light blue
     "05": '\033[1;31m', # light red
@@ -282,9 +283,28 @@ def init_curses(main_scr):
         w.idlok(True)
         w.scrollok(True)
     return WIN
-            
+
+def clean_exit():
+    base_dir = GLOBALS["basedir"]
+    lock_file = pjoin(base_dir, "alive")
+    try:
+        os.remove(lock_file)
+    except Exception:
+        print >>sys.stderr, "could not remove lock file %s" %lock_file
+    clear_tempdir()
+    terminate_job_launcher()
+
 def app_wrapper(func, args):
     global NCURSES
+    base_dir = GLOBALS.get("scratch_dir", GLOBALS["basedir"])
+    lock_file = pjoin(base_dir, "alive")
+    
+    if not pexist(lock_file) or args.clearall:
+        open(lock_file, "w").write(time.ctime())
+    else:
+        clean_exit()
+        print >>sys.stderr, '\nThe same process seems to be running. Use --clearall or remove the lock file "alive" within the output dir'
+        sys.exit(1)
 
     if not args.enable_ui:
         NCURSES = False
@@ -294,10 +314,13 @@ def app_wrapper(func, args):
             curses.wrapper(main, func, args)
         else:
             main(None, func, args)
-    except ConfigError, e: 
+    except ConfigError, e:
         print >>sys.stderr, "\nConfiguration Error:", e
-    except DataError, e: 
+        clean_exit()
+    except DataError, e:
         print >>sys.stderr, "\nData Error:", e
+        clean_exit()
+        sys.exit(1)
     except KeyboardInterrupt:
         print >>sys.stderr, "\nProgram was interrupted."
         if args.monitor:
@@ -314,10 +337,13 @@ def app_wrapper(func, args):
                     print e
                 else:
                     print >>sys.stderr, status_file, "has been marked as error"
-        sys.exit(1)
+        clean_exit()
     except:
+        clean_exit()
         raise
-
+    else:
+        clean_exit()
+    
 def main(main_screen, func, args):
     """ Init logging and Screen. Then call main function """
 
@@ -329,7 +355,8 @@ def main(main_screen, func, args):
     if args.logfile: 
         screen.logfile = open(os.path.join(GLOBALS["basedir"], "npr.log"), "w")
     sys.stdout = screen
-
+    sys.stderr = screen
+    
     # Start logger, pointing to the selected screen
     log = get_main_log(screen, [28,26,24,22,20,10][args.verbosity])
 

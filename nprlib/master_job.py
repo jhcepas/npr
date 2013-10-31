@@ -7,7 +7,7 @@ import logging
 log = logging.getLogger("main")
 
 from nprlib.utils import (md5, basename, strip, pid_up, HOSTNAME,
-                          GLOBALS, TIME_FORMAT)
+                          GLOBALS, TIME_FORMAT, pjoin)
 
 class Job(object):
     ''' A generic program launcher.
@@ -32,11 +32,9 @@ class Job(object):
     '''
     def __repr__(self):
         return "Job (%s, %s)" %(self.jobname, self.jobid[:6])
-
+   
     def __init__(self, bin, args, jobname=None, parent_ids=None):
         # Used at execution time
-        self.jobdir = None
-        self.status_file = None
         self.status = "W"
         # How to run the app
         self.bin = bin
@@ -47,7 +45,7 @@ class Job(object):
         self.cores = 1
         self.exec_type = "insitu"
         self.jobname = jobname
-
+        
         # generates the unique job identifier based on the params of
         # the app. Some params include path names that can prevent
         # recycling the job, so a clean it.
@@ -55,10 +53,10 @@ class Job(object):
         parsed_id_string = ["%s %s" %(clean(str(pair[0])), clean(str(pair[1])))
                             for pair in self.args.iteritems()]
         #print '\n'.join(map(str, self.args.items()))
+
         self.jobid = md5(','.join(sorted([md5(e) for e in
                                           parsed_id_string])))
-
-        #self.jobid = md5(','.join(sorted([md5(str(pair)) for pair in 
+        # self.jobid = md5(','.join(sorted([md5(str(pair)) for pair in 
         #                                  self.args.iteritems()])))
         if parent_ids:
             self.jobid = md5(','.join(sorted(parent_ids+[self.jobid])))
@@ -68,22 +66,25 @@ class Job(object):
 
         self.ifdone_cmd = ""
         self.iffail_cmd = ""
+        self.set_jobdir(pjoin(GLOBALS["tasks_dir"], self.jobid))
+        self.input_files = {}
         self.dependencies = set()
-
+        
+    def add_input_file(self, ifile, outpath = None):
+        self.input_files[ifile] = outpath
+        
     def set_jobdir(self, basepath):
         ''' Initialize the base path for all info files associated to
         the job. '''
         #self.jobdir = os.path.join(basepath, self.jobid)
-        jobname = "%s_%s" %(basename(self.bin), self.jobid[:6])
-        jobname = re.sub("[^0-9a-zA-Z]", "-",jobname)
-
+        #jobname = "%s_%s" %(basename(self.bin), self.jobid[:6])
+        #jobname = re.sub("[^0-9a-zA-Z]", "-",jobname)
         #self.jobdir = os.path.join(basepath, "%s_%s" %\
         #                               (self.jobname, self.jobid[:6]))
 
         self.jobdir = basepath
-        
-        if not os.path.exists(self.jobdir):
-            os.makedirs(self.jobdir)
+        #if not os.path.exists(self.jobdir):
+        #    os.makedirs(self.jobdir)
         self.status_file = os.path.join(self.jobdir, "__status__")
         self.time_file = os.path.join(self.jobdir, "__time__")
         self.cmd_file = os.path.join(self.jobdir, "__cmd__")
@@ -165,9 +166,6 @@ class Job(object):
 
         return self.status
 
-    def save_status(self, status):
-        open(self.status_file, "w").write(status)
-        
     def clean(self):
         if os.path.exists(self.jobdir):
             shutil.rmtree(self.jobdir)

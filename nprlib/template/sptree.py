@@ -2,9 +2,10 @@ import logging
 from collections import defaultdict
 
 from nprlib.task import TreeMerger
-from nprlib.utils import GLOBALS, generate_runid, pjoin, rpath
+from nprlib.utils import (GLOBALS, generate_runid, pjoin, rpath, DATATYPES, md5,
+                          dict_string)
 
-from nprlib.errors import DataError
+from nprlib.errors import DataError, TaskError
 from nprlib import db
 from nprlib.template.common import (process_new_tasks, IterConfig,
                                     get_next_npr_node, get_iternumber)
@@ -59,36 +60,83 @@ def process_task(task, npr_conf, nodeid2info):
     threadid, nodeid, seqtype, ttype = (task.threadid, task.nodeid,
                                         task.seqtype, task.ttype)
     cladeid, targets, outgroups = db.get_node_info(threadid, nodeid)
+    if outgroups and len(outgroups) > 1:
+        constrain_id = nodeid
+    else:
+        constrain_id = None
+        
     node_info = nodeid2info[nodeid]
     conf = GLOBALS[task.configid]
     new_tasks = []    
     if ttype == "cog_selector":
-        # register concat alignment task. NodeId associated to
-        # concat_alg tasks and all its sibling jobs should take into
-        # account cog information and not only species and outgroups
-        # included.
-        concat_job = concatclass(nodeid, task.cogs,
-                                 seqtype, conf, concatconf)
+       
+        # Generates a md5 id based on the genetree configuration workflow used
+        # for the concat alg task. If something changes, concat alg will change
+        # and the associated tree will be rebuilt
+        config_blocks = set(["genetree"])
+        for key, value in conf["genetree"].iteritems():
+            if isinstance(value, list) or  isinstance(value, tuple) \
+                    or isinstance(value, set):
+                for elem in value:
+                    config_blocks.add(elem[1:]) if isinstance(elem, str) and elem.startswith("@") else None
+            elif isinstance(value, str):
+                config_blocks.add(value[1:]) if value.startswith("@") else None
+        config_checksum =  md5(''.join(["[%s]\n%s" %(x, dict_string(conf[x]))
+                                        for x in sorted(config_blocks)]))
+        
+        # Check that current selection of cogs will cover all target and
+        # outgroup species
+        cog_hard_limit = int(conf[concatconf]["_max_cogs"])
+        sp_repr = defaultdict(int)
+        for co in task.raw_cogs[:cog_hard_limit]:
+            for seq in co:
+                sp = seq.split(GLOBALS["spname_delimiter"], 1)[0]
+                sp_repr[sp] += 1
+        missing_sp = (targets | outgroups) - set(sp_repr.keys())
+        if missing_sp:
+            raise TaskError("missing species under current cog selection:" %missing_sp)
+        else:
+            log.log(28, "Analysis of current COG selection:")
+            for sp, ncogs in sorted(sp_repr.items(), key=lambda x:x[1]):
+                log.log(28, "   % 30s species present in % 6d COGs" %(sp, ncogs))
+                
+        # register concat alignment task. NodeId associated to concat_alg tasks
+        # and all its children jobs should take into account cog information and
+        # not only species and outgroups included.
+        concat_job = concatclass(task.cogs, seqtype, conf, concatconf,
+                                 config_checksum)
+
         db.add_node(threadid,
                     concat_job.nodeid, cladeid,
                     targets, outgroups)
-                                      
+
+        # Register Tree constrains
+        constrain_tree = "(%s, (%s));" %(','.join(sorted(outgroups)), 
+                                         ','.join(sorted(targets)))
+        _outs = "\n".join(map(lambda name: ">%s\n0" %name, sorted(outgroups)))
+        _tars = "\n".join(map(lambda name: ">%s\n1" %name, sorted(targets)))
+        constrain_alg = '\n'.join([_outs, _tars])
+        db.add_task_data(concat_job.nodeid, DATATYPES.constrain_tree, constrain_tree)
+        db.add_task_data(concat_job.nodeid, DATATYPES.constrain_alg, constrain_alg)
+        db.dataconn.commit() # since the creation of some Task objects
+                             # may require this info, I need to commit
+                             # right now.
         concat_job.size = task.size
         new_tasks.append(concat_job)
        
     elif ttype == "concat_alg":
         # register tree for concat alignment, using constraint tree if
         # necessary
-        constrain_tree_path = None 
-        if outgroups and len(outgroups) > 1 and len(targets) > 1:
-            constrain_tree_path = pjoin(task.taskdir,
-                                        "constrain_tree.nw")
-            newick = "(%s, (%s));" %(','.join(outgroups), ','.join(targets))
-            open(constrain_tree_path, "w").write(newick)
-           
-        tree_task = treebuilderclass(nodeid, task.alg_phylip_file,
-                                     constrain_tree_path, "JTT",
-                                     seqtype, conf, treebuilderconf)
+        alg_id = db.get_dataid(task.taskid, DATATYPES.concat_alg_phylip)
+        try:
+            parts_id = db.get_dataid(task.taskid, DATATYPES.model_partitions)
+        except ValueError:
+            parts_id = None
+       
+        tree_task = treebuilderclass(nodeid, alg_id,
+                                     constrain_id, None,
+                                     seqtype, conf, treebuilderconf,
+                                     parts_id=parts_id)
         tree_task.size = task.size
         new_tasks.append(tree_task)
         
@@ -111,10 +159,13 @@ def process_task(task, npr_conf, nodeid2info):
         # Add new nodes
         source_seqtype = "aa" if "aa" in GLOBALS["seqtypes"] else "nt"
         ttree, mtree = task.task_tree, task.main_tree
+
         log.log(28, "Processing tree: %s seqs, %s outgroups",
                 len(targets), len(outgroups))
+        
         for node, seqs, outs in get_next_npr_node(task.configid, ttree,
-                                                  mtree, None, npr_conf):
+                                                  task.out_seqs, mtree, None,
+                                                  npr_conf): # None is to avoid alg checks
             log.log(28, "Adding new node: %s seqs, %s outgroups",
                     len(seqs), len(outs))
             new_task_node = cogclass(seqs, outs,

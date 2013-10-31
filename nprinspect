@@ -1,0 +1,202 @@
+#!/usr/bin/env python
+import sys
+import os
+import time
+from string import strip
+
+# This avoids installing nprlib module. npr script will find it in the
+# same directory in which it is
+NPRPATH = os.path.split(os.path.realpath(__file__))[0]
+sys.path.insert(0, NPRPATH)
+import signal
+from collections import defaultdict
+
+from nprlib.argparse import ArgumentParser, RawDescriptionHelpFormatter
+from nprlib.utils import (print_as_table, read_time_file, sec2time, Getch, Tree, iter_prepostorder, pjoin)
+from nprlib import db
+from nprlib.errors import DataError
+from nprlib.logger import get_main_log
+
+import sqlite3
+
+subtype2color = {
+    "tree": "green",
+    "treemerger": "cyan",
+    "alg": "red",
+    "acleaner": "yellow",
+    "concat_alg": "red", 
+    "mchooser": "orange",
+    "cog_selector": "blue", 
+    "msf": "blue"
+}
+status2color = {
+    "E": "green",
+    "W": "yellow",
+    "R": "orange",
+    "D": "blue"
+}
+
+def color(color, string):
+    if not args.colors:
+        return string
+        
+    color2code = {
+        "header": '\033[95m',
+        "blue": '\033[94m',
+        "green": '\033[92m',
+        "yellow": '\033[93m',
+        "red": '\033[91m',
+        "magenta": "\033[35m",
+        "gray": "\033[37m",
+        "orange": "\033[33m",
+        "black": "\033[30m",
+        "cyan": "\033[36m",
+        "white": "\033[29m",
+    }
+    END = '\033[0m'
+    return ''.join([color2code[color], string, END])
+
+def get_report(runid):
+    cmd = """
+      SELECT task.taskid, task.nodeid, task.parentid, task.status,
+             type, subtype, name, tm_end-tm_start, tm_start, tm_end
+             FROM task 
+      """ 
+    print cmd
+    
+    #ORDER BY task.status ASC,target_size DESC;
+    CURSOR.execute(cmd)
+    report = CURSOR.fetchall()
+    return report
+
+
+def inspect_ly(node):
+    if hasattr(node, "npr"):
+        if node.npr["type"] == "job":
+            node.img_style["fgcolor"] = "indianred"
+            node.img_style["shape"] = "square"
+            node.img_style["size"] = 6
+        elif node.npr["type"] == "task":
+            node.img_style["fgcolor"] = subtype2color[node.npr["subtype"]]
+            node.img_style["size"] = 8
+            if node.npr["subtype"] == "msf":
+                node.img_style["shape"] = "circle"
+                node.img_style["size"] = 12
+            elif node.npr["subtype"] == "tree":
+                node.img_style["shape"] = "circle"
+                node.img_style["size"] = 10
+            elif node.npr["subtype"] == "treemerger":
+                node.img_style["shape"] = "sphere"
+                node.img_style["size"] = 15
+            elif node.npr["subtype"] in set(["alg", "acleaner"]) :
+                node.img_style["shape"] = "circle"
+                node.img_style["size"] = 8
+            
+                        
+def update_top():
+    short_date = lambda secs: time.strftime("%d %b %y, %H:%M", time.gmtime(secs))
+    os.system("clear")
+    runid_name = RUNID_NAME.get(RUNIDS[CURRENT_RUNID], RUNIDS[CURRENT_RUNID])
+    print "NPR execution ID:", color("magenta", runid_name), "started:", color("yellow", runid_date)
+    print "Current time:", time.ctime()
+    print "Showing %s-%s records" %(args.start_entry, args.start_entry + args.entries)
+    report = get_report(RUNIDS[CURRENT_RUNID])
+    hd = ["t.id", "st", "t.type", "t.subtype", "t.name", "size", "outs", "ex.time", "start", "end"]
+    mod_report = []
+    report.sort(key=lambda x: x[8])
+
+    name2node = {}
+    n2parent = {}
+    roots = []
+    for r in report:
+        print r["taskid"], r["parentid"], r["nodeid"], r["type"], r["subtype"], r["name"]
+        node = Tree()
+        node.name = r["subtype"] + r["name"]
+        name2node[r["taskid"]] = node
+        node.add_features(npr = r)
+        if r["parentid"]:
+            n2parent[r["taskid"]] = r["parentid"]
+        else:
+            roots.append(node)
+
+        for key, value in dict(r).iteritems():
+            node.add_feature("npr_%s"%key, str(value))
+            
+    for nodeid, parentid in n2parent.iteritems():
+        print nodeid, parentid
+        name2node[parentid].add_child(name2node[nodeid])
+       
+    for node in roots[0].traverse():
+        if node.children:
+            node.children.sort(lambda a,b: cmp(a.npr["tm_start"], b.npr["tm_start"]))
+        
+    for t in roots:
+        print t
+        t.show(inspect_ly)
+        
+    #print_as_table(mod_report, fields=[0, 4, 5, 6, 7, 8, 9, 10, 11, 12], header=hd )
+    #return len(report)
+__DESCRIPTION__ = "Display NPR tasks"
+        
+if __name__ == "__main__":
+    parser = ArgumentParser(description=__DESCRIPTION__, 
+                            formatter_class=RawDescriptionHelpFormatter)
+   
+    parser.add_argument("-t", "--schedule-time", dest="schedule_time", 
+                        type=int, default=5,
+                        help="""Refresh time in seconds. """)
+  
+    parser.add_argument('nprdir', metavar='npr_base_dir', type=str, nargs=1,
+                   help='Path to an NPR execution directory')
+
+    parser.add_argument("-C", dest="colors", 
+                        action="store_false", 
+                        help="""Disable colors""")
+
+    parser.add_argument("-n", dest="entries", 
+                        type=int, default=40,
+                        help="""Number of entries (rows) to show.""")
+
+    parser.add_argument("-s", dest="start_entry", 
+                        type=int, default=0,
+                        help="""starting entry.""")
+
+    parser.add_argument("-f", dest="filter_states", 
+                        type=set, default=set(),
+                        help="""Filter out entries whose state is in filter_states""")
+    
+    parser.add_argument("-i", dest="runid", 
+                        type=str, nargs="+",
+                        help="""Specifies what execution thread id to show. "
+                        "Last execution id is used by default.""")
+  
+    args = parser.parse_args()
+    if not os.path.isdir(args.nprdir[0]):
+        raise DataError("NPR dir [%s] not found." %args.nprdir[0])
+    #if not os.path.exists(os.path.join(args.nprdir[0], "npr.db")):
+    #    raise DataError("[%s] does not contain NPR data." %args.nprdir[0])
+        
+    #dbfile = os.path.join(os.path.realpath(args.nprdir[0]), "npr.db")
+    log = get_main_log(sys.stderr)
+    nprdir = pjoin(os.path.realpath(args.nprdir[0]))
+    RUNID_NAME = {}
+    if not args.runid:
+        RUNIDS = set()
+        for fname in os.listdir(nprdir):
+            runid_file = pjoin(nprdir, fname, "runid")
+            if os.path.exists(runid_file):
+                runid, dbfile = open(runid_file, "rU").readlines()[-1].split("\t")
+                runid, dbfile = map(strip, [runid, dbfile])
+                RUNIDS.add(runid)
+                RUNID_NAME[runid] = fname
+        runid_date = dbfile
+    else:
+        RUNIDS = set(args.runid)
+        runid_date = "?"
+
+    RUNIDS = list(RUNIDS)
+    CURRENT_RUNID = 0
+    conn = sqlite3.connect(dbfile)
+    conn.row_factory = sqlite3.Row
+    CURSOR = conn.cursor()
+    update_top()

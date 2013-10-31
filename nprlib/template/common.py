@@ -49,6 +49,8 @@ aa_tree_builder = list()
 nt_tree_builder = list()
 tree_splitter = list()
 
+target_levels = set()
+
 [meta_aligner]
 _alg_trimming = boolean()
 
@@ -120,10 +122,10 @@ def process_new_tasks(task, new_tasks):
         if task:
             # Clone processor, in case tasks belong to a side workflow
             ts.task_processor = task.task_processor
-            ts.threadid = task.threadid
             ts.configid = task.configid
+            ts.threadid = task.threadid
             ts.main_tree = task.main_tree
-        db.add_runid2task(ts.threadid, ts.taskid)
+        #db.add_runid2task(ts.threadid, ts.taskid)
             
 def inc_iternumber(threadid):
     current_iter = get_iternumber(threadid)
@@ -166,7 +168,7 @@ def get_seqs_identity(alg, seqs):
             numpy.mean(ident), numpy.std(ident))
 
     
-def split_tree(task_tree, main_tree, alg_path, npr_conf, threadid):
+def split_tree(task_tree_node, task_outgroups, main_tree, alg_path, npr_conf, threadid):
     """Browses a task tree from root to leaves and yields next
     suitable nodes for NPR iterations. Each yielded node comes with
     the set of target and outgroup tips. 
@@ -182,15 +184,18 @@ def split_tree(task_tree, main_tree, alg_path, npr_conf, threadid):
 
         """
         _isleaf = False
-        if len(n2content[_n]) >= npr_conf.min_npr_size and _n is not master_node:
+        if len(n2content[_n]) >= npr_conf.min_npr_size \
+                and _n is not master_node \
+                and (not _TARGET_NODES or _n in _TARGET_NODES):
+                        
             if ALG and npr_conf.max_seq_simiarity < 1.0: 
                 if not hasattr(_n, "seqs_mean_ident"):
                     log.log(20, "Calculating node sequence stats...")
-
                     mx, mn, avg, std = get_seqs_identity(ALG,
                                                          [__n.name for __n in n2content[_n]])
                     _n.add_features(seqs_max_ident=mx, seqs_min_ident=mn,
                                    seqs_mean_ident=avg, seqs_std_ident=std)
+                    log.log(20, "mx=%s, mn=%s, avg=%s, std=%s" %(mx, mn, avg, std))
             else:
                 _n.add_features(seqs_max_ident=None, seqs_min_ident=None,
                                 seqs_mean_ident=None, seqs_std_ident=None)
@@ -214,30 +219,68 @@ def split_tree(task_tree, main_tree, alg_path, npr_conf, threadid):
                 # If sequences are different enough and node is
                 # not well supported, optimize it. 
                 _isleaf = True
+            
         return _isleaf
         
     log.log(20, "Loading tree content...")
-    n2content = main_tree.get_node2content()
-    if alg_path: 
-        log.log(20, "Calculating sequence similarity for each tree node...")
-        ALG = SeqGroup(alg_path)
+    n2content = main_tree.get_cached_content()
+    if alg_path:
+        log.log(20, "Loading associated alignment to check seq. similarity")
+        raw_alg = db.get_task_data(*alg_path.split("."))
+        ALG = SeqGroup(raw_alg)
     else:
         ALG = None
-    #for n in task.task_tree.traverse(): 
+    #for n in task.task_tree_node.traverse(): 
     #    content = n2content[n]
     #    mx, mn, avg, std = get_seqs_identity(ALG, [node.name for node in content])
     #    n.add_features(seqs_max_ident=mx, seqs_min_ident=mn,
     #                   seqs_mean_ident=avg, seqs_std_ident=std)
 
     log.log(20, "Finding next NPR nodes...")
-    # task_tree is actually a node in main_tree, since it has been
+    # task_tree_node is actually a node in main_tree, since it has been
     # already merged
-    trees_to_browse = [task_tree]
+    trees_to_browse = [task_tree_node]
     npr_nodes = 0
+    # loads current tree content, so we can check not reconstructing exactly the
+    # same tree
+    tasktree_content = set([leaf.name for leaf in n2content[task_tree_node]]) | set(task_outgroups)
     while trees_to_browse: 
         master_node = trees_to_browse.pop()
-        root_content = set([leaf.name for leaf in n2content[master_node]])
+
+        # if custom taxa levels are defined as targets, find them in this
+        # subtree
+        _TARGET_NODES = defaultdict(list) # this container is used by
+                                          # processable_node function
+        if GLOBALS["optimized_levels"]:
+            # any descendant of the already processed node is suitable for
+            # selection. If the ancestor of level-species is on top of the
+            # task_tree_node, it will be discarded
+            avail_nodes = set(master_node.get_descendants())
+            for lin in GLOBALS["optimized_levels"]:
+                sp2lin, lin2sp = GLOBALS["lineages"]
+                optimized, strict_monophyly = GLOBALS["optimized_levels"][lin]
+                if not optimized:
+                    ancestor = main_tree.get_common_ancestor(*lin2sp[lin])
+                    if ancestor in avail_nodes:
+                        # check that the node satisfies level monophyly config
+                        ancestor_content = set([x.name for x in n2content[ancestor]])
+                        if not strict_monophyly or lin2sp[lin] == ancestor_content:
+                            _TARGET_NODES[ancestor].append(lin)
+                        elif strict_monophyly:
+                            log.log(28, "Discarding not monophyletic level @@11:%s@@1:" %lin)
+                    else:
+                        log.log(28, "Discarding upper clade @@11:%s@@1:" %lin)
+                        
         for node in master_node.iter_leaves(is_leaf_fn=processable_node):
+            if GLOBALS["optimized_levels"]:
+                log.log(28, "Trying to optimizing custom tree level: @@11:%s@@1:" %_TARGET_NODES[node])
+                for lin in _TARGET_NODES[node]:
+                    # Marks the level as optimized, so is not computed again
+                    GLOBALS["optimized_levels"][lin][0] = True
+           
+            log.log(28, "Found possible target node of size %s" %len(n2content[node]))
+
+            # Finds best outgroup for the target node
             if npr_conf.outgroup_size == 0:
                 seqs = set([_i.name for _i in n2content[node]])
                 outs = set()
@@ -245,21 +288,30 @@ def split_tree(task_tree, main_tree, alg_path, npr_conf, threadid):
                 splitterconfname, _ = npr_conf.tree_splitter
                 splitterconf = GLOBALS[threadid][splitterconfname]
                 seqs, outs = select_outgroups(node, n2content, splitterconf)
-            if seqs | outs == root_content:
-                log.log(28, "Discarding NPR node due to perfect identity with its parent")
+                
+            if seqs | outs == tasktree_content:
+                log.log(28, "Discarding target node of size %s, due to identity with its parent node" %len(n2content[node]))
+                #print tasktree_content
+                #print seqs
+                #print outs
                 trees_to_browse.append(node)
             else:
                 npr_nodes += 1
+                log.log(28,
+                        "@@16:Target node of size %s with %s outgroups marked for a new NPR iteration!@@1:" %(
+                        len(seqs),
+                        len(outs)))
                 yield node, seqs, outs
     log.log(28, "%s nodes will be optimized", npr_nodes)
 
-def get_next_npr_node(threadid, ttree, mtree, alg_path, npr_conf):
+def get_next_npr_node(threadid, ttree, task_outgroups, mtree, alg_path, npr_conf):
     current_iter = get_iternumber(threadid)
     if npr_conf.max_iters and current_iter >= npr_conf.max_iters:
         log.warning("Maximum number of iterations reached!")
         return
         
-    for node, seqs, outs in split_tree(ttree, mtree, alg_path, npr_conf, threadid):
+    for node, seqs, outs in split_tree(ttree, task_outgroups, mtree, alg_path,
+                                       npr_conf, threadid):
         if npr_conf.max_iters and current_iter < npr_conf.max_iters:
 
             if DEBUG():
@@ -349,11 +401,12 @@ def select_outgroups(target, n2content, splitterconf):
                       %out_min_support)
     valid_nodes.sort(sort_outgroups, reverse=True)
     best_outgroup = valid_nodes[0]
-
     seqs = [n.name for n in n2content[target]]
     outs = [n.name for n in n2content[best_outgroup]]
    
-    log.log(20, "Found possible outgroup. Size:%s Score(support,size,dist):%s", len(outs), score(best_outgroup))
+    log.log(20,
+            "Found possible outgroup of size %s: score (support,size,dist)=%s",
+            len(outs), score(best_outgroup))
    
     log.log(20, "Supports: %0.2f (children=%s)", best_outgroup.support,
             ','.join(["%0.2f" % ch.support for ch in
@@ -436,5 +489,6 @@ def assembly_tree(runid):
         tree.add_features(iternumber=iternumber)
         iternumber += 1
     return main_tree, iternumber 
-          
-
+        
+  
+    

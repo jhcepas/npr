@@ -3,7 +3,9 @@ from collections import defaultdict
 import sqlite3
 import cPickle
 import base64
+import zlib
 import logging
+from nprlib.utils import md5, pexist
 
 log = logging.getLogger("main")
 
@@ -13,6 +15,8 @@ seqconn = None
 seqcursor = None
 orthoconn = None
 orthocursor = None
+dataconn = None
+datacursor = None
 
 AUTOCOMMIT = False
 def autocommit(targetconn = conn):
@@ -25,25 +29,48 @@ def encode(x):
 def decode(x):
     return cPickle.loads(base64.decodestring(x))
 
+def zencode(x):
+    return base64.encodestring(zlib.compress(cPickle.dumps(x)))
+
+def zdecode(x):
+    return cPickle.loads(zlib.decompress(base64.decodestring(x)))
+
+def prevent_sqlite_umask_bug(fname):
+    # avoids using sqlite module to create the file with deafult 644 umask
+    # permissions. Bug
+    # http://www.mail-archive.com/sqlite-users@sqlite.org/msg59080.html
+    if not pexist(fname):
+        open(fname, "w").close() 
+    
 def connect_nprdb(nprdb_file):
     global conn, cursor
     conn = sqlite3.connect(nprdb_file)
     cursor = conn.cursor()
 
+def init_datadb(datadb_file):
+    global dataconn, datacursor
+    prevent_sqlite_umask_bug(datadb_file)    
+    dataconn = sqlite3.connect(datadb_file)
+    datacursor = dataconn.cursor()
+    create_data_db()
+    
 def init_nprdb(nprdb_file):
     global conn, cursor
+    prevent_sqlite_umask_bug(nprdb_file)
     conn = sqlite3.connect(nprdb_file)
     cursor = conn.cursor()
     create_db()
 
 def init_seqdb(seqdb_file):
     global seqconn, seqcursor
+    prevent_sqlite_umask_bug(seqdb_file)
     seqconn = sqlite3.connect(seqdb_file)
     seqcursor = seqconn.cursor()
     create_seq_db()
 
 def init_orthodb(orthodb_file):
     global orthoconn, orthocursor
+    prevent_sqlite_umask_bug(orthodb_file)
     orthoconn = sqlite3.connect(orthodb_file)
     orthocursor = orthoconn.cursor()
     create_ortho_db()
@@ -51,6 +78,7 @@ def init_orthodb(orthodb_file):
 def close():
     conn.close()
     seqconn.close()
+    dataconn.close()
     if orthoconn: orthoconn.close()
     
 def parse_job_list(jobs):
@@ -77,6 +105,89 @@ def create_ortho_db():
     # indexes are created while importing
     orthocursor.executescript(ortho_table)
     autocommit(orthoconn)
+
+def create_data_db():
+    data_table = '''
+    CREATE TABLE IF NOT EXISTS task(
+    taskid CHAR(32) PRIMARY KEY, 
+    type INTEGER,
+    tasktype INTEGER,
+    cmd BLOB,
+    stdout BLOB,
+    stderr BLOB, 
+    time BLOB,
+    status CHAR(1)
+    );
+
+    CREATE TABLE IF NOT EXISTS task2data(
+      taskid CHAR(32),
+      datatype INTEGER,
+      md5 CHAR(32),
+      PRIMARY KEY(taskid, datatype)
+    );
+
+    CREATE TABLE IF NOT EXISTS data(
+      md5 CHAR(32) PRIMARY KEY,
+      data BLOB
+    );
+
+    '''
+    # indexes are created while importing
+    datacursor.executescript(data_table)
+    autocommit(dataconn)
+
+def get_dataid(taskid, datatype):
+    cmd = """ SELECT md5 FROM task2data WHERE taskid="%s" AND datatype = "%s"
+        """ %(taskid, datatype)
+    datacursor.execute(cmd)
+    try:
+        return datacursor.fetchone()[0]
+    except TypeError:
+        raise ValueError("data not found")
+
+def get_data(dataid):
+    cmd = """ SELECT data.data FROM data WHERE md5="%s" """ %(dataid)
+    datacursor.execute(cmd)
+    return zdecode(datacursor.fetchone()[0])
+
+def get_task_data(taskid, datatype):
+    cmd = """ SELECT data FROM task2data as t LEFT JOIN data AS d ON(d.md5 = t.md5) WHERE taskid="%s" AND t.datatype = "%s"
+        """ %(taskid, datatype)
+    datacursor.execute(cmd)
+    return zdecode(datacursor.fetchone()[0])
+
+def task_is_saved(taskid):
+    cmd = """ SELECT status FROM task WHERE taskid="%s" """ %taskid
+    datacursor.execute(cmd)
+    try:
+        st = datacursor.fetchone()[0]
+    except TypeError:
+        return False
+    else:
+        return True if st =="D" else False
+
+def add_task_data(taskid, datatype, data, duplicates="OR IGNORE"):
+    data_id = md5(str(data))
+    cmd = """ INSERT %s INTO task (taskid, status) VALUES
+    ("%s", "D") """ %(duplicates, taskid)
+    datacursor.execute(cmd)
+    
+    cmd = """ INSERT %s INTO task2data (taskid, datatype, md5) VALUES
+    ("%s", "%s", "%s") """ %(duplicates, taskid, datatype, data_id)
+    datacursor.execute(cmd)
+    cmd = """ INSERT %s INTO data (md5, data) VALUES
+    ("%s", "%s") """ %(duplicates, data_id, zencode(data))
+    datacursor.execute(cmd)
+    autocommit()
+    return data_id
+
+def register_task_data(taskid, datatype, data_id, duplicates="OR IGNORE"):
+    cmd = """ INSERT %s INTO task2data (taskid, datatype, md5) VALUES
+    ("%s", "%s", "%s") """ %(duplicates, taskid, datatype, data_id)
+    datacursor.execute(cmd)
+    autocommit()
+    return data_id
+
     
 def create_seq_db():
     seq_table ='''
@@ -165,7 +276,6 @@ def add_task(tid, nid, parent=None, status=None, type=None, subtype=None,
     cmd = ('INSERT OR REPLACE INTO task (taskid, nodeid, parentid, status,'
            ' type, subtype, name) VALUES (%s);' %(values))
     execute(cmd)
-
     autocommit()
     
 def add_runid2task(runid, tid):
@@ -199,7 +309,7 @@ def update_node(nid, runid, **kargs):
         execute(cmd)
         autocommit()
         
-def get_task_status(tid):
+def get_last_task_status(tid):
     cmd = 'SELECT status FROM task WHERE taskid="%s"' %(tid)
     execute(cmd)
     return cursor.fetchone()[0]
@@ -274,8 +384,11 @@ def get_runid_nodes(runid):
     
 def report(runid, filter_rules=None):
     task_ids = get_runid_tasks(runid)
-    filters = 'WHERE runid ="%s" AND taskid IN (%s) ' %(runid,
-                            ','.join(map(lambda x: '"%s"' %x, task_ids)))
+    #filters = 'WHERE runid ="%s" AND taskid IN (%s) ' %(runid,
+    #                        ','.join(map(lambda x: '"%s"' %x, task_ids)))
+    # There is a single npr.db file per runid
+    filters = 'WHERE runid ="%s" ' %(runid)
+    
     if filter_rules: 
         custom_filter = ' AND '.join(filter_rules)
         filters += " AND " + custom_filter
@@ -347,6 +460,11 @@ def update_species_in_ortho_pairs():
     cmd = 'INSERT OR REPLACE INTO species (taxid) VALUES (?)'
     orthocursor.executemany(cmd, [[sp] for sp in species])
     print cmd
+    autocommit()
+
+def update_cog_species(species):
+    cmd = 'INSERT OR REPLACE INTO species (taxid) VALUES (?)'
+    orthocursor.executemany(cmd, [[sp] for sp in species])
     autocommit()
     
 def get_ortho_species():

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
+ 
 import errno
 import __builtin__
 def wrap(method, retries):
@@ -21,7 +21,6 @@ def wrap(method, retries):
 class safefile(file):
     __retries = 2
     def read(self, *args, **kargs):
-        print "CAPTURADO"
         for i in xrange(self.__retries):
             try:
                 return file.read(self, *args, **kargs)
@@ -54,7 +53,7 @@ from StringIO import StringIO
 from collections import defaultdict
 import filecmp
 import logging
-from tempfile import NamedTemporaryFile        
+import tempfile
 log = None
 import numpy
 from time import ctime, time
@@ -68,7 +67,7 @@ from nprlib.configobj import ConfigObj, flatten_errors
 from nprlib import validate
 from nprlib.utils import (strip, SeqGroup, generate_runid,  AA, NT,
                           GLOBALS, encode_seqname, pjoin, pexist,
-                          hascontent, ETE_CITE)
+                          hascontent, clear_tempdir, ETE_CITE)
 from nprlib.errors import ConfigError, DataError
 from nprlib.master_task import Task
 from nprlib.interface import app_wrapper
@@ -96,24 +95,32 @@ except:
 __DESCRIPTION__ = (
 """--------------------------------------------------------------------------------
             Nested Phylogenetic Reconstruction (NPR) program.
-                          NPR-0.1%s(beta), %s.
+                     ETE-NPR %s (beta), %s.
     
-      NPR allows to reconstruct large phylogenies by means of an
-      iterative strategy that provides scalable resolution along the
-      different levels of a tree. At each iteration, internal nodes
-      are re-evaluated to optimize and fine tune the parameters of the
-      phylogenetic inference.
+      ETE-NPR is a Python application that encapsulates all necessary software
+      and methods to reconstruct phylogenetic trees starting from a single FASTA
+      file. It provides a convenient interface, based on a single configuration
+      file, in which complex phylogenetic workflows can be defined in a few
+      lines.
+
+      In addition, ETE-NPR implements the Nested Phylogenetic Reconstruction
+      (NPR) algorithm, by which nodes in a phylogenetic tree can be
+      hierarchically revisited through several iterations in order to maximize
+      their resolution.
 
       If you use this program in a published work, please cite:
 
-        Jaime Huerta-Cepas and Toni Gabaldon. Nested Phylogenetic
-        Reconstruction. XXX-XX. 
+        - Jaime Huerta-Cepas and Toni Gabaldon. ETE-NPR: a python application for
+          nested phylogenetic reconstruction and workflow design. XXX-XX.
 
-      (Note that a list of the external programs used to complete the
-      necessary computations will be shown shown together with your
-      results.)
+      If you also use the NPR methodology, please cite:
 
-      Contact: jhuerta [at] crg.es & tgabaldon [at] crg.es
+        - 
+
+      (Note that a list of the external programs used to complete the necessary
+      computations will be shown shown together with your results.)
+
+           Contact: jhuerta [at] crg.es & tgabaldon [at] crg.es
 --------------------------------------------------------------------------------
 
     """ %(__VERSION__, __DATE__))
@@ -155,6 +162,11 @@ def is_list(value):
         raise ConfigError("Expected a list of values. Found [%s]" %value)
     return value
 
+def is_set(value):
+    if not isinstance(value, list):
+        raise ConfigError("Expected a list of values. Found [%s]" %value)
+    return set(value)
+
 def is_boolean_list(value):
     is_list(value)
     typed_value = []
@@ -189,10 +201,12 @@ def is_correlative_integer_list(value, minv=1, maxv=None):
 
 def main(args):
     global log
-    base_dir = GLOBALS["basedir"]
     log = logging.getLogger("main")
+    base_dir = GLOBALS["basedir"]
+    db_dir = GLOBALS.get("dbdir", base_dir)
     print __DESCRIPTION__
-    
+    log.log(28, "Starting NPR execution at %s" %(ctime()))
+    log.log(28, "Output directory %s" %(GLOBALS["output_dir"]))
     npr_template = args.workflow
     if npr_template == "sptree":
         GLOBALS["template"] = "sptree"
@@ -207,12 +221,7 @@ def main(args):
         arch = "64 " if sys.maxsize > 2**32 else "32"
     else:
         arch = args.arch
-        
-    # UnCompress packed execution data
-    if pexist(os.path.join(base_dir,"nprdata.tar.bz2")):
-        log.log(28, "compressed data found. Extracting content to start execution...")
-        cmd = "cd %s && tar -jxf nprdata.tar.bz2 && rm nprdata.tar.bz2" % base_dir
-        os.system(cmd)
+       
 
     # Check and load all configuration files
     run2config = {}
@@ -221,9 +230,9 @@ def main(args):
         local_conf_file = pjoin(base_dir, clearname, "workflow.cfg")
         if pexist(base_dir):
             if hascontent(local_conf_file):
-                if not args.override and \
-                   not filecmp.cmp(fname, local_conf_file):
-                    raise ConfigError("Output directory seem to contain"
+                if not filecmp.cmp(fname, local_conf_file):
+                    if not args.override:
+                        raise ConfigError("Output directory seem to contain"
                                       " a NPR execution using a different"
                                       " config file [workflow.cfg]. Use"
                                       " --override option or change the"
@@ -242,6 +251,7 @@ def main(args):
                         "float": is_float,
                         "integer": is_integer,
                         "list": is_list,
+                        "set": is_set,
                         }
         val = validate.Validator(custom_types)
         check = config.validate(val)
@@ -252,7 +262,7 @@ def main(args):
         # Check that fields are filled for all max_seq values
         for flow_name in ["sptree", "genetree"]:
             npr_config = [len(v) for k, v in config[flow_name].iteritems()
-                          if type(v) == list]
+                          if type(v) == list and k != "target_levels"]
             if len(set(npr_config)) != 1:
                 print '\n'.join([str((len(v),v)) for k, v in config[flow_name].iteritems()
                           if type(v) == list])
@@ -261,9 +271,13 @@ def main(args):
         # setup portable apps
         apps_to_test = {}
         for k,v in config["app"].iteritems():
+            if k in config["threading"]:
+                core_limit = int(config["threading"][k])
+                config["threading"][k] = min(core_limit, args.maxcores)
+               
             if v == "built-in":
                 cores = int(config["threading"].get(k, args.maxcores))
-                cores = min(args.maxcores, cores)
+                #cores = min(args.maxcores, cores)
                 config["threading"][k] = cores
                 if args.sge_execute:
                     _apps_path = os.path.realpath(config["sge"]["remote_npr_path"])
@@ -274,34 +288,90 @@ def main(args):
                     cmd = apps.get_call(k, APPSPATH, base_dir, str(cores))
                     config["app"][k] = cmd
                     apps_to_test[k] = cmd
-            
+
         # Copy config file
         config["_outpath"] = pjoin(base_dir, clearname)
         try:
             os.makedirs(config["_outpath"])
         except OSError:
             pass
-        shutil.copy(fname, local_conf_file)
+        open(local_conf_file, "w").write(open(fname).read())
+
+        # save checksum of current workflow (traking checksum of config file. deprecated)
+        #config["_config_checksum"] = checksum(local_conf_file)
         run2config[clearname] = config
             
-    # Create main dir structure
+    # Set up paths    
     gallery_dir = os.path.join(base_dir, "gallery")
-    sge_dir = os.path.join(base_dir, "sge_jobs")
-    tmp_dir = os.path.join(base_dir, "tmp")
-    tasks_dir = os.path.join(base_dir, "tasks")
+    sge_dir = pjoin(base_dir, "sge_jobs")
+    tmp_dir = pjoin(base_dir, "tmp")
+    tasks_dir = pjoin(base_dir, "tasks")
+    input_dir = pjoin(base_dir, "input")
     GLOBALS["sge_dir"] = sge_dir
     GLOBALS["tmp"] = tmp_dir
     GLOBALS["gallery_dir"] = gallery_dir
     GLOBALS["tasks_dir"] = tasks_dir
-    for dirname in [tmp_dir, tasks_dir]:
+    GLOBALS["input_dir"] = input_dir
+    
+    GLOBALS["nprdb_file"]  = pjoin(db_dir, "npr.db")
+    GLOBALS["datadb_file"]  = pjoin(db_dir, "data.db")
+    GLOBALS["orthodb_file"]  = pjoin(db_dir, "ortho.db") if not args.orthodb else args.orthodb
+    GLOBALS["seqdb_file"]  = pjoin(db_dir, "seq.db") if not args.seqdb else args.seqdb
+    
+    # Clear databases if necessary
+    if args.clearall:
+        log.log(28, "Erasing all existing npr data...")
+        shutil.rmtree(GLOBALS["tasks_dir"]) if pexist(GLOBALS["tasks_dir"]) else None
+        shutil.rmtree(GLOBALS["tmp"]) if pexist(GLOBALS["tmp"]) else None
+        shutil.rmtree(GLOBALS["input_dir"]) if pexist(GLOBALS["input_dir"]) else None
+        if not args.seqdb and pexist(GLOBALS["seqdb_file"]):
+            os.remove(GLOBALS["seqdb_file"])
+        if not args.orthodb and pexist(GLOBALS["orthodb_file"]):
+            os.remove(GLOBALS["orthodb_file"])
+        os.remove(GLOBALS["datadb_file"]) if pexist(GLOBALS["datadb_file"]) else None
+    else:
+        if args.softclear:
+            log.log(28, "Erasing precomputed data (reusing task directory)")
+            shutil.rmtree(GLOBALS["tmp"]) if pexist(GLOBALS["tmp"]) else None
+            shutil.rmtree(GLOBALS["input_dir"]) if pexist(GLOBALS["input_dir"]) else None
+            os.remove(GLOBALS["datadb_file"]) if pexist(GLOBALS["datadb_file"]) else None
+        if args.clearseqs and pexist(GLOBALS["seqdb_file"]) and not args.seqdb:
+            log.log(28, "Erasing existing sequence database...")
+            os.remove(GLOBALS["seqdb_file"])
+        if args.clearorthology and pexist(GLOBALS["orthodb_file"]) and not args.orthodb:
+            log.log(28, "Erasing existing orthologs database...")
+            os.remove(GLOBALS["orthodb_file"])
+    
+    if not args.clearall:
+        if base_dir != GLOBALS["output_dir"] or db_dir != GLOBALS["output_dir"]:
+            log.log(20, "Copying previous npr files to temp folder %s..." %db_dir)
+            try: shutil.copy(pjoin(GLOBALS["output_dir"], "data.db"), base_dir)
+            except IOError: pass
+            try: shutil.copy(pjoin(GLOBALS["output_dir"], "seq.db"), base_dir)
+            except IOError: pass
+            try: shutil.copy(pjoin(GLOBALS["output_dir"], "ortho.db"), base_dir)
+            except IOError: pass
+            try: shutil.copy(pjoin(GLOBALS["output_dir"], "nprdata.tar.gz"), base_dir)
+            except IOError: pass
+            
+            # try: os.system("cp -a %s/* %s/" %(GLOBALS["output_dir"],  base_dir))
+            # except Exception: pass
+
+    # UnCompress packed execution data
+    if pexist(os.path.join(base_dir,"nprdata.tar.gz")):
+        log.warning("Compressed data found. Extracting content to start execution...")
+        cmd = "cd %s && tar -zxf nprdata.tar.gz && rm nprdata.tar.gz" % base_dir
+        os.system(cmd)
+            
+    # Create dir structure
+    for dirname in [tmp_dir, tasks_dir, input_dir]:
         try:
             os.makedirs(dirname)
         except OSError:
             log.warning("Using existing dir: %s", dirname)
-
-
+            
     if not args.nochecks:
-        print "Testing x86-%s portable applications..." % arch
+        log.log(28, "Testing x86-%s portable applications..." % arch)
         apps.test_apps(apps_to_test)
     
     # Set number of CPUs available
@@ -309,12 +379,19 @@ def main(args):
     log.debug("Enabling %d CPU cores" %args.maxcores)
             
     
-    if npr_template == "sptree" and not args.ortho_pairs:
-        raise ConfigError("Species tree workflow requires a list"
-                          " of orthologous gene/protein pairs to be"
-                          " supplied through the --ortho-pair"
+    # if npr_template == "sptree" and not args.ortho_pairs:
+    #     raise ConfigError("Species tree workflow requires a list"
+    #                       " of orthologous gene/protein pairs to be"
+    #                       " supplied through the --ortho-pair"
+    #                       " argument.")
+    
+    if npr_template == "sptree" and not args.cogs_file:
+        raise ConfigError("Species tree workflow requires a list of COGS"
+                          " to be supplied through the --cogs"
                           " argument.")
-
+    elif npr_template == "sptree":
+        GLOBALS["cogs_file"] = os.path.abspath(args.cogs_file)
+        
     GLOBALS["seqtypes"] = set()
     if args.nt_seed_file:
         GLOBALS["seqtypes"].add("nt")
@@ -324,44 +401,29 @@ def main(args):
         GLOBALS["seqtypes"].add("aa")
         GLOBALS["inputname"] = os.path.split(args.aa_seed_file)[-1]
 
-    # Set up custom databases if necessary
-    GLOBALS["nprdb_file"]  = pjoin(base_dir, "npr.db")
-    GLOBALS["orthodb_file"]  = pjoin(base_dir, "ortho.db") \
-        if not args.orthodb else args.orthodb
-    GLOBALS["seqdb_file"]  = pjoin(base_dir, "seq.db") \
-        if not args.seqdb else args.seqdb
-
-    # Clear databases if necessary
-    if args.cleardb and pexist(GLOBALS["nprdb_file"]):
-        log.log(28, "Erasing existing npr database...")
-        os.remove(GLOBALS["nprdb_file"])
-    if args.clearseqs and pexist(GLOBALS["seqdb_file"]):
-        log.log(28, "Erasing existing seq database...")
-        os.remove(GLOBALS["seqdb_file"])
-    if args.clearorthology and pexist(GLOBALS["orthodb_file"]):
-        log.log(28, "Erasing existing ortho database...")
-        os.remove(GLOBALS["orthodb_file"])
         
     # Initialize db if necessary, otherwise extract basic info
     db.init_nprdb(GLOBALS["nprdb_file"])
-        
+    db.init_datadb(GLOBALS["datadb_file"])
+    
     # Check and load data
     ERROR = ""
     if not pexist(GLOBALS["seqdb_file"]):
-        db.init_seqdb(GLOBALS["seqdb_file"])
         target_seqs = None
         target_seqs, seqnames, name2len, name2unk, name2seq = scan_sequences(args, target_seqs)
-        ERROR = check_seq_integrity(target_seqs, seqnames, name2len, name2unk, name2seq)
+        ERROR = check_seq_integrity(args, target_seqs, seqnames, name2len, name2unk, name2seq)
         sp2counter = defaultdict(int)
         if npr_template == "sptree":
             for name in target_seqs:
-                spname = name.split(GLOBALS["spname_delimiter"])[0]
+                spname = name.split(GLOBALS["spname_delimiter"], 1)[0]
                 sp2counter[spname] += 1
                 #seq_species = set([name.split(GLOBALS["spname_delimiter"])[0] 
                 #               for name in target_seqs])
-            db.add_seq_species(sp2counter)
             seq_species = set(sp2counter.keys())
-        if not ERROR: 
+        if not ERROR:
+            db.init_seqdb(GLOBALS["seqdb_file"])
+            if npr_template == "sptree":
+                db.add_seq_species(sp2counter)
             load_sequences(target_seqs, name2seq, npr_template)
         seqnames, name2len, name2unk, name2seq = [None] * 4 # Release mem
     else:
@@ -373,14 +435,20 @@ def main(args):
 
     if npr_template == "sptree":
         if not pexist(GLOBALS["orthodb_file"]):
-            db.init_orthodb(GLOBALS["orthodb_file"])            
-            check_and_load_orthologs(args.ortho_pairs)
-            log.log(28, "Updating species info in ortholog-pairs")
-            db.update_species_in_ortho_pairs()
-            db.orthoconn.commit()
+             db.init_orthodb(GLOBALS["orthodb_file"])            
+        #     check_and_load_orthologs(args.ortho_pairs)
+        #     log.log(28, "Updating species info in ortholog-pairs")
+        #     db.update_species_in_ortho_pairs()
+        #     db.orthoconn.commit()
+             all_species = set()
+             for line in open(args.cogs_file):
+                 all_species.update(map(lambda n: n.split(args.spname_delimiter, 1)[0].strip(), line.split("\t")))
+             db.update_cog_species(all_species)
+             db.orthoconn.commit()
         else:
             db.init_orthodb(GLOBALS["orthodb_file"])
             log.warning("Skipping check and load ortholog pairs (loading from database...)")
+        
         # species in ortho pairs
         ortho_species = db.get_ortho_species()
         log.log(28, "Found %d unqiue species codes in ortholog-pairs" %(len(ortho_species)))
@@ -391,7 +459,7 @@ def main(args):
         # Species filter
         if args.spfile:
             target_species = set([line.strip() for line in open(args.spfile)])
-            GLOBALS["target_species"].discard("")
+            target_species.discard("")
             log.log(28, "Enabling NPR for %d species", len(target_species))
         else: 
             target_species = seq_species
@@ -405,11 +473,59 @@ def main(args):
         GLOBALS["target_species"] = target_species
         
     if ERROR:
-        open("npr_error.log", "w").write(' '.join(sys.argv) + "\n\n" + ERROR)
+        open(pjoin(base_dir, "error.log"), "w").write(' '.join(sys.argv) + "\n\n" + ERROR)
         raise DataError("Errors were found while loading data. Please"
-                        " check error file in the current director for details"
-                        " [npr_error.log]")
+                        " check error file for details")
 
+    # Prepare target taxa levels, if any
+    if npr_template == "sptree" and args.lineages_file and config["sptree"].get("target_levels", None):
+        sp2lin = {}
+        lin2sp = defaultdict(set)
+        all_sorted_levels = []
+        for line in open(args.lineages_file):
+            sp, lineage = line.split("\t")
+            sp = sp.strip()
+            if sp in target_species:
+                sp2lin[sp] = map(lambda x: x.strip().lower(), lineage.split(","))
+                for lin in sp2lin[sp]:
+                    if lin not in lin2sp:
+                        all_sorted_levels.append(lin)
+                    lin2sp[lin].add(sp)
+        # any target species without lineage information?
+        if target_species - set(sp2lin):
+            missing = target_species - set(sp2lin)
+            log.warning("%d species not found in lineages file" %len(missing))
+            
+        # So, the following levels (with at least 2 species) could be optimized     
+        avail_levels = [(lin, len(lin2sp[lin])) for lin in all_sorted_levels if len(lin2sp[lin])>=2]
+        log.log(26, "Available levels for NPR optimization:\n%s", '\n'.join(map(lambda x: "% 30s (%d spcs)"%x, avail_levels)))
+        avail_levels = set([lv[0] for lv in avail_levels])
+        
+        # Let's prepare the dictionary with the target levels
+        GLOBALS["optimized_levels"] = {}
+        for target_level in config["sptree"]["target_levels"]:
+
+            # If target level name starts with ~, we allow para and
+            # poly-phyletic grouping of the species in such level
+            strict_monophyly = True
+            if target_level.startswith("~"):
+                target_level = target_level.lstrip("~")
+                strict_monophyly = False
+            
+            target_level = target_level.lower()
+            if target_level in avail_levels:
+                GLOBALS["optimized_levels"][target_level] = [False, strict_monophyly]
+            else:
+                raise ConfigError("Target level not found in the species lineage file: %s" %target_level)
+            
+        log.log(26, "Target levels:\n%s" %
+                '\n'.join(map(lambda x: "% 30s (%s spcs)**" %(x, len(lin2sp[x])),
+                              GLOBALS["optimized_levels"].keys())))
+        GLOBALS["lineages"] = (sp2lin, lin2sp)
+    # if we miss lineages file, raise an error
+    elif npr_template == "sptree" and config["sptree"].get("target_levels", None):
+        raise ConfigError("The use of target_levels requires a species lineage file provided through the --lineages option")
+        
     target_seqs = None # release mem
 
     if npr_template == "genetree":
@@ -418,7 +534,7 @@ def main(args):
         else:
             GLOBALS["target_sequences"] = db.get_all_seqids("nt")
         log.log(28, "Working on %d ids whose sequences are available", len(GLOBALS["target_sequences"]))
-            
+        
     # how task will be executed
     if args.execute:
         if args.monitor:
@@ -447,23 +563,30 @@ def main(args):
         pending_tasks.extend(new_tasks)
 
         # Clear info from previous runs
-        open(os.path.join(config["_outpath"], "runid"), "a").write('\t'.join([thread_id, ctime()+"\n"]))
+        open(os.path.join(config["_outpath"], "runid"), "a").write('\t'.join([thread_id, GLOBALS["nprdb_file"]+"\n"]))
         # Write command line info
-        cmd_info = '\t'.join([start_time, thread_id, GLOBALS["cmdline"]])
+        cmd_info = '\t'.join([start_time, thread_id, str(args.monitor), GLOBALS["cmdline"]])
         open(pjoin(config["_outpath"], "command_lines"), "a").write(cmd_info+"\n")
 
-    schedule(pipeline, pending_tasks, args.schedule_time,
-             execution, args.retry, args.debug)
+    thread_errors = schedule(pipeline, pending_tasks, args.schedule_time,
+                             execution, args.retry, args.debug)
     db.close()
-    if args.compress:
-        log.log(20, "Compressing intermediate data...")
-        cmd = "cd %s && tar --remove-files -jcf nprdata.tar.bz2 ortho.db seq.db tasks/" %\
+    
+    if not thread_errors:
+        if args.compress:
+            log.log(20, "Compressing intermediate data...")
+            cmd = "cd %s && tar --remove-files -zcf nprdata.tar.gz data.db input/ tmp/ tasks/ seq.db; gzip -f npr.log" %\
               GLOBALS["basedir"]
+            os.system(cmd)
+        log.log(20, "Deleting temporal data...")
+        cmd = "cd %s && rm tmp/ -rf" %GLOBALS["basedir"]
         os.system(cmd)
 
+    GLOBALS["citator"].show()       
+        
 def check_and_load_orthologs(fname):
     log.log(28, "importing orthologous pairs into database (this may take a while)...")
-    template_import = NamedTemporaryFile()
+    template_import = tempfile.NamedTemporaryFile()
     template_import.write('''
 PRAGMA cache_size = 1000000;
 PRAGMA synchronous = OFF;
@@ -520,10 +643,12 @@ def scan_sequences(args, target_seqs):
             continue
         GLOBALS["seqtypes"].add(seqtype)
         log.log(28, "Scanning %s sequence file...", seqtype)
-        SEQS = SeqGroup(seqfile, fix_duplicates=False)
+        fix_dups = True if args.rename_dup_seqnames else False
+        SEQS = SeqGroup(seqfile, fix_duplicates=fix_dups)
         for c1, (seqid, seq) in enumerate(SEQS.id2seq.iteritems()):
             if c1%10000 == 0:
                 print >>sys.stderr, c1, "\r",
+                sys.stderr.flush()
 
             seqname = SEQS.id2name[seqid]
             if target_seqs and seqname not in target_seqs:
@@ -531,18 +656,24 @@ def scan_sequences(args, target_seqs):
                 continue
             visited_seqs[seqtype].append(seqname)
 
-            # Clear symbols
-            seq = seq.replace(".", "-")
-            seq = seq.replace("*", "X")
+            # Clear problematic symbols
+            if not args.no_seq_checks:
+                seq = seq.replace(".", "-")
+                seq = seq.replace("*", "X")
+                if seqtype == "aa":
+                    seq = seq.upper()
+                    seq = seq.replace("J", "X") # phyml fails with J
+                    seq = seq.replace("U", "X") # selenocysteines
             if args.dealign:
                 seq = seq.replace("-", "").replace(".", "")
             seq2seq[seqtype][seqname] = seq
             seq2length[seqtype][seqname] = len(seq)
-            # Load unknown symbol inconsistencies
-            if seqtype == "nt" and set(seq) - NT:
-                seq2unknown[seqtype][seqname] = set(seq) - NT
-            elif seqtype == "aa" and set(seq) - AA:
-                seq2unknown[seqtype][seqname] = set(seq) - AA
+            if not args.no_seq_checks:
+                # Load unknown symbol inconsistencies
+                if seqtype == "nt" and set(seq) - NT:
+                    seq2unknown[seqtype][seqname] = set(seq) - NT
+                elif seqtype == "aa" and set(seq) - AA:
+                    seq2unknown[seqtype][seqname] = set(seq) - AA
 
         # Initialize target sets using aa as source
         if not target_seqs and seqtype == "aa":
@@ -554,20 +685,21 @@ def scan_sequences(args, target_seqs):
                              
     return target_seqs, visited_seqs, seq2length, seq2unknown, seq2seq
 
-def check_seq_integrity(target_seqs, visited_seqs, seq2length, seq2unknown, seq2seq):
+def check_seq_integrity(args, target_seqs, visited_seqs, seq2length, seq2unknown, seq2seq):
     log.log(28, "Checking data consistency ...")
     source_seqtype = "aa" if "aa" in GLOBALS["seqtypes"] else "nt"
     error = ""
 
     # Check for duplicate ids
-    seq_number = len(set(visited_seqs[source_seqtype]))
-    if len(visited_seqs[source_seqtype]) != seq_number:
-        counter = defaultdict(int)
-        for seqname in visited_seqs[source_seqtype]:
-            counter[seqname] += 1
-        duplicates = ["%s\thas %d copies" %(key, value) for key, value in counter.iteritems() if value > 1]
-        error += "\nDuplicate sequence names.\n"
-        error += '\n'.join(duplicates)
+    if not args.ignore_dup_seqnames:
+        seq_number = len(set(visited_seqs[source_seqtype]))
+        if len(visited_seqs[source_seqtype]) != seq_number:
+            counter = defaultdict(int)
+            for seqname in visited_seqs[source_seqtype]:
+                counter[seqname] += 1
+            duplicates = ["%s\thas %d copies" %(key, value) for key, value in counter.iteritems() if value > 1]
+            error += "\nDuplicate sequence names.\n"
+            error += '\n'.join(duplicates)
 
     # check that the seq of all targets is available
     if target_seqs: 
@@ -608,9 +740,11 @@ def check_seq_integrity(target_seqs, visited_seqs, seq2length, seq2unknown, seq2
     for v in all_len:
         if abs(mean_len - v) >  (3 * std_len):
             outliers.append(v)
+    log.log(28, "Total sequences:  %d" %len(seq2length))
+    log.log(28, "Average sequence length: %d +- %0.1f " %(mean_len, std_len))
     log.log(28, "Max sequence length:  %d" %max_len)
     log.log(28, "Min sequence length:  %d" %min_len)
-    log.log(28, "Mean sequence length: %d +- %0.1f " %(mean_len, std_len))
+
     if outliers:
         log.warning("%d sequence lengths look like outliers" %len(outliers))
 
@@ -628,6 +762,7 @@ def hash_names(target_names):
     hash2name = defaultdict(list)
     for c1, name in enumerate(target_names):
         print >>sys.stderr, c1, "\r",
+        sys.stderr.flush()
         hash_name = encode_seqname(name)
         hash2name[hash_name].append(name)
 
@@ -688,122 +823,174 @@ if __name__ == "__main__":
 
 
     # Input data related flags
-    input_group = parser.add_argument_group('INPUT OPTIONS\n==============')
+    input_group = parser.add_argument_group('==== Input Options ====')
 
     input_group.add_argument("-w", dest="workflow",
-                        choices=["sptree", "genetree"],
-                        required=True,
-                        help="Type of phylogenetic workflow.")
+                             required=True,
+                             choices=["sptree", "genetree"],
+                             help="Type of phylogenetic workflow.")
 
     input_group.add_argument("-c", "--config", dest="configfile",
-                        type=str, required=True, nargs="+",
-                        help="Configuration file.")
+                             type=str, required=True, nargs="+",
+                             help="Configuration file.")
 
     input_group.add_argument("-a", dest="aa_seed_file",
-                        type=existing_file,
-                        help="Initial multi sequence file with"
-                        " protein sequences.")
+                             type=existing_file,
+                             help="Initial multi sequence file with"
+                             " protein sequences.")
 
     input_group.add_argument("-n", dest="nt_seed_file",
-                        type=existing_file,
-                        help="Initial multi sequence file with"
-                        " nucleotide sequences")
+                             type=existing_file,
+                             help="Initial multi sequence file with"
+                             " nucleotide sequences")
 
     input_group.add_argument("--dealign", dest="dealign",
-                        action="store_true",
-                        help="when used, gaps in the orginal fasta file will"
-                        " be removed, thus allowing to use alignment files as input.")
-
+                             action="store_true",
+                             help="when used, gaps in the orginal fasta file will"
+                             " be removed, thus allowing to use alignment files as input.")
+    
     input_group.add_argument("--no-seq-rename", dest="seq_rename",
-                        action="store_false",
-                        help="If used, sequence names will NOT be"
+                             action="store_false",
+                             help="If used, sequence names will NOT be"
                              " internally translated to 10-character-"
                              "identifiers.")
 
+    input_group.add_argument("--no-seq-checks", dest="no_seq_checks",
+                            action="store_true",
+                            help="Skip consistency sequence checks for not allowed symbols, etc.")
+    
+    dup_names_group = input_group.add_mutually_exclusive_group()
+    
+    dup_names_group.add_argument("--ignore-dup-seqnames", dest="ignore_dup_seqnames",
+                                 action = "store_true",
+                                 help=("If duplicated sequence names exist in the input"
+                                       " fasta file, a single random instance will be used."))
+    
+    dup_names_group.add_argument("--rename-dup-seqnames", dest="rename_dup_seqnames",
+                                 action = "store_true",
+                                 help=("If duplicated sequence names exist in the input"
+                                       " fasta file, duplicates will be renamed."))
+    
     input_group.add_argument("--first-split-outgroup", dest="first_split",
                              type=str,
                              help=("When used, it overrides first_split option"
-                                  " in any tree merger config block in the"
+                                   " in any tree merger config block in the"
                                    " config file."))
-
+    
     input_group.add_argument("--orthodb", dest="orthodb",
                              type=str,
                              help="Uses a custom orthology-pair database file")
-
+    
     input_group.add_argument("--seqdb", dest="seqdb",
                              type=str,
                              help="Uses a custom sequence database file")
     
     # Sptree workflow
-
+    
     input_group.add_argument("--ortho-pairs", dest="ortho_pairs",
-                        type=existing_file,
-                        help="File containing all one2one orthologous"
+                             type=existing_file,
+                             help="File containing all one2one orthologous"
                              " relationships among the species of interest.")
+    
+    input_group.add_argument("--cogs", dest="cogs_file",
+                             type=existing_file,
+                             help="A file defining clusters of orthologous groups. One per line. Tab delimited sequence ids. ")
 
+    input_group.add_argument("--lineages", dest="lineages_file",
+                             type=existing_file,
+                             help="A file containing the (sorted) lineage "
+                                  "track of each species. It enables "
+                                  "NPR algorithm to fix what taxonomic "
+                                  "levels should be optimized."
+                                  "Note that linage tracks must consist in "
+                                  "a comma separated list of taxonomic levels "
+                                  "sorted from deeper to swallower clades "
+                                  "(i.e. 9606 [TAB] Eukaryotes,Mammals,Primates)"
+                             )
+    
     input_group.add_argument("--spname-delimiter", dest="spname_delimiter",
-                        type=str, default="_",
-                        help="In sptree mode, spname_delimiter is used to split"
+                             type=str, default="_",
+                             help="In sptree mode, spname_delimiter is used to split"
                              " the name of sequences into species code and"
                              " sequence identifier (i.e. HUMAN_p53 = HUMAN, p53)."
                              " Note that species name must always precede seq.identifier.")
 
     input_group.add_argument("--spfile", dest="spfile",
-                        type=existing_file,
-                        help="If specified, only the sequences and ortholog"
+                             type=existing_file,
+                             help="If specified, only the sequences and ortholog"
                              " pairs matching the group of species in this file"
                              " (one species code per line) will be used. ")
-
-
+    
+    
     # Output data related flags
-    output_group = parser.add_argument_group('OUTPUT OPTIONS\n==============')
+    output_group = parser.add_argument_group('==== Output Options ====')
     output_group.add_argument("-o", "--outdir", dest="outdir",
-                        type=str, required=True,
-                        help="""Output directory for results.""")
+                              type=str, required=True,
+                              help="""Output directory for results.""")
+    
+    output_group.add_argument("--scratch_dbdir", dest="scratch_dbdir",
+                              type=existing_dir, 
+                              help="""If provided, sqlite files will be created in the provided scratch path. Files will be moved to outpath when finished.""")
 
+    output_group.add_argument("--scratch_dir", dest="scratch_dir",
+                              type=existing_dir, 
+                              help="""If provided, npr will run on the scratch folder and all files will be transferred to the output dir when finished. """)
+    
     output_group.add_argument("--taskdir", dest="taskdir",
-                        type=existing_dir,
-                        help="""Output directory for tasks related data""")
+                              type=existing_dir,
+                              help="""Output directory for tasks related data""")
     
     output_group.add_argument("--compress", action="store_true",
-                        help="Compress intermediate files when"
+                              help="Compress intermediate files when"
                               " a task is finished.")
-
+    
     output_group.add_argument("--logfile", action="store_true",
-                          help="Log messages are saved into a file"
-                      )
-
+                              help="Log messages are saved into a file")
+    
+    output_group.add_argument("--email", dest="email",
+                              type=str, 
+                              help="Send email info when errors or finished threads")
+    
+    output_group.add_argument("--email_report_time", dest="email_report_time",
+                              type=int, default = 0, 
+                              help="Send email reports while execution")
+    
+    
     # Task execution related flags
-    exec_group = parser.add_argument_group('INPUT EXECUTION OPTIONS\n======================')
+    exec_group = parser.add_argument_group('==== Execution Mode Options ====')
 
     exec_group.add_argument("-r", "--retry_error_jobs", dest="retry",
-                        action="store_true",
-                        help="Try to relaunch jobs marked"
-                        " as error.")
-
+                            action="store_true",
+                            help="Try to relaunch jobs marked as error.")
+    
     exec_group.add_argument("-m", "--maxcores", dest="maxcores", type=int,
-                        default=1, help="Maximum number of CPU cores"
-                        " available in the execution hosts. If higher"
-                        " than 1, tasks with multi-threading"
-                        " capabilities will be set appropriately.")
+                            default=1, help="Maximum number of CPU cores"
+                            " available in the execution host. If higher"
+                            " than 1, tasks with multi-threading"
+                            " capabilities will enabled.")
 
     exec_group.add_argument("-t", "--schedule_time", dest="schedule_time",
-                        type=float, default=30.0,
-                        help="""How often tasks should be checked""")
-
+                            type=float, default=2,
+                            help="""How often tasks should be checked""")
+    
+    exec_group.add_argument("--launch_time", dest="launch_time",
+                            type=float, default=5,
+                            help="""How often queued jobs should be launched""")
+    
     exec_type_group = exec_group.add_mutually_exclusive_group()
     exec_type_group.add_argument("-x", "--insitu_execution", dest="execute",
-                        action="store_true",
-                        help="Pipeline jobs are launched in the same machine as the"
-                        " as ETE-NPR is running.")
-
+                                 action="store_true",
+                                 help="Pipeline jobs are launched in the same machine as the"
+                                 " as ETE-NPR is running.")
+    
     exec_type_group.add_argument("--sge", dest="sge_execute",
-                        action="store_true", help="EXPERIMENTAL!: Jobs will be"
-                        " launched using the Sun Grid Engine"
-                        " queue system.")
+                                 action="store_true", help="EXPERIMENTAL!: Jobs will be"
+                                 " launched using the Sun Grid Engine"
+                                 " queue system.")
 
     exec_group.add_argument("--monitor", dest="monitor",
-                        action="store_true", help="Pipeline jobs will be"
+                            action="store_true",
+                            help="Pipeline jobs will be"
                             " detached from the main NPR process. This means that"
                             " when npr execution is interrupted, all currently"
                             " running jobs will keep running. Use this option if you"
@@ -813,28 +1000,36 @@ if __name__ == "__main__":
 
     exec_group.add_argument("--override", dest="override",
                             action="store_true",
-                            help="Overrides output files from past program executions." )
+                            help="Override workflow configuration if necessary." )
 
-    exec_group.add_argument("--clear_nprdb", dest="cleardb",
+    exec_group.add_argument("--clearall", dest="clearall",
                             action="store_true",
-                            help="Overrides all tables in database")
-
+                            help="Erase all previous data if necessary.")
+    
+    exec_group.add_argument("--softclear", dest="softclear",
+                            action="store_true",
+                            help="Clear precomputed data (data.db), but keeps task raw data (tasks/).")
+    
     exec_group.add_argument("--clear_orthodb", dest="clearorthology",
                             action="store_true",
-                            help="Overrides orthology pairs table in database")
+                            help="DEPRECATED: Override orthology pairs table in database.")
 
     exec_group.add_argument("--clear_seqdb", dest="clearseqs",
                             action="store_true",
-                            help="Overrides sequences table in database")
+                            help="Reload sequences deleting previous database if necessary.")
 
     exec_group.add_argument("--arch", dest="arch",
                             choices=["auto", "32", "64"],
                             default="auto", help="Set the architecture of"
                             " execution hosts (needed only when using"
                             " built-in applications.)")
-
+    
+    exec_group.add_argument("--nochecks", dest="nochecks",
+                            action="store_true",
+                            help="Skip application checks.")
+    
     # Interface related flags
-    ui_group = parser.add_argument_group("INTERFACE OPTIONS\n=================")
+    ui_group = parser.add_argument_group("==== Program Interface Options ====")
     ui_group.add_argument("-u", dest="enable_ui",
                         action="store_true", help="When used, a color"
                         " based interface is launched to monitor NPR"
@@ -847,30 +1042,52 @@ if __name__ == "__main__":
                         help="Verbosity level: 0=very quiet, 4=very "
                           " verbose.")
 
-    ui_group.add_argument("--nochecks", dest="nochecks",
-                          action="store_true",
-                          help="Skip application checks during the start-up")
-
     ui_group.add_argument("--debug", nargs="?",
                           const="all",
-                          help="Starts a debugging"
-                          " session. A taskid can be provided, so"
-                          " debugging will start from such task on."
-                          )
+                          help="Start debugging"
+                          " A taskid can be provided, so"
+                          " debugging will start from such task on.")
 
     args = parser.parse_args()
 
     if not args.aa_seed_file and not args.nt_seed_file:
         parser.error('At least one input file argument (-a, -n) is required')
 
-    GLOBALS["basedir"] = os.path.abspath(args.outdir)
+    outdir = os.path.abspath(args.outdir)
+    final_dir, runpath = os.path.split(outdir)
+    if not runpath:
+        raise ValueError("Invalid outdir")
+
+    GLOBALS["output_dir"] = os.path.abspath(args.outdir)
+    
+    if args.scratch_dir:
+        # set paths for scratch folder for sqlite files 
+        print >>sys.stderr, "Creating temporary scratch dir..."
+        base_scratch_dir = os.path.abspath(args.scratch_dir)        
+        scratch_dir = tempfile.mkdtemp(prefix='npr_tmp', dir=base_scratch_dir)
+        GLOBALS["scratch_dir"] = scratch_dir
+        GLOBALS["basedir"] = scratch_dir
+    elif args.scratch_dbdir:
+        # set paths for scratch folder for sqlite files 
+        print >>sys.stderr, "Creating temporary scratch dir for sqlite files..."
+        base_dbdir = os.path.abspath(args.scratch_dbdir)        
+        dbdir = tempfile.mkdtemp(prefix='npr_tmp', dir=base_dbdir)
+        GLOBALS["dbdir"] = dbdir
+        GLOBALS["basedir"] = GLOBALS["output_dir"]
+    else:
+        GLOBALS["basedir"] = GLOBALS["output_dir"]
+        
     if args.taskdir:
         GLOBALS["taskdir"] = os.path.realpath(args.taskdir)
     else:
         GLOBALS["taskdir"] = os.path.join(GLOBALS["basedir"], "tasks")
+        
     if args.first_split:
         GLOBALS["first_split_outgroup"] = args.first_split
-        
+
+    GLOBALS["email"] = args.email
+    GLOBALS["email_report_time"] = args.email_report_time
+    GLOBALS["launch_time"] = args.launch_time
     GLOBALS["cmdline"] = ' '.join(sys.argv)
     GLOBALS["nodeinfo"] = defaultdict(dict)
     GLOBALS["threadinfo"] = defaultdict(dict)
@@ -881,7 +1098,12 @@ if __name__ == "__main__":
     GLOBALS["color_shell"] = True
     GLOBALS["citator"] = Citator()
     
+    GLOBALS["lineages"] = None
+    GLOBALS["optimized_levels"] = None
+    GLOBALS["cogs_file"] = None 
+    
     GLOBALS["citator"].add(ETE_CITE)
+    
     if not pexist(GLOBALS["basedir"]):
         os.makedirs(GLOBALS["basedir"])
 

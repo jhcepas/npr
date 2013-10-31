@@ -13,19 +13,18 @@ from nprlib.errors import TaskError
 __all__ = ["ConcatAlg"]
 
 class ConcatAlg(ConcatAlgTask):
-    def __init__(self, nodeid, cogs, seqtype, conf, confname):
-
+    def __init__(self, cogs, seqtype, conf, confname, workflow_checksum):
         self.confname = confname
         self.conf = conf
         self.cogs_hard_limit = int(conf[confname]["_max_cogs"])
         used_cogs = cogs[:self.cogs_hard_limit]
+        
         cog_string = '#'.join([','.join(sorted(c)) for c in used_cogs])
-        cog_keyid = md5(cog_string)
-       
+        cog_keyid = md5(cog_string) # This will be nodeid
         base_args = {}
-      
         ConcatAlgTask.__init__(self, cog_keyid, "concat_alg", "ConcatAlg", 
-                               base_args, conf[confname])
+                               workflow_checksum=workflow_checksum,
+                               base_args=base_args, extra_args=conf[confname])
         self.avail_cogs = len(cogs)
         self.used_cogs = len(used_cogs)
         self.cogs = used_cogs
@@ -40,10 +39,6 @@ class ConcatAlg(ConcatAlgTask):
             self.default_model = conf[confname]["_default_nt_model"]
         self.init()
         
-        self.alg_fasta_file = pjoin(self.taskdir, "final_alg.fasta")
-        self.alg_phylip_file = pjoin(self.taskdir, "final_alg.iphylip")
-        self.partitions_file = pjoin(self.taskdir, "final_alg.regions")
-        
     def load_jobs(self):
         # I want a single phylognetic tree for each cog
         from nprlib.template.genetree import pipeline
@@ -54,6 +49,7 @@ class ConcatAlg(ConcatAlgTask):
             # thread.
             job = Msf(set(co), set(),
                       seqtype = self.seqtype)
+            
             job.main_tree = None
             job.threadid = generate_runid()
             job.configid = self.conf["_configid"]
@@ -67,53 +63,55 @@ class ConcatAlg(ConcatAlgTask):
     def finish(self):
         # Assumes tasks resulting from genetree workflow, in which
         # only Alg and Acleaner tasks could contain the results
-        if pexist(self.alg_fasta_file) and pexist(self.alg_phylip_file) \
-                and pexist(self.partitions_file):
-            log.log(28, "@@8:Concatenated alignment is already present. Skipping...@@1:")
-        else:
-            log.log(26, "Collecting supermatrix data")
-            jobtypes = set()
-            job2alg, job2acleaner = {}, {}
-            for job in self.jobs:
-                jobtypes.add(job.ttype)
-                if job.ttype == "alg" and job.nodeid not in self.job2alg:
-                    job2alg[job.nodeid] = job.alg_fasta_file
-                elif job.ttype == "acleaner":
-                    job2acleaner[job.nodeid] = job.clean_alg_fasta_file
-                elif job.ttype == "mchooser":
-                    self.job2model[job.nodeid] = job.best_model
-
-            if "acleaner" in jobtypes:
-                self.job2alg = job2acleaner
-            else:
-                self.job2alg = job2alg
+        log.log(26, "Collecting supermatrix data")
+        jobtypes = set()
+        job2alg, job2acleaner = {}, {}
+        for job in self.jobs:
+            jobtypes.add(job.ttype)
+            if job.ttype == "alg" and job.nodeid not in self.job2alg:
+                dataid = db.get_dataid(*job.alg_fasta_file.split("."))
+                job2alg[job.nodeid] = db.get_data(dataid)
+            elif job.ttype == "acleaner":
+                a, b =  job.clean_alg_fasta_file.split(".")
+                dataid = db.get_dataid(*job.clean_alg_fasta_file.split("."))
+                job2acleaner[job.nodeid] = db.get_data(dataid)
+            elif job.ttype == "mchooser":
+                self.job2model[job.nodeid] = job.best_model
                 
-            if self.cog_ids - set(self.job2alg):
-                log.error("Missing %s algs", len(self.cog_ids -
-                                                 set(self.job2alg)))
-                missing = self.cog_ids - set(self.job2alg)
-                raise TaskError(self, "Missing algs (%d): i.e. %s" %(len(missing),missing[:10]))
+        if "acleaner" in jobtypes:
+            self.job2alg = job2acleaner
+        else:
+            self.job2alg = job2alg
 
-            alg_data = [(self.job2alg[nid], self.job2model.get(nid, self.default_model)) for nid in self.job2alg]
-            filenames, models = zip(*alg_data)
+        if self.cog_ids - set(self.job2alg):
+            log.error("Missing %s algs", len(self.cog_ids -
+                                             set(self.job2alg)))
+            missing = self.cog_ids - set(self.job2alg)
+            raise TaskError(self, "Missing algs (%d): i.e. %s" %(len(missing),missing[:10]))
 
-            mainalg, partitions, sp2alg, species = get_concatenated_alg(
-                filenames,
-                models, sp_field=0,
-                sp_delimiter=GLOBALS["spname_delimiter"])
+        alg_data = [(self.job2alg[nid],
+                     self.job2model.get(nid, self.default_model))
+                    for nid in self.job2alg]
+        filenames, models = zip(*alg_data)
 
-            log.log(20, "Done concat alg, now writting fasta")
-            mainalg.write(outfile=self.alg_fasta_file, format="fasta")
-            log.log(20, "Done concat alg, now writting phylip")
-            mainalg.write(outfile=self.alg_phylip_file, format="iphylip_relaxed")
-            open(self.partitions_file, "w").write('\n'.join(partitions))
-            log.log(28, "Done concat alg")
-            log.log(26, "Modelled regions: \n"+'\n'.join(partitions))
-                        
+        mainalg, partitions, sp2alg, species = get_concatenated_alg(
+            filenames,
+            models, sp_field=0,
+            sp_delimiter=GLOBALS["spname_delimiter"])
+
+        log.log(20, "Done concat alg, now writting fasta")
+        fasta = mainalg.write(format="fasta")
+        log.log(20, "Done concat alg, now writting phylip")
+        phylip = mainalg.write(format="iphylip_relaxed")
+        txt_partitions = '\n'.join(partitions)
+        log.log(28, "Done concat alg")
+        log.log(26, "Modelled regions: \n"+'\n'.join(partitions))
+        ConcatAlg.store_data(self, fasta, phylip, txt_partitions)
+        
 def get_species_code(name, splitter, field):
     # By default, taxid is the first par of the seqid, separated by
     # underscore
-    return map(strip, name.split(splitter))[field]
+    return map(strip, name.split(splitter, 1))[field]
 
 def get_concatenated_alg(alg_filenames, models=None, 
                         sp_field=0, sp_delimiter="_", 
@@ -165,8 +163,16 @@ def get_concatenated_alg(alg_filenames, models=None,
 
     log.info("%d out of %d will be kept (missing factor threshold=%g, %d species forced to kept)" %\
                  (len(valid_species), len(sp2alg), kill_thr, len(keep_species)))
-          
-    sorted_algs = sorted(alg_objects, lambda x,y: cmp(x.matrix, y.matrix))
+
+    def sort_single_algs(alg1, alg2):
+        r = cmp(alg1.matrix, alg2.matrix)
+        if r == 0:
+            return cmp(sorted(alg1.id2name.values()),
+                       sorted(alg2.id2name.values()))
+        else:
+            return r
+           
+    sorted_algs = sorted(alg_objects, sort_single_algs)
     model2win = {}
     model2size = {}
     for alg in sorted_algs:

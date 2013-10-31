@@ -359,19 +359,19 @@ class TreeStyle(object):
     def set_layout_fn(self, layout):
         self._layout_handler = []
         if type(layout) not in set([list, set, tuple, frozenset]):
-            self._layout_handler.append(layout)
-        else:
-            for ly in layout:
-                # Validates layout function
-                if (type(ly) == types.FunctionType or type(ly) == types.MethodType or ly is None):
-                    self._layout_handler.append(layout)
-                else:
-                    import layouts 
-                    try:
-                        self._layout_handler.append(getattr(layouts, ly))
-                    except Exception, e:
-                        print e
-                        raise ValueError ("Required layout is not a function pointer nor a valid layout name.")
+            layout = [layout]
+
+        for ly in layout:
+            # Validates layout function
+            if (type(ly) == types.FunctionType or type(ly) == types.MethodType or ly is None):
+                self._layout_handler.append(ly)
+            else:
+                import layouts 
+                try:
+                    self._layout_handler.append(getattr(layouts, ly))
+                except Exception, e:
+                    print e
+                    raise ValueError ("Required layout is not a function pointer nor a valid layout name.")
  
     def get_layout_fn(self):
         return self._layout_handler
@@ -494,9 +494,9 @@ class TreeStyle(object):
         self.legend = FaceContainer()
         self.legend_position = 2
 
-        # A text string that will be draw as the Tree title
-        self.title = FaceContainer()
 
+        self.title = FaceContainer()
+        self.tree_width = 180
         # PRIVATE values
         self._scale = None
         
@@ -593,18 +593,23 @@ def set_pen_style(pen, line_style):
         pen.setStyle(QtCore.Qt.DotLine)
      
 
-def save(scene, imgName, w=None, h=None, dpi=300,\
+def save(scene, imgName, w=None, h=None, dpi=90,\
              take_region=False, units="px"):
-
-    ext = imgName.split(".")[-1].upper()
+    if imgName == "%%inline":
+        ipython_inline = True
+        ext = "SVG"
+    else:
+        ipython_inline = False
+        ext = imgName.split(".")[-1].upper()
+        
     main_rect = scene.sceneRect()
     aspect_ratio = main_rect.height() / main_rect.width()
 
     # auto adjust size    
     if not w and not h:
-        units = "mm"
-        w = 205 
-        h = 292
+        units = "px"
+        w = main_rect.width()
+        h = main_rect.height()
         ratio_mode = QtCore.Qt.KeepAspectRatio
     elif w and h: 
         ratio_mode = QtCore.Qt.IgnoreAspectRatio
@@ -649,7 +654,11 @@ def save(scene, imgName, w=None, h=None, dpi=300,\
         # inkscape and browsers...
         temp_compatible_code = open(imgName).read().replace("xml:id=", "id=")
         compatible_code = re.sub('font-size="(\d+)"', 'font-size="\\1pt"', temp_compatible_code)
-        open(imgName, "w").write(compatible_code)
+        if ipython_inline:
+            from IPython.core.display import SVG
+            return SVG(compatible_code)
+        else:
+            open(imgName, "w").write(compatible_code)
         # End of fix
 
     elif ext == "PDF" or ext == "PS":
@@ -661,13 +670,13 @@ def save(scene, imgName, w=None, h=None, dpi=300,\
         printer = QPrinter(QPrinter.HighResolution)
         printer.setResolution(dpi)
         printer.setOutputFormat(format)
-        #printer.setPageSize(QPrinter.A4)
+        printer.setPageSize(QPrinter.A4)
         printer.setPaperSize(QtCore.QSizeF(w, h), QPrinter.DevicePixel)
         printer.setPageMargins(0, 0, 0, 0, QPrinter.DevicePixel) 
 
         #pageTopLeft = printer.pageRect().topLeft()
         #paperTopLeft = printer.paperRect().topLeft()
-        # For PS -> problems with margins
+        # For PS -> problems with margins 
         #print paperTopLeft.x(), paperTopLeft.y()
         #print pageTopLeft.x(), pageTopLeft.y()
         # print  printer.paperRect().height(),  printer.pageRect().height()
@@ -692,3 +701,5 @@ def save(scene, imgName, w=None, h=None, dpi=300,\
         scene.render(pp, targetRect, scene.sceneRect(), ratio_mode)
         pp.end()
         ii.save(imgName)
+
+    return w/main_rect.width(), h/main_rect.height()

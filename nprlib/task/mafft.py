@@ -4,7 +4,8 @@ log = logging.getLogger("main")
 
 from nprlib.master_task import AlgTask
 from nprlib.master_job import Job
-from nprlib.utils import SeqGroup, OrderedDict, GLOBALS, MAFFT_CITE
+from nprlib.utils import SeqGroup, OrderedDict, GLOBALS, MAFFT_CITE, pjoin
+from nprlib import db
 
 __all__ = ["Mafft"]
 
@@ -21,9 +22,6 @@ class Mafft(AlgTask):
         self.seqtype = seqtype
         self.multiseq_file = multiseq_file     
         self.init()
-
-        self.alg_fasta_file = os.path.join(self.taskdir, "final_alg.fasta")
-        self.alg_phylip_file = os.path.join(self.taskdir, "final_alg.iphylip")
  
     def load_jobs(self):
         appname = self.conf[self.confname]["_app"]
@@ -31,8 +29,9 @@ class Mafft(AlgTask):
         # Mafft redirects resulting alg to std.output. The order of
         # arguments is important, input file must be the last
         # one.
-        args[""] = self.multiseq_file
+        args[""] = pjoin(GLOBALS["input_dir"], self.multiseq_file)
         job = Job(self.conf["app"][appname], args, parent_ids=[self.nodeid])
+        job.add_input_file(self.multiseq_file)
         job.cores = self.conf["threading"][appname]
         self.jobs.append(job)
 
@@ -40,6 +39,6 @@ class Mafft(AlgTask):
         # Once executed, alignment is converted into relaxed
         # interleaved phylip format. 
         alg = SeqGroup(self.jobs[0].stdout_file)
-        alg.write(outfile=self.alg_fasta_file, format="fasta")
-        alg.write(outfile=self.alg_phylip_file, format="iphylip_relaxed")
-        AlgTask.finish(self)
+        fasta = alg.write(format="fasta")
+        phylip = alg.write(format="iphylip_relaxed")
+        AlgTask.store_data(self, fasta, phylip)

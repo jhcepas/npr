@@ -11,9 +11,11 @@ from sys import stderr
 from coretype.tree import *
 from coretype.seqgroup import *
 from phylo.phylotree import *
+from evol.evoltree import *
 from webplugin.webapp import *
 from phyloxml import Phyloxml, PhyloxmlTree
 from nexml import Nexml, NexmlTree
+from evol import EvolTree
 
 try:
     from coretype.arraytable import *
@@ -34,11 +36,11 @@ try:
     from treeview.faces import *
     from treeview import faces
     from treeview import layouts
-    from treeview.svg_colors import SVG_COLORS
+    from treeview.svg_colors import *
 except ImportError, e:
     print >>stderr, "Treeview module could not be loaded"
     print e
 
 # Do not modify the following line. It will be checked during
 # installation
-__ETEID__="643cc3270c842b3cf4990861a1126060"
+__ETEID__="1f9f0b7ea3796caac841fc3d45154c9a"
