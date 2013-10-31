@@ -206,7 +206,7 @@ if __name__ == "__main__":
     
     nprdir = pjoin(os.path.realpath(args.nprdir[0]))
     #last_db = get_latest_nprdp(nprdir)
-    last_db = os.path.join(BASE_DIR, "npr.db")
+    last_db = os.path.join(nprdir, "npr.db")
     if not last_db or not os.path.exists(last_db):
         raise ConfigError("[%s] does not contain NPR data." %last_db)
     shutil.copy(last_db, last_db+".nprtop.tmp")

@@ -12,11 +12,10 @@ find $DN/../../* -exec stat {} \; |wc -l
 
 # Now run a real example, so I can grab all dependencies and put them
 # in the CDE pkg
-$DN/../../npr -w genetree -c $DN/workflow.cfg -a $DN/Phy0007XAR_HUMAN.msf.aa -o /tmp/tmpresult -x -v4 -t1 --clearall --override
+$DN/../../npr -w genetree -a $DN/Phy00085K5_HUMAN.alg.raw.fasta --dealign -c $DN/workflow.cfg -o /tmp/tmpresult -x -v4 -t1 --clearall --override -t1 --launch_time 1 -m2 --compress
 $DN/../../nprdump -a /tmp/tmpresult/
-$DN/../../nprtop /tmp/tmpresult/
+#$DN/../../nprtop /tmp/tmpresult/
 #$DN/../../nprview /tmp/tmpresult/final_tree.nw 
-$DN/../../npr -w genetree -c $DN/workflow.cfg -a $DN/Phy0007XAR_HUMAN.msf.aa -o /tmp/tmpresult -x -v4 -t1 --compress
 
 # pack all binaries
 for cmd in /bin/*; do ldd $cmd >/dev/null; done
