@@ -115,6 +115,22 @@ def dump(dumpiter, target, tree, outdir):
     tree.write(features=[], outfile=base_fname+".nwx")
     tree.write(outfile=base_fname+".nw")
 
+
+def get_partitions_changed(prev_tree, new_tree):
+    prev_content = prev_tree.get_cached_content(store_attr="name")
+    new_content = new_tree.get_cached_content(store_attr="name")
+
+    not_found = []
+    for node, leaves in new_content.iteritems():
+        found = False
+        for pnode, pleaves in prev_content.iteritems():
+            if leaves == pleaves:
+                found = True
+                break
+        if not found:
+            prev_node = prev_tree.get_common_ancestor(map(str, leaves))
+            not_found.append([node, prev_node])
+    return not_found
             
 def assembly_tree(runid, outdir):
     log.info("Reading nodes from database...")
@@ -127,6 +143,7 @@ def assembly_tree(runid, outdir):
         for cladeid, packtree, size in task_nodes:
             if cladeid == args.cladeid:
                 clade_tree = db.decode(packtree)
+                clade_tree.ladderize()
                 clade_content = set(clade_tree.get_leaf_names())
         log.info("Tracking clade %s of size %d", args.cladeid, len(clade_content))
     
@@ -163,6 +180,8 @@ def assembly_tree(runid, outdir):
             target_node.up.add_child(tree)
             target_node.detach()
             print "RF with prev tree:", main_tree.robinson_foulds(prev_tree)[:2], len(tree)
+                       
+            
             if len(target_node)!= len(tree):
                 print "cladeids"
                 print "searched", cladeid
@@ -173,6 +192,7 @@ def assembly_tree(runid, outdir):
                 print "recomputed from DB", len(__targets), generate_id(__targets)
                 raw_input()
         else:
+            prev_tree = None
             main_tree = tree
 
         iter_name = "Iter_%04d_%dseqs" %(iternumber, size)
@@ -200,6 +220,17 @@ def assembly_tree(runid, outdir):
                     pass
                               
         OUT.close()
+
+        if prev_tree:
+            REPORT = open(base_fname+".report", "w")
+            not_found = get_partitions_changed(prev_tree, main_tree)
+            for current_node, past_node in not_found:
+                print >>REPORT, "Clade in this iteration:", current_node
+                print >>REPORT, "-----------------"
+                print >>REPORT, "Clade in past iteration:", past_node
+                print >>REPORT, "================="
+            REPORT.close()
+        
         main_tree.write(outfile=base_fname+".nw")
         main_tree.write(features=[], outfile=base_fname+".nwx")
         if REF_TREE:
