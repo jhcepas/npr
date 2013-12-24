@@ -13,7 +13,7 @@ from nprlib.argparse import ArgumentParser, RawDescriptionHelpFormatter
 from nprlib import db
 from nprlib.errors import DataError, ConfigError
 from nprlib.logger import get_main_log
-from nprlib.utils import Tree, pjoin, generate_id, get_latest_nprdp, symlink
+from nprlib.utils import Tree, pjoin, generate_id, get_latest_nprdp, symlink, ncbi
 
 def iter_prepostorder(tree):
     finished_nodes = set()
@@ -119,17 +119,44 @@ def dump(dumpiter, target, tree, outdir):
 def get_partitions_changed(prev_tree, new_tree):
     prev_content = prev_tree.get_cached_content(store_attr="name")
     new_content = new_tree.get_cached_content(store_attr="name")
-
+    
+    prev_content2node = dict([(frozenset(names), node) for node, names in prev_content.iteritems()])
+    new_content2node = dict([(frozenset(names), node) for node, names in new_content.iteritems()])
+    
+    prev_clades = set(prev_content2node.keys())
+    new_clades = set(new_content2node.keys())
+    matches = new_clades & prev_clades
     not_found = []
-    for node, leaves in new_content.iteritems():
-        found = False
-        for pnode, pleaves in prev_content.iteritems():
-            if leaves == pleaves:
-                found = True
-                break
-        if not found:
-            prev_node = prev_tree.get_common_ancestor(map(str, leaves))
-            not_found.append([node, prev_node])
+    for changed_clade in new_clades - prev_clades:
+        new_node = new_content2node[changed_clade]
+        prev_node = prev_tree.get_common_ancestor(map(str, changed_clade))
+
+        for n in new_node.get_descendants("preorder"):
+            if not n.is_leaf():
+                if frozenset(new_content[n]) in prev_clades:
+                    n.collapse = sorted(new_content[n])
+                else:
+                    n.collapse = False
+                
+        for n in prev_node.get_descendants("preorder"):
+            if not n.is_leaf():
+                if frozenset(prev_content[n]) in new_clades:
+                    n.collapse = sorted(prev_content[n])
+                else:
+                    n.collapse = False
+                
+        new_node, prev_node = new_node.copy(), prev_node.copy()
+        for n in new_node.get_descendants():
+            if not n.is_leaf() and n.collapse:
+                n.children = [] 
+                n.name = n.collapse
+        for n in prev_node.get_descendants():
+            if not n.is_leaf() and n.collapse:
+                n.children = []
+                n.name = n.collapse 
+                
+        not_found.append([new_node, prev_node])
+
     return not_found
             
 def assembly_tree(runid, outdir):
@@ -222,13 +249,32 @@ def assembly_tree(runid, outdir):
         OUT.close()
 
         if prev_tree:
+            if args.ncbi:
+                ncbi.connect_database()
+                tax2name = ncbi.get_taxid_translator(main_tree.get_leaf_names())
+                
             REPORT = open(base_fname+".report", "w")
             not_found = get_partitions_changed(prev_tree, main_tree)
             for current_node, past_node in not_found:
-                print >>REPORT, "Clade in this iteration:", current_node
-                print >>REPORT, "-----------------"
-                print >>REPORT, "Clade in past iteration:", past_node
-                print >>REPORT, "================="
+                if args.ncbi:
+                    for lf in current_node.get_leaves() + past_node.get_leaves():
+                        if isinstance(lf.name, list):
+                            lf.name = "%d IDENTICAL  (%s, etc.)" \
+                                %(len(lf.name), ', '.join([tax2name.get(int(_name), _name)
+                                                           for _name in lf.name[:4]]))
+                        else:
+                            lf.name = tax2name.get(int(lf.name), lf.name)
+                else:
+                    for lf in current_node.get_leaves() + past_node.get_leaves():
+                        if isinstance(lf.name, list):
+                            lf.name = "%d IDENTICAL (%s, etc.)" \
+                                %(len(lf.name), ', '.join(lf.name[:4]))
+                    
+                print >>REPORT, "===============================================\n"                                        
+                print >>REPORT, "Clade in THIS iteration:", current_node
+                print >>REPORT, "-----------------------------------------------"
+                print >>REPORT, "Clade in PREV iteration:", past_node
+                print >>REPORT, "===============================================\n"
             REPORT.close()
         
         main_tree.write(outfile=base_fname+".nw")
@@ -301,6 +347,10 @@ if __name__ == "__main__":
     parser.add_argument("--ref", dest="reftree", type=str,
                         help="Compare topology of iteration trees with"
                         " a reference topology")
+
+    parser.add_argument("--ncbi", dest="ncbi", action="store_true",
+                        help="Treats leaf names as taxis, so names are translated")
+
     
     args = parser.parse_args()
         
