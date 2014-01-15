@@ -1,6 +1,15 @@
-1) Ensure npr command is in your path
+This example shows how to produce a phylogenetic tree using the workflow used by
+the phylomeDB database (phylomedb.org), which includes a meta aligning strategy,
+gap trimming, evolutionary model selection and maximum likelihood tree
+inference.
 
-2) call run.sh
+Only a FASTA file is required to start the process. 
 
-3) remove the output directory or use run.sh --clearall to restart the analysis,
-   otherwise precomputed from previous sessions will be used.
+To test it, you can run the shell script run.sh. 
+
+Feel also free to vary the command line used in such example (cat run.sh) and
+explore new options by invoking the npr program with the "-h" argument
+
+Note that you will need to remove the output directory or use run.sh --clearall
+to restart the analysis, otherwise precomputed from previous sessions will be
+used.

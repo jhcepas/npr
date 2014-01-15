@@ -1,3 +1,13 @@
+This example shows how to use the ETE-NPR program to produce a species
+phylogenetic tree based on concatenated alignments. For this, only a fasta file
+containing species proteome sequences and a COG file containing the a list of
+Cluster of Orthologous groups, is necessary. 
+
+Additionally, a lineages file can be provided in order to pre-define the clades
+that will be optimized using the NPR strategy. 
+
+To use this example, you will need to:
+
 1) Decompress the file proteome_seqs.fa.7z with 7-ZIP
 (http://www.7-zip.org/download.html), probably available in your software
 repository.
@@ -6,3 +16,6 @@ repository.
 
 3) remove the output directory or use run.sh --clearall to restart the analysis,
    otherwise precomputed from previous sessions will be used.
+
+
+
