@@ -1,0 +1,6 @@
+1) Ensure npr command is in your path
+
+2) call run.sh
+
+3) remove the output directory or use run.sh --clearall to restart the analysis,
+   otherwise precomputed from previous sessions will be used.
