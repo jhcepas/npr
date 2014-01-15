@@ -1,0 +1,1 @@
+../../npr -o ./result -w sptree -a proteome_seqs.fa --cogs cogs.txt --lineages lineages.txt -c ./fast_workflow_ncbi_targets.cfg -v2 -t2 -x $@

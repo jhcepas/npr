@@ -1,0 +1,8 @@
+1) Decompress the file proteome_seqs.fa.7z with 7-ZIP
+(http://www.7-zip.org/download.html), probably available in your software
+repository.
+
+2) call run.sh
+
+3) remove the output directory or use run.sh --clearall to restart the analysis,
+   otherwise precomputed from previous sessions will be used.
