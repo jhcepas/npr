@@ -1,19 +1,18 @@
 Running a family-tree workflow 
 *************************************
 
-The `genetree` mode allows to run a phylogenetic analysis for a
-given group of sequences, typically a gene family. Only a FASTA file,
-containing amino acid or nucleotide sequences, will be necessary to
-start the analysis.
+The `genetree` mode allows to run a phylogenetic analysis on a given group of
+sequences, typically representing a gene family. Only a FASTA file (aa or nt
+sequences) a configuration template are necessary to start the process.
 
-In addition, if NPR capabilities are enabled, both amino acid and nucleotide
-sequences could be provided at the same time. In such a case, the application
-will choose the more suitable sequence type for each internal node, according to
-the similarity of sequences grouped under each specific node (i.e. when aa
-sequences are identical under a terminal partition, nt sequences will be used to
-refine the node)
+If NPR capabilities are enabled, both amino acid and nucleotide sequences could
+be provided at the same time. In such a case, the application will choose the
+more suitable sequence type for each internal node, according to the similarity
+of sequences grouped under each specific node (i.e. when aa sequences are
+identical under a terminal partition, nt sequences will be used to refine the
+node)
 
-Advantanges of NPR in the genetree workflow
+Advantages of NPR in the genetree workflow
 ===============================================
 
 NPR allows to refine internal nodes within a tree by accommodating different
@@ -70,4 +69,4 @@ Genetree reconstruction is started using the **-m genetree** option.
 
 .. code-block:: sh
 
-   npr -m genetree -a AAseqs.fasta -n NTseqs.fasta -o genetree_results/ -c MyConfig.cfg -x 
+   npr -w genetree -a AAseqs.fasta -n NTseqs.fasta -o genetree_results/ -c MyConfig.cfg -x 
