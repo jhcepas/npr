@@ -18,11 +18,9 @@ This portable package should work on any modern linux distribution (kernel >=
 latest package, decompress, and call any of the npr programs included in the
 root folder.
 
-1. 32-bits portable version http://etetoolkit.org/ETE-NPR/downloads/npr-linux-x32-portable.latest
-1. 64-bits portable version http://etetoolkit.org/ETE-NPR/downloads/npr-linux-x64-portable.latest
-
-Old version can be found at http://npr.cgenomics.org/downloads/
-
+1. 32-bits portable version http://etetoolkit.org/ETE-NPR/releases/npr-HPC-linux-x32-portable.latest
+1. 64-bits portable version http://etetoolkit.org/ETE-NPR/releases/npr-HPC-linux-x64-portable.latest
+Old version can be found at http://etetoolkit.org/ETE-NPR/releases/
 
 
 OSX portable (virtual) package
