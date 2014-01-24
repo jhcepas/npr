@@ -3,56 +3,56 @@
 {% block tables %} 
 <p style="max-width:770px;  text-align: justify; text-justify: newspaper;padding-right:30px;padding-left:30px;font-size:10.5pt;">
 ETE-NPR is a Python application that encapsulates all necessary software and
-methods to<b>reconstruct phylogenetic trees</b> starting from a single FASTA
+methods to <b>reconstruct phylogenetic trees</b> starting from a single FASTA
 file. It provides a convenient interface based on a single configuration file,
 in which a <b>complex phylogenetic workflow can be defined using in a few lines</b>
 (i.e. including alignment refinement and model testing steps).  In addition,
-ETE-NPR implements the<b>Nested Phylogenetic Reconstruction (NPR)</b>
+ETE-NPR implements the <b>Nested Phylogenetic Reconstruction (NPR)</b>
 algorithm, by which nodes in a phylogenetic tree can be hierarchically revisited
 through several iterations in order to <b>maximize the resolution of internal
 nodes</b>. ETE-NPR can be used as a high level wrapper for many standard
 phylogenetic reconstruction workflows, with or without NPR capabilities,
-including<b>gene familiy tree reconstruction or super-matrix species trees</b>.
+including <b>gene familiy tree reconstruction or super-matrix species trees</b>.
 Note also that this software is suitable for High Performance Computing.
 </p>
-<span style="padding-right:30px;padding-left:30px;font-size:9pt;">
-<li><ul>
- <i>If you use this program for published work, please cite:<br></i>
- Huerta-Cepas J and Gabaldón T. <a href="#">ETE-NPR: a portable application
-    for nested phylogenetic reconstruction and workflow design.</a>
-</ul>
-<ul>
-  <i>If you are using the NPR method, please also cite: <br></i>
-  Huerta-Cepas J, Marcet-Houben M, and Gabaldón T. <a href="#">Nested
-    Phylogenetic Reconstruction: Scalable resolution in a growing Tree
-    of Life.</a>
-</ul>
-</li>
-*<i> Note that a list of relevant references, including the use of external
-software, will be provided along with the results produced by ETE-NPR.</i>
-</span>
-<br>
 <br>
 <div style='max-width:800px; width:800px; border:1px solid #eee;'>  
   <table class="contentstable" style='width:800px;' >
     <tr>
     <td width="50%" style="text-align:center;">
-      <p class="biglink"><a class="biglink" href="{{ pathto("changelog/changelog" + version) }}">What's new in NPR {{ version }}?</a><br/>
-         <span class="linkdescr"><a href="{{ pathto("changelog/index") }}">Check older changes</a></span></span></p>
-
-      <p class="biglink"><a class="biglink" href="{{ pathto("tutorial/index") }}">Tutorial and examples</a><br/>
-        <span class="linkdescr">Learn how to run ETE-NPR</span></p>
-
-    </td><td width="50%" style="text-align:center;">
-      <p class="biglink"><a class="biglink" href="{{ pathto("install/index") }}">Setup and Install </a><br/>
-         <span class="linkdescr">Downloads, instalation and portable packages</span></p>
+      <p class="biglink"><a class="biglink" href="{{ pathto("install/index") }}">Setup and Install</a><br/>
+         <span class="linkdescr">Download, Instalation and Portable packages</span></p>
 
       <p class="biglink"><a class="biglink" href="{{ pathto("faqs/index") }}">FAQs</a><br/>
          <span class="linkdescr">Frequently Asked Questions</span></p>
 
+    </td><td width="50%" style="text-align:center;">
+      <p class="biglink"><a class="biglink" href="{{ pathto("tutorial/index") }}">Tutorial and Examples</a><br/>
+        <span class="linkdescr">Learn how to run ETE-NPR</span></p>
+
+      <p class="biglink"><a class="biglink" href="{{ pathto("changelog/changelog" + version) }}">What's new in NPR {{ version }}?</a><br/>
+         <span class="linkdescr"><a href="{{ pathto("changelog/index") }}">Check older changes</a></span></span></p>
+
+
     </td></tr>
   </table>
 </div>
+<span style="padding-right:30px;padding-left:30px;font-size:9pt;">
+<h4>CITATION:</h4>
+<ul style="ol.c {list-style-type: upper-roman;}">
+ <li><b>If you use this program for published work, please cite:</b><br>
+ Huerta-Cepas J and Gabaldón T. <a href="#">ETE-NPR: a portable application
+    for nested phylogenetic reconstruction and workflow design</a> (submitted, preprint)<br></li>
+ <li><b>If you are using the NPR method, please also cite:</b><br>
+  Huerta-Cepas J, Marcet-Houben M, and Gabaldón T. <a href="#">Nested
+    Phylogenetic Reconstruction: Scalable resolution in a growing Tree
+    of Life</a> (submitted, preprint)</li>
+ <i> *Note that a list of relevant references, including the use of external
+software, will be provided along with the results produced by ETE-NPR</i>
+
+</ul>
+</span>
+
 
   <!-- <table class="contentstable" align="center"><tr> -->
   <!--   <td width="50%"> -->

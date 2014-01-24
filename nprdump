@@ -3,6 +3,7 @@ import sys
 import os
 import cPickle
 import shutil
+import gc
 
 # This avoids installing nprlib module. npr script will find it in the
 # same directory in which it is
@@ -178,6 +179,7 @@ def assembly_tree(runid, outdir):
     iternumber = 1
     log.info("Dumping iterations...")
     while task_nodes:
+        gc.collect()
         cladeid, packtree, size = task_nodes.pop(-1)
         if cladeid == args.cladeid:
             tree = clade_tree
@@ -248,7 +250,7 @@ def assembly_tree(runid, outdir):
                               
         OUT.close()
 
-        if prev_tree:
+        if prev_tree and 0: # DISABLED, just debug output
             if args.ncbi:
                 ncbi.connect_database()
                 tax2name = ncbi.get_taxid_translator(main_tree.get_leaf_names())
