@@ -44,6 +44,11 @@ python meta_workflow.py -meta  \
      r:none;m:none;  
      t:fasttree_default'  \
 \
+    'name:standard_fasttree2; 
+     a:clustalo_default; 
+     r:none;m:none;  
+     t:fasttree_full'  \
+\
     'name:standard_raxml; 
      a:clustalo_default; 
      r:none;m:prottest_default;  
