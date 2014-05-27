@@ -59,6 +59,44 @@ python meta_workflow.py -meta  \
      r:none;m:prottest_default;  
      t:phyml_default'  \
 \
+    'name:standard_raxml_bootstrap; 
+     a:clustalo_default; 
+     r:none;m:prottest_default;  
+     t:raxml_default_bootstrap'  \
+\
+    'name:standard_phyml_bootstrap; 
+     a:clustalo_default; 
+     r:none;m:prottest_default;  
+     t:phyml_default_bootstrap'  \
+\
+    'name:linsi_raxml; 
+     a:mafft_linsi; 
+     r:trimal01;
+     m:none;  
+     t:raxml_default'  \
+\
+    'name:linsi_phyml; 
+     a:mafft_linsi; 
+     r:trimal01;
+     m:none;  
+     t:phyml_default'  \
+\
+    'name:linsi_phyml_bootstrap; 
+     a:mafft_linsi; 
+     r:trimal01;
+     m:none;  
+     t:phyml_default_bootstrap'  \
+\
+    'name:fasttree3; 
+     a:mafft_linsi; 
+     r:none;m:none;  
+     t:fasttree_full'  \
+\
+    'name:fasttree3_trimal; 
+     a:mafft_linsi; 
+     r:trimal01;m:none;  
+     t:fasttree_full'  \
+\
      -c apps.cfg
 
 
