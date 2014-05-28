@@ -83,7 +83,7 @@ print >>OUT, '[meta_workflow]\n%s' %('\n'.join(
         ["%s=%s," %(k, ','.join(map(lambda x: "@"+x, v))) for k,v in names.iteritems()]))
    
 print >>OUT, '\n'.join(workflows.values())
-print >>OUT, open(args.config).read()                
+print >>OUT, open(args.config).read()
 OUT.close()
 
                 
