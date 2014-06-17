@@ -1,15 +1,23 @@
-This example shows how to produce a phylogenetic tree using the workflow used by
-the phylomeDB database (phylomedb.org), which includes a meta aligning strategy,
-gap trimming, evolutionary model selection and maximum likelihood tree
-inference.
+This example shows how to produce a phylogenetic tree using the workflow
+described in the phylomeDB database (phylomedb.org), which includes a meta
+aligning strategy, gap trimming, evolutionary model selection and maximum
+likelihood tree inference.
 
-Only a FASTA file is required to start the process. 
+RUN THE EXAMPLE: 
 
-To test it, you can run the shell script run.sh. 
+npr -a Phy0008D92_HUMAN.msf.aa -w phylomedb4 -o results 
 
-Feel also free to vary the command line used in such example (cat run.sh) and
-explore new options by invoking the npr program with the "-h" argument
+Given that this is a quick example, we could accelerate the process by reducing
+the scheduling time between tasks.
 
-Note that you will need to remove the output directory or use run.sh --clearall
-to restart the analysis, otherwise precomputed from previous sessions will be
-used.
+npr -a Phy0008D92_HUMAN.msf.aa -w phylomedb4 -o results -t 1 --launch_time 1 -v2
+
+
+If you are curious about the workflow configuratio, you can always run 
+
+npr show phylomedb4
+
+to see how different tasks are executed
+
+
+
