@@ -12,7 +12,7 @@ find $DN/../../* -exec stat {} \; |wc -l
 
 # Now run a real example, so I can grab all dependencies and put them
 # in the CDE pkg
-$DN/../../npr -c $DN/../../config.cfg -w phylomedb4 -a $DN/Phy00085K5_HUMAN.alg.raw.fasta --dealign -o /tmp/tmpresult -x -v4 -t1 --clearall --override -t1 --launch_time 1 -m2 --compress
+$DN/../../npr -w phylomedb4 -a $DN/Phy00085K5_HUMAN.alg.raw.fasta --dealign -o /tmp/tmpresult -v2 --clearall --override -t1 --launch_time 1 -m3 --compress
 $DN/../../nprdump -a /tmp/tmpresult/
 #$DN/../../nprtop /tmp/tmpresult/
 #$DN/../../nprview /tmp/tmpresult/final_tree.nw 
