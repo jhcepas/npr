@@ -9,9 +9,13 @@ To use this example, you will need to:
 (http://www.7-zip.org/download.html), probably available in your software
 repository.
 
-2) Run the example as: 
+2) Run can run this dummy example as: 
 
-npr -w sptree_fast linsi_fasttree  --cogs cogs.txt -a proteome_seqs.fa -o results/
+npr -w sptree_dummy clustalo_default-none-none-none  --cogs cogs.txt -a proteome_seqs.fa -o results/
+
+3) Or test any orther (time consuming) worflow: 
+
+npr -w sptree-fasttree-80 clustalo_default-none-none-none  --cogs cogs.txt -a proteome_seqs.fa -o results/
 
 
 
