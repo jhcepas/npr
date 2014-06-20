@@ -5,24 +5,14 @@ parser = argparse.ArgumentParser()
 from pprint import pprint
 
 tpl = parser.add_argument_group('TEMPLATE')
-tpl.add_argument('-npr', dest='npr', default='noNPR')
 tpl.add_argument('-appset', dest='appset', default='builtin_apps')
 tpl.add_argument('-c', dest='config')
 tpl.add_argument('-meta', dest='meta', nargs='+')
 
-
 args = parser.parse_args()
-
 
 TEMPLATE = """
 [{name}]
-_app = main
-_max_seqs = 9999999999,
-_npr = {npr_config},
-_workflow = {workflow},
-_appset = {appset}
-
-[w.{name}]
 _app = genetree
 _aa_aligner           =   {aa_aligner}
 _aa_alg_cleaner       =   {aa_trimmer}
@@ -33,6 +23,7 @@ _nt_aligner           =   {nt_aligner}
 _nt_alg_cleaner       =   {nt_trimmer}
 _nt_model_tester      =   none
 _nt_tree_builder      =   {nt_treebuilder}
+_appset               =   {appset}
 """
 
 workflows = dict()
@@ -64,7 +55,6 @@ for metaline in args.meta:
                     name = '-'.join(map(lambda x: x.lstrip('@'),[al, tr, pt, tb]))
                     CFG = TEMPLATE.replace('{name}', name)
                     CFG = CFG.replace('{appset}', "@"+args.appset)
-                    CFG = CFG.replace('{npr_config}', "@"+args.npr)
                     CFG = CFG.replace('{workflow}', "@w."+name)
                     
                     CFG = CFG.replace('{aa_aligner}', al)
