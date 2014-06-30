@@ -1,6 +1,9 @@
-This document describes how to install ETE-NPR from sources in a Linux environment. Note that the recomended approach for most of the users is to use the portable or virtual package available at http://etetoolkit.org/ete_npr. 
+This document describes how to install ETE-NPR from sources in a Linux
+environment. Note that the recomended approach for most of the users is to use
+the portable or virtual package available at http://etetoolkit.org/ete_npr.
 
-However, building ETE-NPR from sources will provide a better performance than the portable packages. 
+However, building ETE-NPR from sources will provide a better performance than
+the portable packages.
    
 
 1. Install dependencies
@@ -12,8 +15,9 @@ However, building ETE-NPR from sources will provide a better performance than th
   python-lxml (optional)
   python-mysqldb (optional) 
 
-You will need also basic tools for compiling (gcc, g++). 
-As an examples, the 'build-essential' package (in ubuntu) should be enough. You may also need to install 'automake' and 'autoconf'
+You will need also basic tools for compiling (gcc, g++). As an examples, the
+'build-essential' package (in ubuntu) should be enough. You may also need to
+install 'automake' and 'autoconf'
   
 Some of the external programs require special libs that might not be installed. Most commonly: 
 
