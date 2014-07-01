@@ -1,21 +1,20 @@
 # Overview 
 
-    ETE-NPR is a bioinformatics program providing a complete environment for
-    the execution of phylogenomic workflows, including super-matrix
-    and family-tree reconstruction approaches. ETE-NPR covers all
-    necessary steps for high quality phylogenetic reconstruction, from
-    alignment reconstruction and model testing to the generation of
-    publication ready images of the produced trees and alignments. ETE-NPR is
-    built on top of a bunch of specialized software and comes with a number
-    of predefined workflows. 
+ETE-NPR is a bioinformatics program providing a complete environment for the
+execution of phylogenomic workflows, including super-matrix and family-tree
+reconstruction approaches. ETE-NPR covers all necessary steps for high quality
+phylogenetic reconstruction, from alignment reconstruction and model testing to
+the generation of publication ready images of the produced trees and
+alignments. ETE-NPR is built on top of a bunch of specialized software and comes
+with a number of predefined workflows.
      
-    If you use ETE-NPR in a published work, please cite:
+If you use ETE-NPR in a published work, please cite:
      
        Jaime Huerta-Cepas, Peer Bork and Toni Gabaldon. In preparation. 
      
-    (Note that a list of the external programs used to complete the necessary
-    computations will be also shown together with your results. They should
-    also be cited.)
+(Note that a list of the external programs used to complete the necessary
+computations will be also shown together with your results. They should also be
+cited.)
 
     Homepage:   http://etetoolkit.org/ete_npr/ 
     Contact:    huerta [at] embl.de & tgabaldon [at] crg.es
