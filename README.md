@@ -22,8 +22,8 @@ cited.)
 # Installing from sources 
 
 This document describes how to install ETE-NPR from sources in a Linux
-environment. Note that the recomended approach for most of the users is to use
-the portable or virtual package available at http://etetoolkit.org/ete_npr.
+environment. Note that **the recomended approach for most of the users is to use
+the portable or virtual package available at http://etetoolkit.org/ete_npr**.
 
 However, building ETE-NPR from sources will provide a better performance than
 the portable packages.
