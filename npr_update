@@ -1,2 +1,4 @@
 #!/bin/sh
-git pull --tags && git checkout tags/latest_stable
+git pull
+git fetch --tags
+git checkout tags/latest_stable
