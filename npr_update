@@ -1,0 +1,2 @@
+#!/bin/sh
+git pull --tags && git checkout tags/latest_stable
