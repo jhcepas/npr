@@ -64,7 +64,7 @@ You need to clone the following repository* at the root* of the npr/ directory:
 Enter the ext_app directory and run the compile script
 ```sh
    $ cd npr/ext_apps/
-   $ sh compile.sh all
+   $ bash compile.sh all
 ```
 
 ## 4. Check that the applications are detected and operative
