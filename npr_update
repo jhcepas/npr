@@ -1,4 +1,7 @@
 #!/bin/sh
+NPRDIR="$(dirname "$(readlink -f "${0}")")"
+cd $NPRDIR
+
 git reset --hard # discard local changes
 git checkout master # move to master
 git pull # get latest repository version
