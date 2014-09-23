@@ -1,3 +1,3 @@
 run the following command line to test the full NPR workflow with mixed sequence types.
 
-$ npr -a NUP62.aa.fa -n NUP62.nt.fa -o results/ -w linsi_fasttree --npr full_NPR -v2
+$ npr -a NUP62.aa.fa -n NUP62.nt.fa -o results/ -w linsi_fasttree --recursive
