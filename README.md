@@ -28,18 +28,13 @@ the portable or virtual package available at http://etetoolkit.org/ete_npr**.
 However, building ETE-NPR from sources will provide a better performance than
 the portable packages.
 
-## 0. Clone this repository
-```sh
-  $ git clone  http://github.com/jhcepas/npr.git   
-```
+## 0. Download the latest release from https://github.com/jhcepas/npr/releases
 
 ## 1. Install dependencies
 ```
   python
   python-numpy
   python-qt4 (optional, required for image generation)
-  python-lxml (optional)
-  python-mysqldb (optional) 
 ```
 
 You will need also basic tools for compiling (gcc, g++). As an examples, the
