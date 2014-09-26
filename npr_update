@@ -9,4 +9,4 @@ git fetch --tags # get latest tags
 git checkout tags/latest_stable # move to latest stable point
 echo
 echo "Current ETE-NPR version:"
-npr version 
+./npr version 
