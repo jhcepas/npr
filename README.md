@@ -28,7 +28,7 @@ the portable or virtual package available at http://etetoolkit.org/ete_npr**.
 However, building ETE-NPR from sources will provide a better performance than
 the portable packages.
 
-## 0. Download the latest official release
+## 0. Download the latest official release from github
 
 https://github.com/jhcepas/npr/releases
 
