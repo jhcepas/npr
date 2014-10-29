@@ -1,0 +1,12 @@
+#!/bin/sh
+NPRDIR="$(dirname "$(readlink -f "${0}")")"
+cd $NPRDIR
+
+git reset --hard # discard local changes
+git checkout master # move to master
+git pull # get latest repository version
+git fetch --tags # get latest tags
+git checkout tags/latest_stable # move to latest stable point
+echo
+echo "Current ETE-NPR version:"
+./npr version 

@@ -8,6 +8,7 @@ def list_workflows(config):
     wtype_legend = {
         'genetree': '(aligner-trimmer-modeltester-treebuilder)',
         'supermatrix': '(sptree-treebuilder-cogselector)',
+        'npr': 'Nested Phylogenetic Reconstruction options',
         }
     for wtype in ['genetree', 'supermatrix']:
         avail_workflows = sorted(['%s %s' %(k.ljust(25), config[k].get('_desc', '')) for k,
@@ -18,11 +19,11 @@ def list_workflows(config):
         print '=' *80
         print ('  %s' %'\n  '.join(avail_workflows))
                 
-    avail_meta = sorted(["%s (%s threads)" %(k.ljust(40), len(v)) for k,
+    avail_meta = sorted(["%s (% 3s threads)" %(k.ljust(40), len(v)) for k,
                          v in config.get('meta_workflow', {}).iteritems()])
 
     print '=' *80
-    print 'Available meta-workflows'.center(80)
+    print 'Available Aliases and Meta-workflows'.center(80)
     print '=' *80
     print ('  %s' %'\n  '.join(avail_meta))
 
@@ -296,7 +297,6 @@ def is_raxml_bootstrap(value):
 CHECKERS = {
     # (app_name, attr_name): (checker_fn, args, required_attr)
     ("main", "_npr"): (is_app_list, {}, True),
-    ("main", "_max_seqs"): (is_correlative_integer_list, {"minv":1}, True),
     ("main", "_workflow"): (is_app_list, {"allow_none":False}, True),
     ("main", "_appset"): (is_app_link, {"allow_none":False}, True),
     

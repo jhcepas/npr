@@ -9,7 +9,7 @@ from nprlib.utils import (md5, merge_arg_dicts, PhyloTree, SeqGroup,
                           checksum, read_time_file, generate_runid,
                           GLOBALS, DATATYPES)
 from nprlib.master_job import Job
-from nprlib.errors import RetryException, TaskError
+from nprlib.errors import TaskError
 from nprlib import db
 import shutil
 
@@ -18,19 +18,20 @@ istask = lambda j: isinstance(j, Task)
 
 def thread_name(task):
     tid = getattr(task, "threadid", None)
-    if GLOBALS.get('verbosity', 4) >= 2:
-        return "@@13:%s@@1:" %GLOBALS.get(tid, {}).get("_name", "?")
+    if hasattr(task, 'target_wkname'):
+        name = getattr(task, 'target_wkname')
     else:
         name = GLOBALS.get(tid, {}).get("_name", "?")
+
+    if GLOBALS.get('verbosity', 4) < 2:
         if len(name)>23:
             name = "%s...%s" %(name[:10], name[-10:])
-        
-        return "@@13:%s@@1:" %name
+    return "@@13:%s@@1:" %name
 
 def genetree_class_repr(cls, cls_name):
     """ Human readable representation of NPR genetree tasks.""" 
-    return "%s (%s seqs, %s, %s/%s)" %\
-        (cls_name, getattr(cls, "size", None) or 0,
+    return "%s (%s %s seqs, %s, %s/%s)" %\
+        (cls_name, getattr(cls, "size", None) or "", getattr(cls, "seqtype", None) or 0,
          cls.tname, 
          "", #(getattr(cls, "taskid", None) or "?")[:6],
          thread_name(cls))
@@ -55,8 +56,8 @@ def concatalg_class_repr(cls, cls_name):
 
 def generic_class_repr(cls, cls_name):
     """ Human readable representation of NPR sptree tasks.""" 
-    return "%s (%s tips, %s, %s/%s)" %\
-        (cls_name, getattr(cls, "size", None) or 0,
+    return "%s (%s %s seqs, %s, %s/%s)" %\
+        (cls_name, getattr(cls, "size", None) or 0, getattr(cls, "seqtype", None) or "",
          cls.tname, 
          "", #(getattr(cls, "taskid", None) or "?")[:6],
          thread_name(cls))
@@ -193,7 +194,7 @@ class Task(object):
                 elif "W" in job_statuses: 
                     self.status = "W"
                 else:
-                    log.error("unknown task state")
+                    log.error("unknown task state %s" %(job_statuses))
 
         logindent(-2)
         
@@ -247,9 +248,9 @@ class Task(object):
                     # If task has an internal worflow processor,
                     # launch it and populate with new jobs
                     if istask(j) and j.task_processor:
-                        pipeliner = j.task_processor[0]
-                        target_workflow = j.task_processor[1]
-                        for new_job in pipeliner(j, target_workflow):
+                        pipeline = j.task_processor
+                        target_workflow = j.target_wkname
+                        for new_job in pipeline(j, target_workflow):
                             jobs_to_check.add(new_job)
                             self.jobs.append(new_job)
 

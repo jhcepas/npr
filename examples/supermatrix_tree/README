@@ -1,21 +1,33 @@
-This example shows how to use the ETE-NPR program to produce a species
-phylogenetic tree based on concatenated alignments. For this, only a fasta file
-containing species proteome sequences and a COG file containing the a list of
-Cluster of Orthologous groups are necessary. 
+This example shows how to use ETE-NPR to produce species trees based on
+concatenated alignments. For this, only a fasta file (containing the species
+proteome sequences) and a COG file (containing the list of Cluster of
+Orthologous groups) are necessary.
 
-To use this example, you will need to:
+To run this (dummy) example, you will need to:
 
 1) Decompress the file proteome_seqs.fa.7z with the 7-ZIP application
 (http://www.7-zip.org/download.html), probably available in your software
 repository.
 
-2) Run can run this dummy example as: 
+2) Execute npr with the following options. Choosing sptree_dummy as the
+supermatrix workflow will restrict to the concatenation of 5 alignments.:
 
-npr -w sptree_dummy clustalo_default-none-none-none  --cogs cogs.txt -a proteome_seqs.fa -o results/
+$ npr -m sptree_dummy -w clustalo_default-none-none-none --cogs cogs.txt \
+    -a proteome_seqs.fa -o results/
 
-3) Or test any orther (time consuming) worflow: 
+3) To run it in recursive way, you just need to add the --recursive flag
 
-npr -w sptree-fasttree-80 clustalo_default-none-none-none  --cogs cogs.txt -a proteome_seqs.fa -o results/
+$ npr -m sptree_dummy -w clustalo_default-none-none-none  --cogs cogs.txt \
+    -a proteome_seqs.fa -o results/ --recursive
+
+
+Note that the chosen genetree workflow do not include model-selection and tree
+build steps, thus reducing the time required the species tree. More elaborate
+examples are possible, although they may take hours of computation even in
+multi-core systems. In example: 
+
+$ npr -m sptree-raxml-85 -w meta_aligner_default-trimal01-prottest_default-none \
+    --cogs cogs.txt -a proteome_seqs.fa -o results/ --recursive --cpu 8                
 
 
 

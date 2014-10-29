@@ -32,11 +32,15 @@ class _DataTypes(object):
         self.msf = 100
         self.alg_fasta = 200
         self.alg_phylip = 201
+        self.alg_nt_fasta = 202
+        self.alg_nt_phylip = 203
+
         self.clean_alg_fasta = 225
         self.clean_alg_phylip = 226
         self.kept_alg_columns = 230
         self.concat_alg_fasta = 250
         self.concat_alg_phylip = 251
+        self.alg_stats = 260
         self.alg_list = 290
         self.best_model = 300
         self.model_ranking = 305
@@ -116,6 +120,7 @@ TIME_FORMAT = '%a %b %d %H:%M:%S %Y'
 
 AA = set('ACEDGFIHKMLNQPSRTWVY*-.UOBZJX') | set('acedgfihkmlnqpsrtwvyuobzjx') 
 NT = set("ACGT*-.URYKMSWBDHVN") | set("acgturykmswbdhvn")
+GAP_CHARS = set(".-")
 
 GENCODE = {
     'ATA':'I', 'ATC':'I', 'ATT':'I', 'ATG':'M',
@@ -311,6 +316,9 @@ def clear_tempdir():
 def terminate_job_launcher():
     back_launcher = GLOBALS.get("_background_scheduler", None)
     if back_launcher:
+        #GLOBALS['_job_queue'].close()
+        GLOBALS['_job_queue'].cancel_join_thread()
+        back_launcher.join(120) # gives a couple of minutes to finish
         back_launcher.terminate()
         
 def print_as_table(rows, header=None, fields=None, print_header=True, stdout=sys.stdout):
@@ -460,7 +468,13 @@ def symlink(target, link_name):
     except OSError:
         pass
     os.symlink(target, link_name)
-        
+
+def silent_remove(target):
+    try:
+        os.remove(target)
+    except OSError:
+        pass
+    
 def get_latest_nprdp(basedir):
     avail_dbs = []
     for fname in glob(os.path.join(basedir, "*.db")):

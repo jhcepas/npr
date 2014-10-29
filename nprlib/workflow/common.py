@@ -13,44 +13,28 @@ from nprlib.master_task import register_task_recursively, isjob
 log = logging.getLogger("main")
                 
 class IterConfig(dict):
-    def __init__(self, conf, workflow, size, seqtype):
+    def __init__(self, conf, wkname, size, seqtype):
         """Special dict to extract the value of each parameter given
          the properties of a task: size and seqtype. 
         """
-        dict.__init__(self, conf[workflow])
+        dict.__init__(self, conf[wkname])
        
         self.conf = conf
         self.seqtype = seqtype
         self.size = size
-        self.index = None
-       
-        # index_slide = 0
-        # while self.index is None: 
-        #     try:
-        #         max_seqs = conf[workflow]["_max_seqs"][index_slide]
-        #     except Index Error:
-        #         raise DataError("Target species [%d] has a size that is not covered in current config file" %self.size)
-        #     else:
-        #         if self.size <= max_seqs:
-        #             self.index = index_slide
-        #         else:
-        #             index_slide += 1
-        # # Updates the dictionary with the workflow application config
-        # appcfg = conf[workflow]['_workflow'][self.index]
-        # if appcfg.startswith('@'):
-        #     self.update(conf[appcfg[1:]])
+        self['npr_wf_type'] = conf['_npr'].get('wf_type', None)
+        self['npr_workflows'] = conf['_npr'].get('workflows', [])
+        self['switch_aa_similarity'] = conf['_npr'].get('nt_switch_thr', 1.0)
+        if conf[wkname]["_app"] == self['npr_wf_type']:
+            self['max_iters'] = conf['_npr'].get('max_iters', 1)  # 1 = no npr by default!
+        else:
+            self['max_iters'] = 1
+            
+        self['_tree_splitter'] = '@default_tree_splitter'
         
-        nprcfg = conf[workflow]['_npr']
-        if nprcfg.startswith('@'):
-            self.update(conf[nprcfg[1:]])
-        elif nprcfg == 'none':
-            self['_max_seq_similarity']   =  1.0
-            self['_switch_aa_similarity'] =  1.0
-            self['_min_branch_support']   =  1.0
-            self['_min_npr_size']         =  4
-            self['_tree_splitter']        =  '@dummy_splitter'
-            self['_max_iters'] = 1
-                    
+        # if max_outgroup size is 0, means that no rooting is done in child NPR trees
+        self['use_outgroup'] = conf['default_tree_splitter']['_max_outgroup_size'] != 0
+        
     def __getattr__(self, v):
         try:
             return dict.__getattr__(self, v)
@@ -66,12 +50,11 @@ class IterConfig(dict):
         try:
             value = dict.__getitem__(self, "_%s" %v)
         except KeyError, e:
-            return None
+            return dict.__getitem__(self, v)
         else:
             # If list, let's take the correct element
             if type(value) == list:
                 raise ValueError('This should not occur. Please report the error!')
-                # value = value[self.index]
                 
             if type(value) != str:
                 return value
@@ -82,7 +65,7 @@ class IterConfig(dict):
                 return value[1:], getattr(all_tasks, classname) 
             else:
                 return value
-
+                
 def process_new_tasks(task, new_tasks, conf):
     # Basic registration and processing of newly generated tasks
     parent_taskid = task.taskid if task else None
@@ -98,8 +81,14 @@ def process_new_tasks(task, new_tasks, conf):
             ts.configid = task.configid
             ts.threadid = task.threadid
             ts.main_tree = task.main_tree
-        #db.add_runid2task(ts.threadid, ts.taskid)
+            # NPR allows switching the workflow associated to new tasks, if so,
+            # child task should have a target_wkname attribute already,
+            # otherwise we assume the same parent workflow
+            if not hasattr(ts, "target_wkname"):
+                ts.target_wkname = task.target_wkname
             
+        #db.add_runid2task(ts.threadid, ts.taskid)
+
 def inc_iternumber(threadid):
     current_iter = get_iternumber(threadid)
     GLOBALS["threadinfo"][threadid]["last_iter"] = current_iter + 1
@@ -146,55 +135,69 @@ def split_tree(task_tree_node, task_outgroups, main_tree, alg_path, npr_conf, th
     suitable nodes for NPR iterations. Each yielded node comes with
     the set of target and outgroup tips. 
     """
-    
+
+
     def processable_node(_n):
         """This an internal function that returns true if a given node
         is suitable for a NPR iteration. It can be used as
         "is_leaf_fn" when traversing a tree.
 
-        Note that this function uses several variables which change
-        within split_tree function.
+        Note that this function uses several variables which change within the
+        split_tree function, so must be kept within its namespace.
 
         """
-        _isleaf = False
-        if len(n2content[_n]) >= npr_conf.min_npr_size \
-           and _n is not master_node \
-           and (not _TARGET_NODES or _n in _TARGET_NODES) \
-           and (target_cladeids is None or _n.cladeid in target_cladeids):
-                        
-            if ALG and npr_conf.max_seq_simiarity < 1.0: 
+        is_leaf = False
+        for wkname, wkfilter in npr_conf.npr_workflows:
+            # if node is not in the targets or does not meet size filters, skip
+            # workflow
+            if _n is master_node or \
+               (_TARGET_NODES and _n not in _TARGET_NODES) or \
+               (target_cladeids and _n.cladeid not in target_cladeids) or \
+               len(n2content[_n]) < max(wkfilter.get("min_size", 3), 3) or \
+               ("max_size" in wkfilter and len(n2content[_n]) > wkfilter["max_size"]):
+                continue
+
+            # If seq_sim filter used, calculate node stats
+            if ALG and ("min_seq_sim" in wkfilter or "max_seq_sim" in wkfilter): 
                 if not hasattr(_n, "seqs_mean_ident"):
                     log.log(20, "Calculating node sequence stats...")
                     mx, mn, avg, std = get_seqs_identity(ALG,
                                                          [__n.name for __n in n2content[_n]])
                     _n.add_features(seqs_max_ident=mx, seqs_min_ident=mn,
-                                   seqs_mean_ident=avg, seqs_std_ident=std)
+                                    seqs_mean_ident=avg, seqs_std_ident=std)
                     log.log(20, "mx=%s, mn=%s, avg=%s, std=%s" %(mx, mn, avg, std))
+                    
+
+                if _n.seqs_mean_ident < wkfilter["min_seq_sim"]:
+                    continue
+                    
+                if _n.seqs_mean_ident > wkfilter["max_seq_sim"]:
+                    continue
+
+                    
             else:
                 _n.add_features(seqs_max_ident=None, seqs_min_ident=None,
                                 seqs_mean_ident=None, seqs_std_ident=None)
 
-            if _n.seqs_mean_ident >= npr_conf.max_seq_similarity:
-                # If sequences are too similar, do not optimize
-                # this node even if it is lowly supported
-                _is_leaf = False
-            elif not npr_conf.outgroup_size and npr_conf.min_branch_support <= 1.0:
-                # If we are optimizing only lowly supported nodes,
-                # and nodes are optimized without outgroup, our
-                # target node is actually the parent of lowly
-                # supported nodes. Therefore, I check if support
-                # is low in children nodes, and return this node
-                # if so.
-                for _ch in _n.children:
-                    if _ch.support <= npr_conf.min_branch_support:
-                        _isleaf = True
-                        break
-            elif _n.support <= npr_conf.min_branch_support:
-                # If sequences are different enough and node is
-                # not well supported, optimize it. 
-                _isleaf = True
-            
-        return _isleaf
+            if "min_support" in wkfilter:
+                # If we are optimizing only lowly supported nodes, and nodes are
+                # optimized without an outgroup, our target node is actually the
+                # parent of lowly supported nodes. Therefore, I check if support
+                # is low in children nodes, and return this node if so.
+                if not npr_conf.use_outgroup:
+                    if not [_ch for _ch in _n.children if _ch.support <= wkfilter["min_support"]]:
+                        continue
+                # Otherwise, just skip the node if it above the min support
+                elif _n.support > wkfilter["min_support"]:
+                    continue
+
+            # At this point, node passed all filters of this workflow were met,
+            # so it can be optimized
+            is_leaf = True
+            _n._target_wkname = wkname
+            break
+                
+        return is_leaf
         
     log.log(20, "Loading tree content...")
     n2content = main_tree.get_cached_content()
@@ -204,11 +207,6 @@ def split_tree(task_tree_node, task_outgroups, main_tree, alg_path, npr_conf, th
         ALG = SeqGroup(raw_alg)
     else:
         ALG = None
-    #for n in task.task_tree_node.traverse(): 
-    #    content = n2content[n]
-    #    mx, mn, avg, std = get_seqs_identity(ALG, [node.name for node in content])
-    #    n.add_features(seqs_max_ident=mx, seqs_min_ident=mn,
-    #                   seqs_mean_ident=avg, seqs_std_ident=std)
 
     log.log(20, "Finding next NPR nodes...")
     # task_tree_node is actually a node in main_tree, since it has been
@@ -242,9 +240,9 @@ def split_tree(task_tree_node, task_outgroups, main_tree, alg_path, npr_conf, th
                         if not strict_monophyly or lin2sp[lin] == ancestor_content:
                             _TARGET_NODES[ancestor].append(lin)
                         elif strict_monophyly:
-                            log.log(28, "Discarding not monophyletic level @@11:%s@@1:" %lin)
+                            log.log(26, "Discarding not monophyletic level @@11:%s@@1:" %lin)
                     else:
-                        log.log(28, "Discarding upper clade @@11:%s@@1:" %lin)
+                        log.log(26, "Discarding upper clade @@11:%s@@1:" %lin)
                         
         for node in master_node.iter_leaves(is_leaf_fn=processable_node):
             if opt_levels:
@@ -253,33 +251,30 @@ def split_tree(task_tree_node, task_outgroups, main_tree, alg_path, npr_conf, th
                     # Marks the level as optimized, so is not computed again
                     opt_levels[lin][0] = True
            
-            log.log(28, "Found possible target node of size %s and branch support %f" %(len(n2content[node]), node.support))
+            log.log(28, "Found possible target node of size %s branch support %f" %(len(n2content[node]), node.support))
+            log.log(28, "First suitable workflow: %s" %(node._target_wkname))
 
             # Finds best outgroup for the target node
-            if npr_conf.outgroup_size == 0:
-                seqs = set([_i.name for _i in n2content[node]])
-                outs = set()
-            else:
+            if npr_conf.use_outgroup:
                 splitterconfname, _ = npr_conf.tree_splitter
                 splitterconf = GLOBALS[threadid][splitterconfname]
                 #seqs, outs = select_outgroups(node, n2content, splitterconf)
                 #seqs, outs = select_closest_outgroup(node, n2content, splitterconf)
                 seqs, outs = select_sister_outgroup(node, n2content, splitterconf)
+            else:
+                seqs = set([_i.name for _i in n2content[node]])
+                outs = set()
                 
                 
             if seqs | outs == tasktree_content:
-                log.log(28, "Discarding target node of size %s, due to identity with its parent node" %len(n2content[node]))
+                log.log(26, "Discarding target node of size %s, due to identity with its parent node" %len(n2content[node]))
                 #print tasktree_content
                 #print seqs
                 #print outs
                 trees_to_browse.append(node)
             else:
                 npr_nodes += 1
-                log.log(28,
-                        "@@16:Target node of size %s with %s outgroups marked for a new NPR iteration!@@1:" %(
-                        len(seqs),
-                        len(outs)))
-                yield node, seqs, outs
+                yield node, seqs, outs, node._target_wkname
     log.log(28, "%s nodes will be optimized", npr_nodes)
 
 def get_next_npr_node(threadid, ttree, task_outgroups, mtree, alg_path, npr_conf, target_cladeids=None):
@@ -287,28 +282,22 @@ def get_next_npr_node(threadid, ttree, task_outgroups, mtree, alg_path, npr_conf
     if npr_conf.max_iters and current_iter >= npr_conf.max_iters:
         log.warning("Maximum number of iterations reached!")
         return
-        
-    for node, seqs, outs in split_tree(ttree, task_outgroups, mtree, alg_path,
-                                       npr_conf, threadid, target_cladeids):
-        if npr_conf.max_iters and current_iter < npr_conf.max_iters:
-            if DEBUG():
-                NPR_TREE_STYLE.title.clear()
-                NPR_TREE_STYLE.title.add_face(faces.TextFace("MainTree:"
-                                                             "Gold color:Newly generated task nodes",
-                                                             fgcolor="blue"), 0)
-                node.img_style["fgcolor"] = "Gold"
-                node.img_style["size"] = 30
 
-            log.log(28, "Selected node: %s targets, %s outgroups", len(seqs), len(outs))
+    if not npr_conf.npr_workflows:
+        log.log(26, "NPR is disabled")
+        return
+        
+    for node, seqs, outs, wkname in split_tree(ttree, task_outgroups, mtree, alg_path,
+                                               npr_conf, threadid, target_cladeids):
+        if npr_conf.max_iters and current_iter < npr_conf.max_iters:
+            log.log(28,
+                    "@@16:Target node of size %s with %s outgroups marked for a new NPR iteration!@@1:" %(
+                        len(seqs),
+                        len(outs)))
             # Yield new iteration
             inc_iternumber(threadid)
-            yield node, seqs, outs
-                    
-    if DEBUG():
-        mtree.show(tree_style=NPR_TREE_STYLE)
-        for _n in mtree.traverse():
-            _n.img_style = None
- 
+            yield node, seqs, outs, wkname
+                     
 def select_closest_outgroup(target, n2content, splitterconf):
     def sort_outgroups(x,y):
         r = cmp(x[1], y[1]) # closer node
@@ -333,7 +322,7 @@ def select_closest_outgroup(target, n2content, splitterconf):
     max_outgroup_size = max(int(float(splitterconf["_max_outgroup_size"]) * len(n2content[target])), 1)
     out_min_support = float(splitterconf["_min_outgroup_support"])
 
-    log.log(28, "Max outgroup size allowed %d" %max_outgroup_size)
+    log.log(26, "Max outgroup size allowed %d" %max_outgroup_size)
     
     # Gets a list of outside nodes an their distance to current target node
     n2targetdist = distance_matrix_new(target, leaf_only=False,
@@ -394,10 +383,10 @@ def select_sister_outgroup(target, n2content, splitterconf):
     out_min_support = float(splitterconf["_min_outgroup_support"])
     if splitterconf["_max_outgroup_size"].strip().endswith("%"):
         max_outgroup_size = max(1, round((float(splitterconf["_max_outgroup_size"].strip("%"))/100) * len(n2content[target])))
-        log.log(28, "Max outgroup size allowed %s = %d" %(splitterconf["_max_outgroup_size"], max_outgroup_size))
+        log.log(26, "Max outgroup size allowed %s = %d" %(splitterconf["_max_outgroup_size"], max_outgroup_size))
     else:
         max_outgroup_size = max(1, int(splitterconf["_max_outgroup_size"]))
-        log.log(28, "Max outgroup size allowed %d" %max_outgroup_size)
+        log.log(26, "Max outgroup size allowed %d" %max_outgroup_size)
     
     # Gets a list of outside nodes an their distance to current target node
     n2targetdist = distance_matrix_new(target, leaf_only=False,

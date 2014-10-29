@@ -52,7 +52,7 @@ for metaline in args.meta:
                 if pt != "none": pt = "@%s" %pt
                 for tb in treebuilders:
                     if tb != "none": tb = "@%s" %tb
-                    name = '-'.join(map(lambda x: x.lstrip('@'),[al, tr, pt, tb]))
+                    name = '-'.join(map(lambda x: x.lstrip('@'), [_v for _v in [al, tr, pt, tb] if _v]))
                     CFG = TEMPLATE.replace('{name}', name)
                     CFG = CFG.replace('{appset}', "@"+args.appset)
                     CFG = CFG.replace('{workflow}', "@w."+name)
@@ -67,7 +67,7 @@ for metaline in args.meta:
                     CFG = CFG.replace('{nt_treebuilder}', tb)
                     names[tagname].append(name)
                     workflows[name] = CFG
-
+                    
 OUT = open('auto_config.cfg', 'w')
 print >>OUT, '[meta_workflow]\n%s' %('\n'.join(
         ["%s=%s," %(k, ','.join(map(lambda x: "@"+x, v))) for k,v in names.iteritems()]))
