@@ -68,7 +68,10 @@ def read_paml (source, obj=None, header_delimiter="\t", fix_duplicates=True):
     seq_id = -1
 
     # Prepares handle from which read sequences
-    if os.path.isfile(source):
+    if source.endswith('.gz'):
+        import gzip
+        _source = gzip.open(source)
+    elif os.path.isfile(source):
         _source = open(source, "rU")
     else:
         _source = iter(source.split("\n"))
