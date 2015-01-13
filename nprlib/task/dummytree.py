@@ -40,8 +40,13 @@ class DummyTree(TreeTask):
         target_seqs = node_info.get("target_seqs", set())
         out_seqs = node_info.get("out_seqs", set())
         all_seqs = list(target_seqs | out_seqs)
-        
-        newick = "(%s, (%s));" %(all_seqs[0], ','.join(all_seqs[1:]))
+
+        if len(all_seqs) == 1:
+            newick = "%s;" %(all_seqs[0])
+        elif len(all_seqs) == 2:
+            newick = "(%s, %s);" %(all_seqs[0], all_seqs[1])
+        else:
+            newick = "(%s, (%s));" %(all_seqs[0], ','.join(all_seqs[1:]))
         
         TreeTask.store_data(self, newick, {})
 

@@ -186,7 +186,8 @@ def process_task(task, wkname, npr_conf, nodeid2info):
         # inference does not make sense given the number of sequences. DummyTree
         # will produce a fake fully collapsed newick tree.
         treebuilderclass = DummyTree
-    
+        mtesterclass = None
+        
     # If more than one outgroup are used, enable the use of constrain
     if out_seqs and len(out_seqs) > 1:
         constrain_id = nodeid
