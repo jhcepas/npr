@@ -337,8 +337,8 @@ CHECKERS = {
     ("treesplitter", "_outgroup_topology_dist"): (is_boolean, {}, True),
     ("treesplitter", "_first_split"): (is_text, {}, True),
 
-    ("metaaligner", "_aligners"): (is_app_list, {}, True),
-    ("metaaligner", "_alg_trimming"): (is_boolean, {}, True),
+    ("metaligner", "_aligners"): (is_app_list, {}, True),
+    ("metaligner", "_alg_trimming"): (is_boolean, {}, True),
 
     ("prottest", "_lk_mode"): (is_choice, {"choices":set(['phyml', 'raxml'])}, True),
     ("prottest", "_models"): (is_list, {}, True),

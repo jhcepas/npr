@@ -1,36 +1,36 @@
 python meta_workflow.py -meta  \
    'name:test_all; 
-    a:muscle_default,mafft_default,mafft_einsi,mafft_linsi,mafft_ginsi,clustalo_default,meta_aligner_default,meta_aligner_trimmed,mcoffee_soft; 
+    a:muscle_default,mafft_default,mafft_einsi,mafft_linsi,mafft_ginsi,clustalo_default,meta_aligner_default,meta_aligner_trimmed,mcoffee_default; 
     r:none,trimal01,trimal02,trimal_gappyout;m:none, prottest_default;  
     t:none,fasttree_full,fasttree_default,phyml_default,raxml_default,raxml_default_bootstrap,phyml_default_bootstrap'  \
 \
     'name:aligners_only; 
-     a:muscle_default, mafft_default, clustalo_default, meta_aligner_default, mcoffee_soft; 
+     a:muscle_default, mafft_default, clustalo_default, meta_aligner_default, mcoffee_default; 
      r:trimal01,trimal02,none;m:prottest_default,none;  
      t:none'  \
 \
     'name:test_aligners_fasttree; 
-     a:muscle_default, mafft_default, clustalo_default, meta_aligner_default, mcoffee_soft; 
+     a:muscle_default, mafft_default, clustalo_default, meta_aligner_default, mcoffee_default; 
      r:none,trimal01;m:none;  
      t:fasttree_full'  \
 \
     'name:test_aligners_raxml; 
-     a:muscle_default, mafft_default, clustalo_default, meta_aligner_default, mcoffee_soft; 
+     a:muscle_default, mafft_default, clustalo_default, meta_aligner_default, mcoffee_default; 
      r:none,trimal01;m:none;  
      t:raxml_default'  \
 \
     'name:test_aligners_raxml_models; 
-     a:muscle_default, mafft_default, clustalo_default, meta_aligner_default, mcoffee_soft; 
+     a:muscle_default, mafft_default, clustalo_default, meta_aligner_default, mcoffee_default; 
      r:none,trimal01;m:none, prottest_default;  
      t:raxml_default'  \
 \
     'name:test_aligners_phyml; 
-     a:muscle_default, mafft_default, clustalo_default, meta_aligner_default, mcoffee_soft; 
+     a:muscle_default, mafft_default, clustalo_default, meta_aligner_default, mcoffee_default; 
      r:none,trimal01;m:none;  
      t:phyml_default'  \
 \
     'name:test_aligners_phyml_models; 
-     a:muscle_default, mafft_default, clustalo_default, meta_aligner_default, mcoffee_soft; 
+     a:muscle_default, mafft_default, clustalo_default, meta_aligner_default, mcoffee_default; 
      r:none,trimal01;m:none, prottest_default;  
      t:phyml_default'  \
 \
