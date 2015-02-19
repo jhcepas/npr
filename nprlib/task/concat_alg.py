@@ -34,10 +34,6 @@ class ConcatAlg(ConcatAlgTask):
         
         self.job2alg = {}
         self.job2model = {}
-        if seqtype == "aa":
-            self.default_model = conf[confname]["_default_aa_model"]
-        elif seqtype == "nt":
-            self.default_model = conf[confname]["_default_nt_model"]
             
         self.genetree_workflow = conf[confname]["_workflow"][1:]
         self.init()
@@ -66,24 +62,44 @@ class ConcatAlg(ConcatAlgTask):
         # Assumes tasks resulting from genetree workflow, in which
         # only Alg and Acleaner tasks could contain the results
         log.log(26, "Collecting supermatrix data")
-        jobtypes = set()
-        job2alg, job2acleaner = {}, {}
+        
+        # jobtypes = set()
+        # job2alg, job2acleaner = {}, {}
+        # for job in self.jobs:
+        #     jobtypes.add(job.ttype)
+        #     if job.ttype == "alg" and job.nodeid not in self.job2alg:
+        #         dataid = db.get_dataid(*job.alg_fasta_file.split("."))
+        #         job2alg[job.nodeid] = db.get_data(dataid)
+        #     elif job.ttype == "acleaner":
+        #         a, b =  job.clean_alg_fasta_file.split(".")
+        #         dataid = db.get_dataid(*job.clean_alg_fasta_file.split("."))
+        #         job2acleaner[job.nodeid] = db.get_data(dataid)
+        #     elif job.ttype == "mchooser":
+        #         self.job2model[job.nodeid] = job.best_model
+
+        # Let's extract alignments from the tree job in the genetree workflow,
+        # so I can make sure I am using the correct version, either raw, trimmed version, or even the
+        # switched nt version
+        observed_seqtypes = set()
+        self.job2alg = {}
         for job in self.jobs:
-            jobtypes.add(job.ttype)
-            if job.ttype == "alg" and job.nodeid not in self.job2alg:
-                dataid = db.get_dataid(*job.alg_fasta_file.split("."))
-                job2alg[job.nodeid] = db.get_data(dataid)
-            elif job.ttype == "acleaner":
-                a, b =  job.clean_alg_fasta_file.split(".")
-                dataid = db.get_dataid(*job.clean_alg_fasta_file.split("."))
-                job2acleaner[job.nodeid] = db.get_data(dataid)
+            if job.ttype == "tree":
+                observed_seqtypes.add(job.seqtype)
+                taskid, datatype = job.alg_phylip_file.split(".")
+                dataid = db.get_dataid(taskid, datatype)
+                self.job2alg[job.nodeid] = db.get_data(dataid)
             elif job.ttype == "mchooser":
                 self.job2model[job.nodeid] = job.best_model
-                
-        if "acleaner" in jobtypes:
-            self.job2alg = job2acleaner
+
+        # if all alignments are nt, then set it as seqtype for concat alg
+        if len(observed_seqtypes) > 1:
+            raise TaskError('Mixed data types not supported in super-matrix workflow')
+        elif "nt" in observed_seqtypes:
+            self.seqtype = "nt"
+            self.default_model = self.conf[self.confname]["_default_nt_model"]
         else:
-            self.job2alg = job2alg
+            self.seqtype = "aa"            
+            self.default_model = self.conf[self.confname]["_default_aa_model"]
 
         if self.cog_ids - set(self.job2alg):
             log.error("Missing %s algs", len(self.cog_ids -
@@ -135,7 +151,7 @@ def get_concatenated_alg(alg_filenames, models=None,
     sp2alg = defaultdict(list)
     
     for algfile, matrix in zip(alg_filenames, models):
-        alg = SeqGroup(algfile, "fasta")
+        alg = SeqGroup(algfile, "iphylip_relaxed")
         alg_objects.append(alg)
         lenseq = None
         browsed_species = set()

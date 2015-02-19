@@ -137,10 +137,11 @@ GENCODE = {
     'GGA':'G', 'GGC':'G', 'GGG':'G', 'GGT':'G',
     'TCA':'S', 'TCC':'S', 'TCG':'S', 'TCT':'S',
     'TTC':'F', 'TTT':'F', 'TTA':'L', 'TTG':'L',
-    'TAC':'Y', 'TAT':'Y', 'TAA':'*', 'TAG':'*',
-    'TGC':'C', 'TGT':'C', 'TGA':'*', 'TGG':'W', 
+    'TAC':'Y', 'TAT':'Y', 'TAA':'X', 'TAG':'X',
+    'TGC':'C', 'TGT':'C', 'TGA':'X', 'TGG':'W', 
     '---': '-',
     }
+# TAA, TAG and TGA are stop codons, but the standard "*" symbol is replaced by "X" during parsing
 
 # Aux functions (general)
 md5 = lambda x: hashlib.md5(x).hexdigest()

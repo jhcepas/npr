@@ -143,10 +143,9 @@ def process_task(task, wkname, npr_conf, nodeid2info):
         nodeid2info[nodeid]["size"] = task.size
         nodeid2info[nodeid]["target_seqs"] = targets
         nodeid2info[nodeid]["out_seqs"] = outgroups
-            
         tree_task = treebuilderclass(nodeid, alg_id,
                                      constrain_id, None,
-                                     seqtype, conf, treebuilderconf,
+                                     task.seqtype, conf, treebuilderconf,
                                      parts_id=parts_id)
         tree_task.size = task.size
         new_tasks.append(tree_task)
